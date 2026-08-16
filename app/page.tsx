@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   CuriosityHomeView,
   type CuriosityGenerationStatus,
+  type CuriosityHomeRecentItem,
   type CuriosityHomeValues,
 } from '@/components/curiosity/home-view';
 import {
@@ -22,7 +23,6 @@ import {
 } from '@/lib/curiosity/agent-contracts';
 import { curiosityPipelineArtifactSchema } from '@/lib/curiosity/agent-pipeline';
 import type { CuriosityPipelineStage } from '@/lib/curiosity/agent-pipeline';
-import type { CuriosityExperienceRecord } from '@/lib/curiosity/repository';
 import {
   CURIOSITY_GENERATION_POLL_INTERVAL_MS,
   CURIOSITY_GENERATION_TIMEOUT_MS,
@@ -40,13 +40,33 @@ export default function HomePage() {
   const abortRef = useRef<AbortController | null>(null);
   const [values, setValues] = useState(initialValues);
   const [status, setStatus] = useState<CuriosityGenerationStatus | null>(null);
-  const [recent, setRecent] = useState<CuriosityExperienceRecord[]>([]);
+  const [recent, setRecent] = useState<CuriosityHomeRecentItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getCuriosityRepository()
+    const repository = getCuriosityRepository();
+    repository
       .listExperiences()
-      .then(setRecent)
+      .then((experiences) =>
+        Promise.all(
+          experiences.map(async (experience) => {
+            const aggregate = await repository.getExperience(experience.id);
+            const activeVersion =
+              aggregate?.versions.find(
+                (version) => version.id === aggregate.experience.activeVersionId,
+              ) ?? null;
+            if (!activeVersion) return null;
+            return {
+              id: experience.id,
+              question: experience.question,
+              summary: activeVersion.spec.presentation.completion,
+              age: experience.age,
+              updatedAt: experience.updatedAt,
+            };
+          }),
+        ),
+      )
+      .then((items) => setRecent(items.filter((item) => item !== null)))
       .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
     return () => abortRef.current?.abort();
   }, []);

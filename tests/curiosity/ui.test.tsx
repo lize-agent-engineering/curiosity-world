@@ -114,6 +114,44 @@ describe('Curiosity parent creation view', () => {
     expect(html).not.toContain('把它编译成');
   });
 
+  it('centers the creation form and stacks summarized history underneath it', () => {
+    const html = renderToStaticMarkup(
+      createElement(CuriosityHomeView, {
+        values: {
+          question: '为什么月亮看起来会跟着我们？',
+          age: 8,
+          interests: '散步、星空',
+        },
+        status: null,
+        recent: [
+          {
+            id: 'cur_shadow',
+            question: '影子为什么会变长？',
+            summary: '你发现了：光源位置变低、光线更倾斜时，影子会变长。',
+            age: 9,
+            updatedAt: '2026-08-16T12:00:00.000Z',
+          },
+        ],
+        error: null,
+        onChange: vi.fn(),
+        onSubmit: vi.fn(),
+        onOpenExperience: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('data-home-creation="centered"');
+    expect(html).toContain('data-home-history="stacked"');
+    expect(html).toContain('你发现了：光源位置变低、光线更倾斜时，影子会变长。');
+    expect(html).toContain('原问题：影子为什么会变长？');
+  });
+
+  it('derives each history title from the generated discovery summary', () => {
+    const source = readFileSync(resolve(process.cwd(), 'app/page.tsx'), 'utf8');
+
+    expect(source).toContain('spec.presentation.completion');
+    expect(source).not.toContain('`这次探索正在继续：${experience.question}`');
+  });
+
   it('keeps a failed generation actionable without exposing pipeline diagnostics', () => {
     const html = renderToStaticMarkup(
       createElement(CuriosityHomeView, {

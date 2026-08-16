@@ -24,10 +24,18 @@ export interface CuriosityGenerationStatus {
   artifacts?: CuriosityPipelineArtifact[];
 }
 
+export interface CuriosityHomeRecentItem {
+  id: string;
+  question: string;
+  summary: string;
+  age: number;
+  updatedAt: string;
+}
+
 interface CuriosityHomeViewProps {
   values: CuriosityHomeValues;
   status: CuriosityGenerationStatus | null;
-  recent: Array<{ id: string; question: string; age: number; updatedAt: string }>;
+  recent: CuriosityHomeRecentItem[];
   error: string | null;
   onChange: <K extends keyof CuriosityHomeValues>(field: K, value: CuriosityHomeValues[K]) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -46,7 +54,7 @@ export function CuriosityHomeView({
   onOpenExperience,
 }: CuriosityHomeViewProps) {
   return (
-    <main className="min-h-dvh overflow-hidden bg-[#08152d] text-[#f8f4e8]">
+    <main className="min-h-dvh overflow-x-hidden bg-[#08152d] text-[#f8f4e8]">
       <div className="relative isolate mx-auto min-h-dvh max-w-[1440px] px-5 pb-12 pt-5 sm:px-9 sm:pt-7 lg:px-14">
         <div
           aria-hidden="true"
@@ -143,10 +151,11 @@ export function CuriosityHomeView({
           </figure>
         </section>
 
-        <section className="grid items-start gap-5 lg:grid-cols-[1.2fr_.8fr]">
+        <section className="mx-auto max-w-5xl space-y-8">
           <form
+            data-home-creation="centered"
             onSubmit={onSubmit}
-            className="relative overflow-hidden rounded-[1.8rem] border border-[#d8cda4]/40 bg-[#faf5e7] p-5 text-[#17283d] shadow-[0_24px_55px_rgba(0,0,0,.18)] sm:p-8"
+            className="relative mx-auto w-full overflow-hidden rounded-[1.8rem] border border-[#d8cda4]/40 bg-[#faf5e7] p-5 text-[#17283d] shadow-[0_24px_55px_rgba(0,0,0,.18)] sm:p-8 lg:p-10"
           >
             <div
               aria-hidden="true"
@@ -230,8 +239,11 @@ export function CuriosityHomeView({
             </Button>
           </form>
 
-          <aside className="rounded-[1.8rem] border border-white/12 bg-[#102543]/70 p-5 backdrop-blur-sm sm:p-7">
-            <p className="text-xs font-bold tracking-[.16em] text-[#a9d5df]">未完的观察</p>
+          <aside
+            data-home-history="stacked"
+            className="rounded-[1.8rem] border border-white/12 bg-[#102543]/70 p-5 backdrop-blur-sm sm:p-7 lg:p-8"
+          >
+            <p className="text-xs font-bold tracking-[.16em] text-[#a9d5df]">探索记录</p>
             <h2 className="mt-2 text-2xl font-black text-[#fff7dc]">继续上次发现</h2>
             {recent.length === 0 ? (
               <p className="mt-4 max-w-sm text-sm leading-7 text-[#bed4dc]">
@@ -244,12 +256,23 @@ export function CuriosityHomeView({
                     type="button"
                     key={item.id}
                     onClick={() => onOpenExperience(item.id)}
-                    className="w-full rounded-2xl border border-white/10 bg-white/[.06] p-4 text-left transition hover:border-[#ffe08a]/45 hover:bg-white/[.1] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffe08a]"
+                    className="group flex min-h-28 w-full items-center justify-between gap-5 rounded-2xl border border-white/10 bg-white/[.06] p-5 text-left transition hover:border-[#ffe08a]/45 hover:bg-white/[.1] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffe08a] sm:p-6"
                   >
-                    <span className="block font-bold text-[#fff8e7]">{item.question}</span>
-                    <span className="mt-2 block text-xs text-[#a9c9d5]">
-                      {item.age} 岁 · {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
+                    <span className="min-w-0">
+                      <span className="block text-lg font-black leading-7 text-[#fff8e7] sm:text-xl">
+                        {item.summary}
+                      </span>
+                      <span className="mt-2 block text-sm text-[#bdd2da]">
+                        原问题：{item.question}
+                      </span>
+                      <span className="mt-2 block text-xs text-[#89afbf]">
+                        {item.age} 岁 · {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
+                      </span>
                     </span>
+                    <ArrowRight
+                      className="size-5 shrink-0 text-[#ffe08a] transition-transform group-hover:translate-x-1"
+                      aria-hidden="true"
+                    />
                   </button>
                 ))}
               </div>
