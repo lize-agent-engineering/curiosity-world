@@ -190,8 +190,10 @@ export function FamilyExperimentScene({
             <motion.ellipse
               cx="510"
               cy="342"
+              rx="120"
               ry="18"
               fill="#071321"
+              initial={{ rx: 120 }}
               animate={{ rx: experimentCount % 2 ? 68 : 120 }}
               transition={{ duration: 0.65, ease: 'easeInOut' }}
             />

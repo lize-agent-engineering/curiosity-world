@@ -307,6 +307,7 @@ describe('Curiosity child runtime frame', () => {
     );
 
     expect(html).toContain('aria-label="光源位置与影子长度实验"');
+    expect(html).toContain('rx="120"');
     expect(html).toContain('移动手电筒观察影子');
     expect(html).not.toContain('RUNTIME_FAILED');
   });
@@ -327,6 +328,15 @@ describe('Curiosity child runtime frame', () => {
     );
 
     expect(source).not.toContain('<motion.path');
+  });
+
+  it('initializes animated SVG geometry before Motion hydration', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/curiosity/scenes/family-experiment-scene.tsx'),
+      'utf8',
+    );
+
+    expect(source).toContain('initial={{ rx: 120 }}');
   });
 
   it.each([
