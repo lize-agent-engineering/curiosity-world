@@ -295,6 +295,40 @@ describe('Curiosity five-ability generation pipeline', () => {
     });
   });
 
+  it('retries one invalid interaction design before activating a candidate', async () => {
+    let attempts = 0;
+    const result = await runCuriosityAgentPipeline(
+      { question: '为什么月亮看起来会跟着我们？', age: 8, interests: ['散步'] },
+      models({
+        'curiosity.interaction-designer': {
+          route: { providerId: 'test', modelId: 'strict-json' },
+          async complete() {
+            attempts += 1;
+            return JSON.stringify(
+              attempts === 1
+                ? {
+                    ...interactionOutput(),
+                    variables: [
+                      { id: 'observer-position', label: '行走距离', min: -10, max: 10, initial: 0 },
+                      { id: 'object-distance', label: '参照物远近', min: 1, max: 3, initial: 2 },
+                    ],
+                  }
+                : interactionOutput(),
+            );
+          },
+        },
+      }),
+      identities,
+    );
+
+    expect(attempts).toBe(2);
+    expect(
+      result.agentRuns.find((run) => run.agentRole === 'curiosity.interaction-designer'),
+    ).toMatchObject({
+      status: 'succeeded',
+    });
+  });
+
   it('rejects adult idioms and belittling language from child narration', async () => {
     const unsafeStory = storyOutput();
     unsafeStory.stages[0]!.openingNarration = '月亮好像在溜须拍马地跟着你，这么简单你肯定懂吧？';

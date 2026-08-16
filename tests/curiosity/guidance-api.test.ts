@@ -157,6 +157,33 @@ describe('Curiosity runtime guide', () => {
     });
   });
 
+  it('retries one invalid guide response before returning a validated turn', async () => {
+    let attempts = 0;
+    const retryingModel: CuriosityPipelineModel = {
+      route: { providerId: 'test', modelId: 'guide-json' },
+      async complete() {
+        attempts += 1;
+        return JSON.stringify(
+          attempts === 1
+            ? { answer: '继续' }
+            : {
+                narration: '记住这个猜想，我们移动看看。',
+                feedbackKind: 'observation',
+                hintLevel: 0,
+                advanceTo: 'explore',
+              },
+        );
+      },
+    };
+
+    await expect(
+      runCuriosityGuidanceTurn({ request, story, knowledge }, retryingModel),
+    ).resolves.toMatchObject({
+      advanceTo: 'explore',
+    });
+    expect(attempts).toBe(2);
+  });
+
   it('deterministically advances an allowed runtime event to the next stage', async () => {
     const eventRequest: GuidanceTurnRequestV1 = {
       ...request,

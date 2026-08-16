@@ -145,7 +145,7 @@ export function CuriosityHomeView({
                 role="alert"
                 className="mt-5 rounded-2xl bg-[#fff0ec] p-4 text-sm font-bold text-[#a33824]"
               >
-                {error}
+                这次探索还没有生成完成，请重新生成。
               </p>
             )}
             <Button
@@ -153,7 +153,7 @@ export function CuriosityHomeView({
               disabled={Boolean(status)}
               className="mt-6 h-14 w-full rounded-2xl bg-[#ff8066] text-base font-black text-[#07152f] hover:bg-[#ff947d]"
             >
-              生成这次探索 <ArrowRight className="size-5" />
+              {error ? '重新生成这次探索' : '生成这次探索'} <ArrowRight className="size-5" />
             </Button>
           </form>
 

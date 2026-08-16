@@ -2,6 +2,14 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 describe('Curiosity production Docker image', () => {
+  it('declares every production runtime module used by the provider factory', () => {
+    const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as {
+      dependencies: Record<string, string>;
+    };
+
+    expect(manifest.dependencies.undici).toBeDefined();
+  });
+
   it('gives the Next.js builder enough heap for the production type check', () => {
     const dockerfile = readFileSync('Dockerfile', 'utf8');
     const builder = dockerfile.slice(

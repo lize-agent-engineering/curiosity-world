@@ -23,6 +23,8 @@ const guideModelOutputSchema = z.strictObject({
     .regex(/^[a-zA-Z0-9_-]+$/),
 });
 
+const MAX_GUIDE_OUTPUT_ATTEMPTS = 3;
+
 export const curiosityGuidanceInputSchema = z.strictObject({
   request: guidanceTurnRequestV1Schema,
   story: storyDesignArtifactV1Schema,
@@ -72,22 +74,39 @@ export async function runCuriosityGuidanceTurn(
     request.childInput.kind === 'event' && nextStageId ? [nextStageId] : [stage.id, nextStageId]
   ).filter((stageId): stageId is string => Boolean(stageId));
 
-  let output: z.infer<typeof guideModelOutputSchema>;
+  let output: z.infer<typeof guideModelOutputSchema> | undefined;
   try {
     const outputSchema = JSON.stringify(z.toJSONSchema(guideModelOutputSchema));
-    const raw = await model.complete({
-      system: `你是儿童探索引导者。\n${renderCuriosityRoleSkill('curiosity.exploration-guide')}\n只返回严格 JSON；只能使用给定知识、提示和相邻阶段，不得直接泄露答案或扩展科学机制。输出必须严格符合以下 JSON Schema：${outputSchema}`,
-      prompt: JSON.stringify({
-        stage,
-        childInput: request.childInput,
-        recentEventIds: request.recentEventIds,
-        allowedAdvanceTo,
-        allowedVocabulary: knowledge.allowedVocabulary,
-        forbiddenExplanations: knowledge.forbiddenExplanations,
-      }),
-      schema: guideModelOutputSchema,
+    const prompt = JSON.stringify({
+      stage,
+      childInput: request.childInput,
+      recentEventIds: request.recentEventIds,
+      allowedAdvanceTo,
+      allowedVocabulary: knowledge.allowedVocabulary,
+      forbiddenExplanations: knowledge.forbiddenExplanations,
     });
-    output = guideModelOutputSchema.parse(JSON.parse(raw));
+    for (let attempt = 1; attempt <= MAX_GUIDE_OUTPUT_ATTEMPTS; attempt += 1) {
+      try {
+        const raw = await model.complete({
+          system: `你是儿童探索引导者。\n${renderCuriosityRoleSkill('curiosity.exploration-guide')}\n只返回严格 JSON；只能使用给定知识、提示和相邻阶段，不得直接泄露答案或扩展科学机制。输出必须严格符合以下 JSON Schema：${outputSchema}`,
+          prompt:
+            attempt === 1
+              ? prompt
+              : `${prompt}\n上一轮输出未通过 Schema 校验。请逐项自检后重新生成完整 JSON。`,
+          schema: guideModelOutputSchema,
+        });
+        output = guideModelOutputSchema.parse(JSON.parse(raw));
+        break;
+      } catch (error) {
+        if (
+          !(error instanceof z.ZodError || error instanceof SyntaxError) ||
+          attempt === MAX_GUIDE_OUTPUT_ATTEMPTS
+        ) {
+          throw error;
+        }
+      }
+    }
+    if (!output) throw new Error('GUIDANCE_MODEL_OUTPUT_MISSING');
   } catch (error) {
     throw new CuriosityGuidanceError(
       'GUIDANCE_MODEL_INVALID',

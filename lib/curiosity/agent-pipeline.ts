@@ -327,8 +327,19 @@ const qualityOutputSchema = z.strictObject({
   verdict: z.enum(['pass', 'reject']),
 });
 
+const MAX_MODEL_OUTPUT_ATTEMPTS = 3;
+
 function parseModelOutput<T>(raw: string, schema: z.ZodType<T>): T {
   return schema.parse(JSON.parse(raw));
+}
+
+function isRetryableModelOutputError(error: unknown, depth = 0): boolean {
+  if (error instanceof z.ZodError || error instanceof SyntaxError) return true;
+  if (!(error instanceof Error) || depth >= 4) return false;
+  if (error.name === 'AI_NoObjectGeneratedError' || error.name === 'AI_TypeValidationError') {
+    return true;
+  }
+  return isRetryableModelOutputError(error.cause, depth + 1);
 }
 
 function modelValidationSummary(error: unknown, depth = 0): string {
@@ -590,12 +601,29 @@ export async function runCuriosityAgentPipeline(
     const startedAt = new Date().toISOString();
     try {
       const outputSchema = JSON.stringify(z.toJSONSchema(parameters.schema));
-      const raw = await selectedModel.complete({
-        system: `你是 ${parameters.role}。\n${renderCuriosityRoleSkill(parameters.role)}\n只返回严格 JSON，不得输出隐藏思维链。输出必须严格符合以下 JSON Schema：${outputSchema}`,
-        prompt: parameters.prompt,
-        schema: parameters.schema,
-      });
-      const artifact = parameters.build(parseModelOutput(raw, parameters.schema));
+      let output: T | undefined;
+      let lastError: unknown;
+      for (let attempt = 1; attempt <= MAX_MODEL_OUTPUT_ATTEMPTS; attempt += 1) {
+        try {
+          const raw = await selectedModel.complete({
+            system: `你是 ${parameters.role}。\n${renderCuriosityRoleSkill(parameters.role)}\n只返回严格 JSON，不得输出隐藏思维链。输出必须严格符合以下 JSON Schema：${outputSchema}`,
+            prompt:
+              attempt === 1
+                ? parameters.prompt
+                : `${parameters.prompt}\n上一轮输出未通过 Schema 校验。请逐项自检后重新生成完整 JSON；不要省略字段、扩大允许范围或改写单位。`,
+            schema: parameters.schema,
+          });
+          output = parseModelOutput(raw, parameters.schema);
+          break;
+        } catch (error) {
+          lastError = error;
+          if (!isRetryableModelOutputError(error) || attempt === MAX_MODEL_OUTPUT_ATTEMPTS) {
+            throw error;
+          }
+        }
+      }
+      if (output === undefined) throw lastError;
+      const artifact = parameters.build(output);
       artifacts.push(artifact);
       agentRuns.push(
         succeededRun({

@@ -37,6 +37,29 @@ describe('Curiosity parent creation view', () => {
     expect(html).toContain('影子为什么会变长？');
     expect(html).not.toMatch(/课程大纲|教师|同学|幻灯片|白板|课堂 TTS|视频导出|PBL/);
   });
+
+  it('keeps a failed generation actionable without exposing pipeline diagnostics', () => {
+    const html = renderToStaticMarkup(
+      createElement(CuriosityHomeView, {
+        values: {
+          question: '为什么月亮看起来会跟着我们？',
+          age: 8,
+          interests: '散步、星空',
+        },
+        status: null,
+        recent: [],
+        error: 'INTERACTION_DESIGN_INVALID: variables.0:custom',
+        onChange: vi.fn(),
+        onSubmit: vi.fn(),
+        onOpenExperience: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('这次探索还没有生成完成，请重新生成。');
+    expect(html).toContain('重新生成这次探索');
+    expect(html).not.toContain('INTERACTION_DESIGN_INVALID');
+    expect(html).not.toContain('variables.0:custom');
+  });
 });
 
 describe('Curiosity structured collaboration', () => {
