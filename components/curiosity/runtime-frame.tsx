@@ -5,6 +5,7 @@ import type { StoryDesignArtifactV1 } from '@/lib/curiosity/agent-contracts';
 import type { CuriosityEventV1, CuriosityExperienceSpecV1 } from '@/lib/curiosity/contracts';
 import { ChildTaskShell } from './child-task-shell';
 import { RelativeMotionScene } from './scenes/relative-motion-scene';
+import { FamilyExperimentScene } from './scenes/family-experiment-scene';
 
 interface CuriosityRuntimeFrameProps {
   spec: CuriosityExperienceSpecV1;
@@ -24,7 +25,7 @@ export function CuriosityRuntimeFrame({
   activeStageKind,
 }: CuriosityRuntimeFrameProps) {
   useEffect(() => {
-    if (spec.knowledge.family !== 'relative-motion') {
+    if (!['relative-motion', 'balance-support', 'light-path'].includes(spec.knowledge.family)) {
       onRuntimeFailure(`RUNTIME_FAILED: 尚未实现 ${spec.knowledge.family} 的 React 场景。`);
       return;
     }
@@ -35,7 +36,14 @@ export function CuriosityRuntimeFrame({
     <ChildTaskShell title={spec.presentation.title}>
       {spec.knowledge.family === 'relative-motion' ? (
         <RelativeMotionScene spec={spec} activeStageKind={activeStageKind} onEvent={onEvent} />
-      ) : null}
+      ) : (
+        <FamilyExperimentScene
+          family={spec.knowledge.family}
+          spec={spec}
+          activeStageKind={activeStageKind}
+          onEvent={onEvent}
+        />
+      )}
     </ChildTaskShell>
   );
 }

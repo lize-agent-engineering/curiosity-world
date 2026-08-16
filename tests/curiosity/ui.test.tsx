@@ -109,6 +109,33 @@ describe('Curiosity structured collaboration', () => {
     expect(html).not.toContain('agent-chat-bubble');
   });
 
+  it('shows the active specialist, live work state, and wait expectation', () => {
+    const html = renderToStaticMarkup(
+      createElement(CollaborationProgress, {
+        status: {
+          step: 'knowledge_design',
+          progress: 25,
+          message: '已确认核心问题与安全范围',
+          completedStages: ['question_modeling'],
+          artifacts: [],
+        },
+      }),
+    );
+
+    expect(html).toContain('知识研究员');
+    expect(html).toContain('正在梳理科学原理、因果关系和常见误解');
+    expect(html).toContain('仍在认真工作');
+    expect(html).toContain('通常需要 2–4 分钟');
+    expect(html).toContain('已完成 1 / 6');
+    expect(html).toContain('问题侦探');
+    expect(html).toContain('互动设计师');
+    expect(html).toContain('故事引导员');
+    expect(html).toContain('运行工程师');
+    expect(html).toContain('体验质检员');
+    expect(html).toContain('把抽象知识变成孩子可以操作的探索');
+    expect(html).toContain('前一位交付结果，下一位接着完成');
+  });
+
   it('renders verified stage conclusions instead of agent chat bubbles', () => {
     const html = renderToStaticMarkup(
       createElement(CollaborationProgress, {
@@ -199,6 +226,44 @@ describe('Curiosity child runtime frame', () => {
     expect(html).not.toContain('观察者位置');
   });
 
+  it('renders a runnable bridge balance scene for the balance-support family', () => {
+    const spec = createValidCuriositySpec();
+    spec.knowledge = { family: 'balance-support', packId: 'balance-support.bridge.v1' };
+    spec.simulation.preset = 'balance-support-v1';
+    const html = renderToStaticMarkup(
+      createElement(CuriosityRuntimeFrame, {
+        spec,
+        activeStageKind: 'exploration',
+        onReady: vi.fn(),
+        onEvent: vi.fn(),
+        onRuntimeFailure: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('aria-label="桥梁支撑与重心实验"');
+    expect(html).toContain('移动桥墩做承重测试');
+    expect(html).not.toContain('RUNTIME_FAILED');
+  });
+
+  it('renders a runnable light and shadow scene for the light-path family', () => {
+    const spec = createValidCuriositySpec();
+    spec.knowledge = { family: 'light-path', packId: 'light-path.shadow-length.v1' };
+    spec.simulation.preset = 'light-path-v1';
+    const html = renderToStaticMarkup(
+      createElement(CuriosityRuntimeFrame, {
+        spec,
+        activeStageKind: 'exploration',
+        onReady: vi.fn(),
+        onEvent: vi.fn(),
+        onRuntimeFailure: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('aria-label="光源位置与影子长度实验"');
+    expect(html).toContain('移动手电筒观察影子');
+    expect(html).not.toContain('RUNTIME_FAILED');
+  });
+
   it('uses labeled vector discovery states rather than decorative emoji', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'components/curiosity/scenes/relative-motion-scene.tsx'),
@@ -206,6 +271,15 @@ describe('Curiosity child runtime frame', () => {
     );
 
     expect(source).not.toMatch(/[✨🌙]/);
+  });
+
+  it('does not animate SVG path data through Motion interpolation', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/curiosity/scenes/family-experiment-scene.tsx'),
+      'utf8',
+    );
+
+    expect(source).not.toContain('<motion.path');
   });
 
   it.each([

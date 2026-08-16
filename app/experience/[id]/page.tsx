@@ -45,6 +45,10 @@ import {
   CURIOSITY_GENERATION_TIMEOUT_MS,
   curiosityGenerationPollLimit,
 } from '@/lib/curiosity/live-timing';
+import {
+  describeExperienceFailure,
+  selectRegenerationBase,
+} from '@/lib/curiosity/experience-recovery';
 
 type Mode = 'child' | 'parent';
 
@@ -376,11 +380,9 @@ export default function CuriosityExperiencePage() {
       setError('EXPERIENCE_NOT_FOUND: 这台设备上没有该体验。');
       return;
     }
-    const active = aggregate.versions.find(
-      (version) => version.id === aggregate.experience.activeVersionId,
-    );
+    const active = selectRegenerationBase(aggregate, selectedId);
     if (!active) {
-      setError('VERSION_NOT_ACTIVE: 需要先完成当前候选版本的运行检查。');
+      setError('EXPERIENCE_NOT_FOUND: 没有可用于重新生成的版本。');
       return;
     }
     setRegenerating(true);
@@ -453,7 +455,7 @@ export default function CuriosityExperiencePage() {
   if (!aggregate || !selected || !summary || !archive)
     return (
       <main className="grid min-h-screen place-items-center bg-[#07152f] p-6 text-white">
-        <p>{error ?? '正在恢复探索…'}</p>
+        <p>{describeExperienceFailure(error) ?? '正在恢复探索…'}</p>
       </main>
     );
 
@@ -509,7 +511,7 @@ export default function CuriosityExperiencePage() {
             role="alert"
             className="mb-4 rounded-2xl border border-[#ff8066]/40 bg-[#ff8066]/10 p-4 text-sm font-bold text-[#ffb8a9]"
           >
-            {error}
+            {describeExperienceFailure(error)}
           </p>
         )}
         {mode === 'child' ? (
@@ -557,7 +559,7 @@ export default function CuriosityExperiencePage() {
             revisionInstruction={instruction}
             revising={revising}
             regenerating={regenerating}
-            error={error}
+            error={describeExperienceFailure(error)}
             onRevisionInstructionChange={setInstruction}
             onSubmitRevision={handleRevision}
             onRegenerate={() => void handleRegenerate()}
