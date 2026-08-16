@@ -35,7 +35,11 @@ import {
   deriveGuidanceRequest,
   type GuidanceState,
 } from '@/lib/curiosity/guidance';
-import { speakManagedGuidance, transcribeChildRecording } from '@/lib/curiosity/voice-client';
+import {
+  describeVoiceFailure,
+  speakManagedGuidance,
+  transcribeChildRecording,
+} from '@/lib/curiosity/voice-client';
 import {
   CURIOSITY_GENERATION_POLL_INTERVAL_MS,
   CURIOSITY_GENERATION_TIMEOUT_MS,
@@ -301,7 +305,7 @@ export default function CuriosityExperiencePage() {
       recorder.start();
       setListening(true);
     } catch (cause) {
-      setVoiceError(cause instanceof Error ? cause.message : String(cause));
+      setVoiceError(describeVoiceFailure(cause));
       setListening(false);
     }
   }, [experienceId, guidanceState, requestGuidance, selected]);

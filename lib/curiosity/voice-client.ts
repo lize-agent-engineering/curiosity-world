@@ -42,6 +42,17 @@ interface ManagedGuidanceDependencies {
   createAudio?: (src: string) => ManagedAudioLike;
 }
 
+export function describeVoiceFailure(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  if (
+    (cause instanceof DOMException && cause.name === 'NotAllowedError') ||
+    /permission denied|permission dismissed|notallowederror/i.test(message)
+  ) {
+    return '没有获得麦克风权限。请在浏览器设置中允许使用麦克风，然后重新说一次。';
+  }
+  return message;
+}
+
 export async function transcribeChildRecording(
   audio: Blob,
   dependencies: { fetch?: typeof fetch } = {},

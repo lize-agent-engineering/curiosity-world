@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  describeVoiceFailure,
   recognizeChildAnswer,
   speakGuidance,
   speakManagedGuidance,
@@ -8,6 +9,15 @@ import {
 } from '@/lib/curiosity/voice-client';
 
 describe('Curiosity browser voice client', () => {
+  it('turns microphone permission denial into an actionable Chinese message', () => {
+    expect(describeVoiceFailure(new DOMException('Permission denied', 'NotAllowedError'))).toBe(
+      '没有获得麦克风权限。请在浏览器设置中允许使用麦克风，然后重新说一次。',
+    );
+    expect(describeVoiceFailure(new Error('Permission denied'))).toBe(
+      '没有获得麦克风权限。请在浏览器设置中允许使用麦克风，然后重新说一次。',
+    );
+  });
+
   it('speaks Chinese guidance and cancels the previous utterance', async () => {
     const cancel = vi.fn();
     const speak = vi.fn((utterance: { onend?: (() => void) | null }) => utterance.onend?.());

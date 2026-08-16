@@ -141,6 +141,18 @@ describe('iframe protocol boundary', () => {
 });
 
 describe('traceable parent summary', () => {
+  it('records a submitted prediction as a parent-visible behavior fact', () => {
+    const summary = summarizeCuriosityEvents(createValidCuriositySpec(), [
+      event('evt_1', 'prediction_submitted', 'prediction', 'option_selected', {
+        optionId: 'near-lamp',
+      }),
+    ]);
+
+    expect(summary.facts).toEqual([
+      expect.objectContaining({ kind: 'prediction', eventIds: ['evt_1'] }),
+    ]);
+  });
+
   it('deduplicates events and attaches evidence ids to every behavior fact', () => {
     const events = [
       event('evt_1', 'experiment_started', 'prediction', 'started'),

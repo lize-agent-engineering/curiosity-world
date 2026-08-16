@@ -34,7 +34,7 @@ export function interpretCuriosityFrameMessage(
 }
 
 export interface CuriositySummaryFact {
-  kind: 'exploration' | 'challenge' | 'explanation' | 'completion';
+  kind: 'prediction' | 'exploration' | 'challenge' | 'explanation' | 'completion';
   text: string;
   eventIds: string[];
 }
@@ -65,6 +65,19 @@ export function summarizeCuriosityEvents(
   }
   const events = [...byId.values()].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
   const facts: CuriositySummaryFact[] = [];
+
+  const prediction = events.findLast((event) => event.type === 'prediction_submitted');
+  if (prediction) {
+    const optionId =
+      typeof prediction.payload.optionId === 'string' ? prediction.payload.optionId : '';
+    const predictionTask = spec.tasks.find((task) => task.kind === 'prediction');
+    const label = predictionTask?.options.find((option) => option.id === optionId)?.label;
+    facts.push({
+      kind: 'prediction',
+      text: label ? `孩子最初猜的是：“${label}”。` : '孩子提交了一次预测。',
+      eventIds: [prediction.eventId],
+    });
+  }
 
   const movement = events.filter((event) => event.type === 'variable_changed');
   if (movement.length > 0) {
