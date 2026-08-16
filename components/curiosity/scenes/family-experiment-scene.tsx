@@ -83,23 +83,25 @@ export function FamilyExperimentScene({
     optionId: string,
     expectedOptionId: string,
   ) => {
+    const selectedOption = options?.find((option) => option.id === optionId);
+    const eventPayload = { optionId, optionLabel: selectedOption?.label ?? optionId };
     setPending(true);
     try {
       if (kind === 'prediction') {
         await emit('experiment_started', 'prediction', 'started');
         await emit('prediction_submitted', prediction?.id ?? 'prediction', 'option_selected', {
-          optionId,
+          ...eventPayload,
         });
       } else if (kind === 'transfer') {
         await emit('challenge_attempted', challenge?.id ?? 'challenge', 'option_selected', {
-          optionId,
+          ...eventPayload,
         });
         if (optionId === expectedOptionId) {
           await emit('challenge_completed', challenge?.id ?? 'challenge', 'completed', { optionId });
         }
       } else {
         await emit('explanation_selected', explanation?.id ?? 'explanation', 'option_selected', {
-          optionId,
+          ...eventPayload,
         });
         if (optionId === expectedOptionId) {
           await emit('experience_completed', 'completion', 'finished', { optionId });

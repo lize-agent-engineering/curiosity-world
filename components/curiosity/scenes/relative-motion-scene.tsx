@@ -102,23 +102,25 @@ export function RelativeMotionScene({ spec, activeStageKind, onEvent }: Relative
   const selectOption = async (
     kind: 'prediction' | 'transfer' | 'explanation',
     optionId: string,
+    optionLabel: string,
     expectedOptionId: string,
   ) => {
+    const eventPayload = { optionId, optionLabel };
     setPendingStage(stage);
     try {
       if (kind === 'prediction') {
         await emit('experiment_started', 'prediction', 'started');
-        await emit('prediction_submitted', 'prediction', 'option_selected', { optionId });
+        await emit('prediction_submitted', 'prediction', 'option_selected', eventPayload);
         return;
       }
       if (kind === 'transfer') {
-        await emit('challenge_attempted', 'challenge', 'option_selected', { optionId });
+        await emit('challenge_attempted', 'challenge', 'option_selected', eventPayload);
         if (optionId === expectedOptionId) {
           await emit('challenge_completed', 'challenge', 'completed', { optionId });
         }
         return;
       }
-      await emit('explanation_selected', 'explanation', 'option_selected', { optionId });
+      await emit('explanation_selected', 'explanation', 'option_selected', eventPayload);
       if (optionId === expectedOptionId) {
         await emit('experience_completed', 'completion', 'finished', { optionId });
         setCompleted(true);
@@ -140,7 +142,7 @@ export function RelativeMotionScene({ spec, activeStageKind, onEvent }: Relative
           type="button"
           whileTap={{ scale: 0.97 }}
           disabled={waitingForGuide}
-          onClick={() => void selectOption(kind, option.id, expectedOptionId)}
+          onClick={() => void selectOption(kind, option.id, option.label, expectedOptionId)}
           className="min-h-16 rounded-2xl border-2 border-white/25 bg-[#f8fbff] px-5 text-base font-black text-[#17324d] shadow-[0_6px_0_#7893a8] disabled:opacity-60"
         >
           {option.label}

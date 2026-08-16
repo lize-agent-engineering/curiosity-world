@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { curiosityEventTypeSchema } from './contracts';
+
 export const CURIOSITY_AGENT_ROLES = [
   'curiosity.question-modeler',
   'curiosity.team-assembler',
@@ -265,7 +267,13 @@ export const guidanceTurnRequestV1Schema = z.strictObject({
   recentEventIds: z.array(identifierSchema.regex(/^evt_/)).max(12),
   childInput: z.discriminatedUnion('kind', [
     z.strictObject({ kind: z.literal('start') }),
-    z.strictObject({ kind: z.literal('event'), eventId: identifierSchema.regex(/^evt_/) }),
+    z.strictObject({
+      kind: z.literal('event'),
+      eventId: identifierSchema.regex(/^evt_/),
+      eventType: curiosityEventTypeSchema,
+      action: identifierSchema,
+      payload: z.record(z.string(), z.unknown()),
+    }),
     z.strictObject({
       kind: z.literal('voice'),
       transcript: z.string().trim().min(1).max(240),

@@ -188,24 +188,41 @@ describe('Curiosity runtime guide', () => {
     const eventRequest: GuidanceTurnRequestV1 = {
       ...request,
       recentEventIds: ['evt_prediction_2'],
-      childInput: { kind: 'event', eventId: 'evt_prediction_2' },
+      childInput: {
+        kind: 'event',
+        eventId: 'evt_prediction_2',
+        eventType: 'prediction_submitted',
+        action: 'option_selected',
+        payload: { optionId: 'near-object', optionLabel: '近处路灯' },
+      },
+    };
+
+    let modelPrompt = '';
+    const contextAwareModel: CuriosityPipelineModel = {
+      route: { providerId: 'test', modelId: 'guide-json' },
+      async complete(input) {
+        modelPrompt = input.prompt;
+        return JSON.stringify({
+          narration: '你选择了近处路灯，我们移动看看。',
+          feedbackKind: 'observation',
+          hintLevel: 0,
+          advanceTo: 'explore',
+        });
+      },
     };
 
     await expect(
       runCuriosityGuidanceTurn(
         { request: eventRequest, story, knowledge },
-        model({
-          narration: '再猜一次。',
-          feedbackKind: 'prompt',
-          hintLevel: 0,
-          advanceTo: 'predict',
-        }),
+        contextAwareModel,
       ),
     ).resolves.toMatchObject({
       stageId: 'predict',
-      narration: '再猜一次。',
+      narration: '你选择了近处路灯，我们移动看看。',
       advanceTo: 'explore',
     });
+    expect(modelPrompt).toContain('"eventType":"prediction_submitted"');
+    expect(modelPrompt).toContain('"optionLabel":"近处路灯"');
   });
 
   it('deterministically keeps an allowed runtime event on the terminal stage', async () => {
@@ -213,7 +230,13 @@ describe('Curiosity runtime guide', () => {
       ...request,
       stageId: 'transfer',
       recentEventIds: ['evt_transfer_1'],
-      childInput: { kind: 'event', eventId: 'evt_transfer_1' },
+      childInput: {
+        kind: 'event',
+        eventId: 'evt_transfer_1',
+        eventType: 'challenge_attempted',
+        action: 'option_selected',
+        payload: { optionId: 'far' },
+      },
     };
 
     await expect(

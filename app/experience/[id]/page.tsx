@@ -246,7 +246,16 @@ export default function CuriosityExperiencePage() {
       const mappedType = event.type === 'challenge_attempted' ? 'transfer_attempted' : event.type;
       if (!stage?.allowedEventTypes.includes(mappedType as never)) return;
       try {
-        await requestGuidance({ kind: 'event', eventId: event.eventId }, [event.eventId]);
+        await requestGuidance(
+          {
+            kind: 'event',
+            eventId: event.eventId,
+            eventType: event.type,
+            action: event.action,
+            payload: event.payload,
+          },
+          [event.eventId],
+        );
       } catch (cause) {
         setVoiceError(cause instanceof Error ? cause.message : String(cause));
       }
