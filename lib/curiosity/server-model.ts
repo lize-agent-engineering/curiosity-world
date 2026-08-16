@@ -201,12 +201,12 @@ function curiosityModelTimeoutMs(): number {
 }
 
 const CURIOSITY_ROLE_OUTPUT_TOKENS: Record<CuriosityAgentRole, number> = {
-  'curiosity.question-modeler': 1536,
-  'curiosity.knowledge-designer': 3072,
-  'curiosity.interaction-designer': 8192,
-  'curiosity.presentation-designer': 8192,
-  'curiosity.quality-reviewer': 4096,
-  'curiosity.revision-planner': 3072,
+  'curiosity.question-modeler': 1_536,
+  'curiosity.knowledge-designer': 3_072,
+  'curiosity.interaction-designer': 8_192,
+  'curiosity.presentation-designer': 8_192,
+  'curiosity.quality-reviewer': 4_096,
+  'curiosity.revision-planner': 3_072,
 };
 
 function createTestRoleModel(

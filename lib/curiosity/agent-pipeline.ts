@@ -405,7 +405,7 @@ export async function runCuriosityAgentPipeline(
         try {
           if (attempt > 1) schemaRepairs += 1;
           const raw = await selectedModel.complete({
-            system: `你是 ${parameters.role}。\n${renderCuriosityRoleSkill(parameters.role)}\n只返回严格 JSON，不得输出隐藏思维链。不得输出 HTML、CSS、JavaScript、函数或表达式。输出必须严格符合以下 JSON Schema：${JSON.stringify(z.toJSONSchema(parameters.schema))}`,
+            system: `你是 ${parameters.role}。\n${renderCuriosityRoleSkill(parameters.role)}\n只返回严格 JSON，不得输出隐藏思维链。不得输出 HTML、CSS、JavaScript、函数或表达式。响应 Schema 已由系统强制校验。`,
             prompt:
               attempt === 1
                 ? parameters.prompt

@@ -13,10 +13,10 @@ const SKILLS: Record<CuriosityAgentRole, CuriosityRoleSkill> = {
   'curiosity.question-modeler': {
     name: '儿童问题澄清',
     version: '1.0.0',
-    workflow: ['提取孩子真正困惑', '改写为可观察的问题', '路由唯一知识族'],
-    inputContract: '只读取结构化儿童提问、年龄和允许知识族。',
+    workflow: ['提取孩子真正困惑', '改写为可观察的问题', '确定 curated 或 open 路由'],
+    inputContract: '只读取结构化儿童提问、年龄和服务端路由结果。',
     outputContract: '只输出符合 Schema 的问题模型 JSON。',
-    refusalRules: ['不得抢先解释答案。', '不得扩展到允许知识族外。'],
+    refusalRules: ['不得抢先解释答案。', '不得推翻服务端确定的路由。'],
   },
   'curiosity.knowledge-designer': {
     name: '儿童科学解释',
