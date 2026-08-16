@@ -76,3 +76,4 @@ next-env.d.ts
 # e2e screenshot artifacts
 e2e/screenshots/
 /.playwright-mcp/
+/.playwright-cli/
