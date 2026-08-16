@@ -39,6 +39,31 @@
       "note": "Question modeling alone consumed 91.9 seconds, so the five-stage serial route cannot meet the 120-second hard limit."
     },
     {
+      "kind": "deepseek-v4-flash-all-stages",
+      "terminal": "QUALITY_REJECTED",
+      "stageDurationsMs": {
+        "question": 2434,
+        "knowledge": 30663,
+        "scene": 4616,
+        "presentation": 8016,
+        "quality": 6609
+      },
+      "qualityRetryCount": 1,
+      "note": "The initial pass was fast, but the quality agent rejected both the original and the allowed redesign for age-appropriateness, grounding and narration coverage."
+    },
+    {
+      "kind": "deepseek-v4-flash-with-glm-5.2-quality",
+      "terminal": "stopped_after_p95_budget_exceeded",
+      "stageDurationsMs": {
+        "question": 31143,
+        "knowledge": 63010,
+        "scene": 15896,
+        "presentation": 12326
+      },
+      "durationBeforeQualityMs": 122375,
+      "note": "The second DeepSeek sample exceeded the hard limit before the GLM quality review began, so the route has unacceptable latency variance."
+    },
+    {
       "kind": "glm-5.2-with-duplicate-schema-prompt-removed",
       "terminal": "quality_retry_started",
       "stageDurationsMs": {
