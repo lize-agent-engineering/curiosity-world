@@ -5,12 +5,24 @@ import { ArrowLeft, Moon, Play, ScrollText } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { z } from 'zod';
 
-import { CuriosityParentReview } from '@/components/curiosity/parent-review';
-import { CuriosityRuntimeFrame } from '@/components/curiosity/runtime-frame';
-import { VoiceGuide } from '@/components/curiosity/voice-guide';
-import { ExplorationTeamStrip } from '@/components/curiosity/exploration-team-strip';
 import { ExplorationCompletion } from '@/components/curiosity/exploration-completion';
+import { CuriosityParentReview } from '@/components/curiosity/parent-review';
+import { ReviewedNarrationPanel } from '@/components/curiosity/reviewed-narration-panel';
+import { CuriosityRuntimeFrame } from '@/components/curiosity/runtime-frame';
 import { Button } from '@/components/ui/button';
+import { buildCuriosityArchive } from '@/lib/curiosity/archive';
+import {
+  curiosityAgentRunSchema,
+  curiosityExperienceSpecV2Schema,
+  interactionDesignArtifactV1Schema,
+  knowledgeDesignArtifactV1Schema,
+  revisionImpactArtifactV1Schema,
+  storyDesignArtifactV1Schema,
+  type ChildVoiceEventV1,
+  type RevisionImpactArtifactV1,
+  type StoryDesignArtifactV1,
+} from '@/lib/curiosity/agent-contracts';
+import { curiosityPipelineArtifactSchema } from '@/lib/curiosity/agent-pipeline';
 import {
   getCuriosityApiHeaders,
   getCuriosityRepository,
@@ -18,49 +30,24 @@ import {
   readApiJson,
   syncCuriosityExperience,
 } from '@/lib/curiosity/client';
+import { isExperienceComplete } from '@/lib/curiosity/completion';
 import { curiosityExperienceSpecSchema, type CuriosityEventV1 } from '@/lib/curiosity/contracts';
 import {
-  curiosityAgentRunSchema,
-  curiosityExperienceSpecV2Schema,
-  knowledgeDesignArtifactV1Schema,
-  revisionImpactArtifactV1Schema,
-  storyDesignArtifactV1Schema,
-  teamAssemblyArtifactV1Schema,
-  type ChildVoiceEventV1,
-  type GuidanceTurnResponseV1,
-  type RevisionImpactArtifactV1,
-} from '@/lib/curiosity/agent-contracts';
-import { curiosityPipelineArtifactSchema } from '@/lib/curiosity/agent-pipeline';
-import type { CuriosityExperienceAggregate } from '@/lib/curiosity/repository';
-import { summarizeCuriosityEvents } from '@/lib/curiosity/runtime';
-import { buildCuriosityArchive } from '@/lib/curiosity/archive';
-import {
-  applyGuidanceTurn,
-  createGuidanceState,
-  deriveGuidanceRequest,
-  mapGuidanceTriggerEvent,
-  type GuidanceState,
-} from '@/lib/curiosity/guidance';
-import {
-  describeVoiceFailure,
-  ManagedGuidancePlayer,
-  requestMicrophoneStream,
-  transcribeChildRecording,
-} from '@/lib/curiosity/voice-client';
+  describeExperienceFailure,
+  selectRegenerationBase,
+} from '@/lib/curiosity/experience-recovery';
 import {
   CURIOSITY_GENERATION_POLL_INTERVAL_MS,
   CURIOSITY_GENERATION_TIMEOUT_MS,
   curiosityGenerationPollLimit,
 } from '@/lib/curiosity/live-timing';
-import {
-  describeExperienceFailure,
-  selectRegenerationBase,
-} from '@/lib/curiosity/experience-recovery';
-import { runGuidanceWithRetry } from '@/lib/curiosity/guidance-retry';
-import { selectActiveTeamMember } from '@/lib/curiosity/team-speaker';
-import { isExperienceComplete } from '@/lib/curiosity/completion';
+import { selectReviewedNarration } from '@/lib/curiosity/narration-library';
+import type { CuriosityExperienceAggregate } from '@/lib/curiosity/repository';
+import { summarizeCuriosityEvents } from '@/lib/curiosity/runtime';
+import { ReviewedNarrationPlayer } from '@/lib/curiosity/voice-client';
 
 type Mode = 'child' | 'parent';
+type NarrationLine = StoryDesignArtifactV1['narrationLibrary'][number];
 
 export default function CuriosityExperiencePage() {
   const params = useParams<{ id: string }>();
@@ -70,32 +57,21 @@ export default function CuriosityExperiencePage() {
   const initialCandidateId = search.get('candidate');
   const activationRef = useRef<Promise<void>>(Promise.resolve());
   const activatedCandidateIdsRef = useRef(new Set<string>());
-  const guidanceVersionRef = useRef<string | null>(null);
-  const guidanceStateRef = useRef<GuidanceState | null>(null);
-  const guidanceRequestQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingChunksRef = useRef<Blob[]>([]);
-  const guidancePlayerRef = useRef<ManagedGuidancePlayer | null>(null);
+  const narrationPlayerRef = useRef<ReviewedNarrationPlayer | null>(null);
   const [aggregate, setAggregate] = useState<CuriosityExperienceAggregate | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(initialCandidateId);
   const [pendingCandidateId, setPendingCandidateId] = useState<string | null>(initialCandidateId);
   const [events, setEvents] = useState<CuriosityEventV1[]>([]);
+  const [voiceEvents, setVoiceEvents] = useState<ChildVoiceEventV1[]>([]);
   const [mode, setMode] = useState<Mode>('child');
   const [instruction, setInstruction] = useState('');
   const [revising, setRevising] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [revisionImpact, setRevisionImpact] = useState<RevisionImpactArtifactV1 | undefined>();
-  const [guidanceState, setGuidanceState] = useState<GuidanceState | null>(null);
-  const [guideStarted, setGuideStarted] = useState(false);
-  const [guideNarration, setGuideNarration] = useState('准备好后，我们一起开始探索。');
-  const [listening, setListening] = useState(false);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [guideStatus, setGuideStatus] = useState<string | null>(null);
-  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
-  const [requestingMicrophone, setRequestingMicrophone] = useState(false);
-  const [transcript, setTranscript] = useState<string | null>(null);
-  const [voiceEvents, setVoiceEvents] = useState<ChildVoiceEventV1[]>([]);
+  const [revisionImpact, setRevisionImpact] = useState<RevisionImpactArtifactV1>();
+  const [narrationStarted, setNarrationStarted] = useState(false);
+  const [narrationError, setNarrationError] = useState<string | null>(null);
+  const [currentNarration, setCurrentNarration] = useState<NarrationLine | null>(null);
 
   const refresh = useCallback(
     async (preferredId?: string) => {
@@ -106,16 +82,15 @@ export default function CuriosityExperiencePage() {
         await syncCuriosityExperience(experienceId);
       }
       if (!next) throw new Error('EXPERIENCE_NOT_FOUND: 这台设备上没有该体验。');
-      setAggregate(next);
       const picked =
         next.versions.find((version) => version.id === preferredId) ??
         next.versions.find((version) => version.id === next.experience.activeVersionId) ??
         next.versions.at(-1);
       if (!picked) throw new Error('VERSION_NOT_FOUND: 体验没有可用版本。');
-      if (!next.experience.activeVersionId && picked.status === 'candidate') {
-        setPendingCandidateId(picked.id);
-      }
+      setAggregate(next);
       setSelectedId(picked.id);
+      if (!next.experience.activeVersionId && picked.status === 'candidate')
+        setPendingCandidateId(picked.id);
       setEvents(await getCuriosityRepository().listEvents(experienceId, picked.id));
       setVoiceEvents(await getCuriosityRepository().listVoiceEvents(experienceId, picked.id));
     },
@@ -127,71 +102,39 @@ export default function CuriosityExperiencePage() {
       setError(cause instanceof Error ? cause.message : String(cause)),
     );
   }, [initialCandidateId, refresh]);
-
-  useEffect(
-    () => () => {
-      guidancePlayerRef.current?.stop();
-    },
-    [],
-  );
+  useEffect(() => () => narrationPlayerRef.current?.stop(), []);
 
   const selected = aggregate?.versions.find((version) => version.id === selectedId) ?? null;
-  const selectedVersionId = selected?.id;
-  const story = useMemo(() => {
+  const presentation = useMemo(() => {
     const artifact = selected?.artifacts.find(
-      (candidate) => candidate.agentRole === 'curiosity.story-designer',
+      (candidate) => candidate.agentRole === 'curiosity.presentation-designer',
     );
     return artifact ? storyDesignArtifactV1Schema.parse(artifact) : null;
   }, [selected]);
-  const explorationTeam = useMemo(() => {
+  const interaction = useMemo(() => {
     const artifact = selected?.artifacts.find(
-      (candidate) => candidate.agentRole === 'curiosity.team-assembler',
+      (candidate) =>
+        candidate.agentRole === 'curiosity.interaction-designer' &&
+        candidate.schemaVersion === '1.0',
     );
-    return artifact ? teamAssemblyArtifactV1Schema.parse(artifact) : null;
+    return artifact ? interactionDesignArtifactV1Schema.parse(artifact) : null;
   }, [selected]);
-  const experienceCompleted = selected ? isExperienceComplete(selected.spec, events) : false;
-  const activeStageKind = story?.stages.find((stage) => stage.id === guidanceState?.stageId)?.kind;
-  const activeTeamMember = useMemo(
-    () =>
-      explorationTeam
-        ? selectActiveTeamMember(
-            explorationTeam,
-            experienceCompleted ? 'explanation' : activeStageKind,
-            experienceCompleted ? '' : guideNarration,
-          )
-        : null,
-    [activeStageKind, experienceCompleted, explorationTeam, guideNarration],
-  );
 
   useEffect(() => {
-    if (!story || !selectedVersionId) return;
-    if (guidanceVersionRef.current !== selectedVersionId) {
-      guidanceVersionRef.current = selectedVersionId;
-      guidanceStateRef.current = null;
-      guidanceRequestQueueRef.current = Promise.resolve();
-      setGuideStarted(false);
-      setTranscript(null);
-      setVoiceError(null);
-      setGuideStatus(null);
-      setVoiceStatus(null);
-      setRequestingMicrophone(false);
-    }
-    let cancelled = false;
-    getCuriosityRepository()
-      .getGuidanceState(experienceId, selectedVersionId)
-      .then((stored) => {
-        if (cancelled) return;
-        const next = stored ?? createGuidanceState(story);
-        guidanceStateRef.current = next;
-        setGuidanceState(next);
-        const stage = story.stages.find((candidate) => candidate.id === next.stageId);
-        setGuideNarration(stage?.openingNarration ?? '准备好后，我们一起开始探索。');
-      })
-      .catch((cause) => setVoiceError(cause instanceof Error ? cause.message : String(cause)));
-    return () => {
-      cancelled = true;
-    };
-  }, [experienceId, selectedVersionId, story]);
+    if (!presentation) return;
+    const opening = selectReviewedNarration(presentation.narrationLibrary, {
+      type: 'experiment_started',
+      action: 'start',
+    });
+    setCurrentNarration(
+      opening ??
+        presentation.narrationLibrary.toSorted((a, b) => a.id.localeCompare(b.id))[0] ??
+        null,
+    );
+    setNarrationStarted(false);
+    setNarrationError(null);
+  }, [presentation, selectedId]);
+
   const summary = useMemo(
     () => (selected ? summarizeCuriosityEvents(selected.spec, events) : null),
     [events, selected],
@@ -210,10 +153,21 @@ export default function CuriosityExperiencePage() {
     );
     return artifact ? revisionImpactArtifactV1Schema.parse(artifact) : undefined;
   }, [revisionImpact, selected]);
+
+  const playNarration = useCallback(async (line: NarrationLine | null) => {
+    if (!line) return;
+    setNarrationError(null);
+    try {
+      narrationPlayerRef.current ??= new ReviewedNarrationPlayer();
+      await narrationPlayerRef.current.play(line);
+    } catch (cause) {
+      setNarrationError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, []);
+
   const handleReady = useCallback(() => {
-    if (!pendingCandidateId) return;
+    if (!pendingCandidateId || activatedCandidateIdsRef.current.has(pendingCandidateId)) return;
     const candidateId = pendingCandidateId;
-    if (activatedCandidateIdsRef.current.has(candidateId)) return;
     activatedCandidateIdsRef.current.add(candidateId);
     const operation = getCuriosityRepository()
       .activateVersion(experienceId, candidateId)
@@ -227,199 +181,40 @@ export default function CuriosityExperiencePage() {
     activationRef.current = operation;
   }, [experienceId, pendingCandidateId, refresh, router]);
 
-  const handleEvent = useCallback(async (event: CuriosityEventV1) => {
-    await activationRef.current;
-    try {
-      await getCuriosityRepository().appendEvent(event);
-      await syncCuriosityExperience(event.experienceId);
-      setEvents(await getCuriosityRepository().listEvents(event.experienceId, event.versionId));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    }
-  }, []);
-
-  const requestGuidance = useCallback(
-    async (childInput: Parameters<typeof deriveGuidanceRequest>[4], triggerEventIds: string[]) => {
-      if (!story || !selected) return;
-      const operation = guidanceRequestQueueRef.current.then(async () => {
-        const current = guidanceStateRef.current;
-        if (!current) throw new Error('GUIDANCE_STAGE_CONFLICT: 引导状态尚未就绪。');
-        const request = deriveGuidanceRequest(
-          current,
-          story,
-          { experienceId, versionId: selected.id },
-          triggerEventIds,
-          childInput,
-        );
-        setGuideStatus(null);
-        const body = await runGuidanceWithRetry(
-          async () =>
-            readApiJson(
-              await fetch('/api/curiosity/guidance', {
-                method: 'POST',
-                headers: getCuriosityApiHeaders('curiosity.exploration-guide'),
-                body: JSON.stringify({
-                  request,
-                  story,
-                  knowledge: selected.artifacts.find(
-                    (artifact) => artifact.agentRole === 'curiosity.knowledge-designer',
-                  ),
-                }),
-              }),
-            ),
-          {
-            attempts: 3,
-            onRetry: () => setGuideStatus('探索伙伴正在整理下一步，请稍等一下…'),
-          },
-        );
-        const response = body.response as GuidanceTurnResponseV1;
-        const next = applyGuidanceTurn(current, response, story, {
-          experienceId,
-          versionId: selected.id,
-        });
-        guidanceStateRef.current = next;
-        setGuidanceState(next);
-        await getCuriosityRepository().saveGuidanceState(experienceId, selected.id, next);
-        await syncCuriosityExperience(experienceId);
-        setGuideNarration(response.narration);
-        setGuideStatus(null);
-        guidancePlayerRef.current ??= new ManagedGuidancePlayer();
-        await guidancePlayerRef.current.play(response.narration);
-      });
-      guidanceRequestQueueRef.current = operation.catch(() => undefined);
-      return operation;
-    },
-    [experienceId, selected, story],
-  );
-
-  const handleGuidedEvent = useCallback(
+  const handleEvent = useCallback(
     async (event: CuriosityEventV1) => {
-      await handleEvent(event);
-      if (!story || !guidanceState) return;
-      if (!guideStarted) setGuideStarted(true);
-      const stage = story.stages.find((candidate) => candidate.id === guidanceState.stageId);
-      if (!stage) return;
-      const mappedType = mapGuidanceTriggerEvent(stage.kind, event.type);
-      if (!mappedType) return;
-      if (!stage.allowedEventTypes.includes(mappedType as never)) return;
+      await activationRef.current;
       try {
-        await requestGuidance(
-          {
-            kind: 'event',
-            eventId: event.eventId,
-            eventType: event.type,
-            action: event.action,
-            payload: event.payload,
-          },
-          [event.eventId],
-        );
-      } catch (_cause) {
-        setGuideStatus('探索伙伴还在想怎么说得更清楚，请再做一次刚才的观察。');
+        await getCuriosityRepository().appendEvent(event);
+        await syncCuriosityExperience(event.experienceId);
+        setEvents(await getCuriosityRepository().listEvents(event.experienceId, event.versionId));
+        if (presentation) {
+          const line = selectReviewedNarration(presentation.narrationLibrary, event);
+          if (line) {
+            setCurrentNarration(line);
+            if (narrationStarted) void playNarration(line);
+          }
+        }
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
       }
     },
-    [guidanceState, guideStarted, handleEvent, requestGuidance, story],
+    [narrationStarted, playNarration, presentation],
   );
-
-  const playNarration = useCallback(async () => {
-    setVoiceError(null);
-    setVoiceStatus(null);
-    try {
-      guidancePlayerRef.current ??= new ManagedGuidancePlayer();
-      await guidancePlayerRef.current.play(guideNarration);
-    } catch (cause) {
-      setVoiceError(cause instanceof Error ? cause.message : String(cause));
-    }
-  }, [guideNarration]);
-
-  const handleVoiceAnswer = useCallback(async () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-      return;
-    }
-    setVoiceError(null);
-    try {
-      if (!selected || !guidanceState) {
-        throw new Error('GUIDANCE_STAGE_CONFLICT: 引导状态尚未就绪。');
-      }
-      if (aggregate?.experience.activeVersionId !== selected.id) {
-        throw new Error('VERSION_NOT_ACTIVE: 探索版本刚刚更新。');
-      }
-      setRequestingMicrophone(true);
-      setVoiceStatus('正在等待麦克风授权，请在浏览器提示中选择允许。');
-      const stream = await requestMicrophoneStream(
-        navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices),
-      );
-      setRequestingMicrophone(false);
-      setVoiceStatus(null);
-      const recorder = new MediaRecorder(stream);
-      recordingChunksRef.current = [];
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
-      };
-      recorder.onstop = () => {
-        void (async () => {
-          try {
-            const recording = new Blob(recordingChunksRef.current, {
-              type: recorder.mimeType || 'audio/webm',
-            });
-            const answer = await transcribeChildRecording(recording);
-            setTranscript(answer.transcript);
-            const eventId = `evt_voice_${Date.now()}`;
-            await activationRef.current;
-            const latest = await getCuriosityRepository().getExperience(experienceId);
-            if (latest?.experience.activeVersionId !== selected.id) {
-              throw new Error('VERSION_NOT_ACTIVE: 探索版本刚刚更新。');
-            }
-            const voiceEvent: ChildVoiceEventV1 = {
-              schemaVersion: '1.0',
-              eventId,
-              experienceId,
-              versionId: selected.id,
-              stageId: guidanceState.stageId,
-              status: 'accepted',
-              transcript: answer.transcript,
-              occurredAt: new Date().toISOString(),
-            };
-            await getCuriosityRepository().appendVoiceEvent(voiceEvent);
-            await syncCuriosityExperience(experienceId);
-            setVoiceEvents(
-              await getCuriosityRepository().listVoiceEvents(experienceId, selected.id),
-            );
-            await requestGuidance({ kind: 'voice', transcript: answer.transcript }, [eventId]);
-          } catch (cause) {
-            setVoiceError(describeVoiceFailure(cause));
-          } finally {
-            stream.getTracks().forEach((track) => track.stop());
-            mediaRecorderRef.current = null;
-            setListening(false);
-          }
-        })();
-      };
-      mediaRecorderRef.current = recorder;
-      recorder.start();
-      setListening(true);
-    } catch (cause) {
-      setVoiceError(describeVoiceFailure(cause));
-      setVoiceStatus(null);
-      setRequestingMicrophone(false);
-      setListening(false);
-    }
-  }, [aggregate, experienceId, guidanceState, requestGuidance, selected]);
 
   const handleRuntimeFailure = useCallback(
     async (message: string) => {
       setError(message);
-      if (pendingCandidateId) {
-        await getCuriosityRepository().markVersionFailed(
-          experienceId,
-          pendingCandidateId,
-          'RUNTIME_FAILED',
-        );
-        await syncCuriosityExperience(experienceId);
-        setPendingCandidateId(null);
-        await refresh();
-        setMode('parent');
-      }
+      if (!pendingCandidateId) return;
+      await getCuriosityRepository().markVersionFailed(
+        experienceId,
+        pendingCandidateId,
+        'RUNTIME_FAILED',
+      );
+      await syncCuriosityExperience(experienceId);
+      setPendingCandidateId(null);
+      await refresh();
+      setMode('parent');
     },
     [experienceId, pendingCandidateId, refresh],
   );
@@ -429,10 +224,7 @@ export default function CuriosityExperiencePage() {
     const active = aggregate?.versions.find(
       (version) => version.id === aggregate.experience.activeVersionId,
     );
-    if (!active) {
-      setError('VERSION_NOT_ACTIVE: 需要先完成当前候选版本的运行检查。');
-      return;
-    }
+    if (!active) return setError('VERSION_NOT_ACTIVE: 需要先完成当前候选版本的运行检查。');
     setRevising(true);
     setError(null);
     try {
@@ -449,14 +241,12 @@ export default function CuriosityExperiencePage() {
         }),
       );
       const spec = curiosityExperienceSpecSchema.parse(body.spec);
-      const experienceSpec = curiosityExperienceSpecV2Schema.parse(body.experienceSpec);
-      const impact = revisionImpactArtifactV1Schema.parse(body.impact);
       await getCuriosityRepository().addCandidateVersion(spec, String(body.specHash), {
-        experienceSpec,
+        experienceSpec: curiosityExperienceSpecV2Schema.parse(body.experienceSpec),
         artifacts: z.array(curiosityPipelineArtifactSchema).parse(body.artifacts),
         agentRuns: z.array(curiosityAgentRunSchema).parse(body.agentRuns),
       });
-      setRevisionImpact(impact);
+      setRevisionImpact(revisionImpactArtifactV1Schema.parse(body.impact));
       setInstruction('');
       setPendingCandidateId(spec.versionId);
       setMode('child');
@@ -469,19 +259,12 @@ export default function CuriosityExperiencePage() {
   };
 
   const handleRegenerate = async () => {
-    if (!aggregate) {
-      setError('EXPERIENCE_NOT_FOUND: 这台设备上没有该体验。');
-      return;
-    }
+    if (!aggregate) return setError('EXPERIENCE_NOT_FOUND: 这台设备上没有该体验。');
     const active = selectRegenerationBase(aggregate, selectedId);
-    if (!active) {
-      setError('EXPERIENCE_NOT_FOUND: 没有可用于重新生成的版本。');
-      return;
-    }
+    if (!active) return setError('EXPERIENCE_NOT_FOUND: 没有可用于重新生成的版本。');
     setRegenerating(true);
     setError(null);
     try {
-      const revision = Math.max(...aggregate.versions.map((version) => version.revision)) + 1;
       const activeKnowledge = knowledgeDesignArtifactV1Schema.parse(
         active.artifacts.find((artifact) => artifact.agentRole === 'curiosity.knowledge-designer'),
       );
@@ -492,43 +275,38 @@ export default function CuriosityExperiencePage() {
           body: JSON.stringify({
             question: aggregate.experience.question,
             age: active.spec.profile.age,
-            interests: active.spec.profile.interests,
             experienceId,
-            revision,
+            revision: Math.max(...aggregate.versions.map((version) => version.revision)) + 1,
             perspectiveDirective:
-              '换一种与上一版明显不同、贴近儿童生活的观察角度重新解释；保持科学因果不变，但重新设计情境、互动任务和故事旁白。',
+              '换一种贴近儿童生活的观察角度；保持科学因果不变，重新设计情境、互动任务和旁白。',
             preservedCausalRelations: activeKnowledge.causalRelations,
           }),
         }),
       );
-      const pollUrl = String(created.pollUrl);
       for (let attempt = 0; attempt < curiosityGenerationPollLimit(); attempt += 1) {
         await new Promise((resolve) =>
           window.setTimeout(resolve, CURIOSITY_GENERATION_POLL_INTERVAL_MS),
         );
-        const job = await readApiJson(await fetch(pollUrl, { cache: 'no-store' }));
-        if (job.status === 'failed') {
+        const job = await readApiJson(await fetch(String(created.pollUrl), { cache: 'no-store' }));
+        if (job.status === 'failed')
           throw new Error(`${String(job.errorCode)}: ${String(job.error)}`);
-        }
-        if (job.status === 'candidate_ready') {
-          const result = job.result as {
-            spec?: unknown;
-            experienceSpec?: unknown;
-            specHash?: unknown;
-          };
-          const spec = curiosityExperienceSpecSchema.parse(result.spec);
-          const experienceSpec = curiosityExperienceSpecV2Schema.parse(result.experienceSpec);
-          await getCuriosityRepository().addCandidateVersion(spec, String(result.specHash), {
-            experienceSpec,
-            artifacts: z.array(curiosityPipelineArtifactSchema).parse(job.artifacts),
-            agentRuns: z.array(curiosityAgentRunSchema).parse(job.agentRuns),
-          });
-          setRevisionImpact(undefined);
-          setPendingCandidateId(spec.versionId);
-          setMode('child');
-          await refresh(spec.versionId);
-          return;
-        }
+        if (job.status !== 'candidate_ready') continue;
+        const result = job.result as {
+          spec?: unknown;
+          specHash?: unknown;
+          experienceSpec?: unknown;
+        };
+        const spec = curiosityExperienceSpecSchema.parse(result.spec);
+        await getCuriosityRepository().addCandidateVersion(spec, String(result.specHash), {
+          experienceSpec: curiosityExperienceSpecV2Schema.parse(result.experienceSpec),
+          artifacts: z.array(curiosityPipelineArtifactSchema).parse(job.artifacts),
+          agentRuns: z.array(curiosityAgentRunSchema).parse(job.agentRuns),
+        });
+        setRevisionImpact(undefined);
+        setPendingCandidateId(spec.versionId);
+        setMode('child');
+        await refresh(spec.versionId);
+        return;
       }
       throw new Error(
         `GENERATION_TIMEOUT: 生成未在 ${CURIOSITY_GENERATION_TIMEOUT_MS / 60_000} 分钟内返回候选体验。`,
@@ -545,51 +323,52 @@ export default function CuriosityExperiencePage() {
     setEvents(await getCuriosityRepository().listEvents(experienceId, versionId));
   };
 
-  if (!aggregate || !selected || !summary || !archive)
+  if (!aggregate || !selected || !summary || !archive || !presentation || !interaction) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#07152f] p-6 text-white">
         <div className="max-w-md text-center">
           <p>{describeExperienceFailure(error) ?? '正在恢复探索…'}</p>
           {error && (
-            <Button
-              type="button"
-              onClick={() => router.push('/')}
-              className="mt-5 min-h-12 bg-[#ffd76a] px-5 font-black text-[#173047] hover:bg-[#ffe393]"
-            >
+            <Button onClick={() => router.push('/')} className="mt-5 bg-[#ffd76a] text-[#173047]">
               返回新的问题
             </Button>
           )}
         </div>
       </main>
     );
+  }
 
+  const completed = isExperienceComplete(selected.spec, events);
+  const activeStageKind = !events.some((event) => event.type === 'prediction_submitted')
+    ? 'prediction'
+    : !events.some((event) => event.type === 'variable_changed') ||
+        (interaction.sceneType === 'relation-explorer' &&
+          !events.some((event) => event.action.startsWith('compare-')))
+      ? 'exploration'
+      : !events.some((event) => event.type === 'challenge_completed')
+        ? 'transfer'
+        : 'explanation';
   return (
     <main className="min-h-dvh bg-[#08152d] p-4 text-white sm:p-6">
       <header className="mx-auto mb-5 flex max-w-[1450px] items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/')}
-            className="text-white hover:bg-white/10 hover:text-white"
-          >
-            <ArrowLeft className="size-4" />
-            新的问题
-          </Button>
-          <span className="hidden items-center gap-2 text-sm font-black text-[#fff4c7] sm:flex">
-            <Moon className="size-4 fill-[#ffe08a] text-[#ffe08a]" aria-hidden="true" />
-            为什么世界
-          </span>
-        </div>
+        <Button
+          variant="ghost"
+          onClick={() => router.push('/')}
+          className="text-white hover:bg-white/10 hover:text-white"
+        >
+          <ArrowLeft className="size-4" />
+          新的问题
+        </Button>
+        <span className="hidden items-center gap-2 text-sm font-black text-[#fff4c7] sm:flex">
+          <Moon className="size-4 fill-[#ffe08a] text-[#ffe08a]" />
+          为什么世界
+        </span>
         <div className="flex rounded-xl border border-white/10 bg-white/[.06] p-1">
           <Button
             size="sm"
             variant="ghost"
             onClick={() => setMode('child')}
-            className={
-              mode === 'child'
-                ? 'bg-[#ffd76a] text-[#07152f] hover:bg-[#ffd76a]'
-                : 'text-white hover:bg-white/10 hover:text-white'
-            }
+            className={mode === 'child' ? 'bg-[#ffd76a] text-[#07152f]' : 'text-white'}
           >
             <Play className="size-4" />
             儿童探索
@@ -598,11 +377,7 @@ export default function CuriosityExperiencePage() {
             size="sm"
             variant="ghost"
             onClick={() => setMode('parent')}
-            className={
-              mode === 'parent'
-                ? 'bg-[#ffd76a] text-[#07152f] hover:bg-[#ffd76a]'
-                : 'text-white hover:bg-white/10 hover:text-white'
-            }
+            className={mode === 'parent' ? 'bg-[#ffd76a] text-[#07152f]' : 'text-white'}
           >
             <ScrollText className="size-4" />
             家长复盘
@@ -619,54 +394,40 @@ export default function CuriosityExperiencePage() {
           </p>
         )}
         {mode === 'child' ? (
-          <div className="min-h-[calc(100vh-110px)]">
-            {explorationTeam && (
-              <ExplorationTeamStrip team={explorationTeam} activeMemberId={activeTeamMember?.id} />
-            )}
-            {experienceCompleted && explorationTeam && activeTeamMember && summary ? (
-              <ExplorationCompletion
-                spec={selected.spec}
-                team={explorationTeam}
-                speaker={activeTeamMember}
-                summary={summary}
-                onParentReview={() => setMode('parent')}
-                onNewQuestion={() => router.push('/')}
-              />
-            ) : (
-              <>
-                {story &&
-                  !pendingCandidateId &&
-                  selected.id === aggregate.experience.activeVersionId && (
-                    <VoiceGuide
-                      narration={guideNarration}
-                      started={guideStarted}
-                      listening={listening}
-                      requestingMicrophone={requestingMicrophone}
-                      speakerName={activeTeamMember?.name}
-                      speakerAvatar={activeTeamMember?.avatar}
-                      status={voiceStatus ?? guideStatus}
-                      error={voiceError}
-                      transcript={transcript}
-                      onStart={() => {
-                        setGuideStarted(true);
-                        void playNarration();
-                      }}
-                      onReplay={() => void playNarration()}
-                      onSkip={() => guidancePlayerRef.current?.stop()}
-                      onListen={() => void handleVoiceAnswer()}
-                    />
-                  )}
-                <CuriosityRuntimeFrame
-                  key={selected.id}
-                  spec={selected.spec}
-                  onReady={handleReady}
-                  onEvent={handleGuidedEvent}
-                  onRuntimeFailure={handleRuntimeFailure}
-                  activeStageKind={activeStageKind}
+          completed ? (
+            <ExplorationCompletion
+              spec={selected.spec}
+              presentation={presentation}
+              summary={summary}
+              onParentReview={() => setMode('parent')}
+              onNewQuestion={() => router.push('/')}
+            />
+          ) : (
+            <>
+              {currentNarration && selected.id === aggregate.experience.activeVersionId && (
+                <ReviewedNarrationPanel
+                  narration={currentNarration.text}
+                  started={narrationStarted}
+                  error={narrationError}
+                  onStart={() => {
+                    setNarrationStarted(true);
+                    void playNarration(currentNarration);
+                  }}
+                  onReplay={() => void playNarration(currentNarration)}
+                  onSkip={() => narrationPlayerRef.current?.stop()}
                 />
-              </>
-            )}
-          </div>
+              )}
+              <CuriosityRuntimeFrame
+                key={selected.id}
+                spec={selected.spec}
+                interaction={interaction}
+                activeStageKind={activeStageKind}
+                onReady={handleReady}
+                onEvent={handleEvent}
+                onRuntimeFailure={handleRuntimeFailure}
+              />
+            </>
+          )
         ) : (
           <CuriosityParentReview
             spec={selected.spec}

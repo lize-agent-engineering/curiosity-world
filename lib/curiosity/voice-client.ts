@@ -1,17 +1,4 @@
-interface SpeechSynthesisLike {
-  cancel(): void;
-  speak(utterance: SpeechUtteranceLike): void;
-}
-
-interface SpeechUtteranceLike {
-  readonly text: string;
-  lang: string;
-  rate: number;
-  onend: (() => void) | null | undefined;
-  onerror: (() => void) | null | undefined;
-}
-
-type UtteranceConstructor = new (text: string) => SpeechUtteranceLike;
+import type { ReviewedNarrationLine } from './narration-library';
 
 interface RecognitionResultEventLike {
   results?: ArrayLike<ArrayLike<{ transcript?: string; confidence?: number }>>;
@@ -30,33 +17,23 @@ interface RecognitionLike {
 
 type RecognitionConstructor = new () => RecognitionLike;
 
-interface ManagedAudioLike {
-  readonly src: string;
+interface ControllableManagedAudioLike {
+  readonly src?: string;
   play(): Promise<void>;
-}
-
-interface ControllableManagedAudioLike extends ManagedAudioLike {
   pause(): void;
   currentTime: number;
   onended: (() => void) | null;
   onerror: (() => void) | null;
 }
 
-interface ManagedGuidanceDependencies {
-  fetch?: typeof fetch;
-  createObjectURL?: (blob: Blob) => string;
-  revokeObjectURL?: (url: string) => void;
-  createAudio?: (src: string) => ManagedAudioLike;
-}
-
-interface ManagedGuidancePlayerDependencies {
+interface ReviewedNarrationPlayerDependencies {
   fetch?: typeof fetch;
   createObjectURL?: (blob: Blob) => string;
   revokeObjectURL?: (url: string) => void;
   createAudio?: (src: string) => ControllableManagedAudioLike;
 }
 
-export class ManagedGuidancePlayer {
+export class ReviewedNarrationPlayer {
   private active:
     | {
         audio: ControllableManagedAudioLike;
@@ -66,7 +43,7 @@ export class ManagedGuidancePlayer {
     | undefined;
   private request: AbortController | undefined;
 
-  constructor(private readonly dependencies: ManagedGuidancePlayerDependencies = {}) {}
+  constructor(private readonly dependencies: ReviewedNarrationPlayerDependencies = {}) {}
 
   stop(): void {
     this.request?.abort();
@@ -80,7 +57,7 @@ export class ManagedGuidancePlayer {
     finish();
   }
 
-  async play(text: string): Promise<void> {
+  async play(line: ReviewedNarrationLine): Promise<void> {
     this.stop();
     const request = new AbortController();
     this.request = request;
@@ -89,7 +66,7 @@ export class ManagedGuidancePlayer {
       const response = await fetchNarration('/api/curiosity/narration', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: line.text }),
         signal: request.signal,
       });
       if (!response.ok) throw new Error('TTS_FAILED: 语音旁白生成失败，请重试。');
@@ -203,59 +180,6 @@ export async function transcribeChildRecording(
     );
   }
   return { transcript: body.transcript.trim() };
-}
-
-export async function speakManagedGuidance(
-  text: string,
-  dependencies: ManagedGuidanceDependencies = {},
-  signal?: AbortSignal,
-): Promise<void> {
-  const fetchNarration = dependencies.fetch ?? globalThis.fetch;
-  const createObjectURL = dependencies.createObjectURL ?? URL.createObjectURL.bind(URL);
-  const revokeObjectURL = dependencies.revokeObjectURL ?? URL.revokeObjectURL.bind(URL);
-  const createAudio = dependencies.createAudio ?? ((src) => new Audio(src));
-  const response = await fetchNarration('/api/curiosity/narration', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text }),
-    signal,
-  });
-  if (!response.ok) {
-    throw new Error('TTS_FAILED: 语音旁白生成失败，请重试。');
-  }
-  const objectUrl = createObjectURL(await response.blob());
-  try {
-    await createAudio(objectUrl).play();
-  } catch {
-    throw new Error('TTS_FAILED: 语音旁白播放失败，请重试。');
-  } finally {
-    revokeObjectURL(objectUrl);
-  }
-}
-
-export function speakGuidance(
-  text: string,
-  dependencies: {
-    speechSynthesis?: SpeechSynthesisLike;
-    Utterance?: UtteranceConstructor;
-  } = {},
-): Promise<void> {
-  const speechSynthesis =
-    dependencies.speechSynthesis ?? (globalThis.speechSynthesis as SpeechSynthesisLike);
-  const Utterance =
-    dependencies.Utterance ?? (globalThis.SpeechSynthesisUtterance as UtteranceConstructor);
-  if (!speechSynthesis || !Utterance) {
-    return Promise.reject(new Error('TTS_UNAVAILABLE: 当前浏览器不支持语音旁白。'));
-  }
-  speechSynthesis.cancel();
-  const utterance = new Utterance(text);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 0.9;
-  return new Promise((resolve, reject) => {
-    utterance.onend = () => resolve();
-    utterance.onerror = () => reject(new Error('TTS_FAILED: 语音旁白播放失败。'));
-    speechSynthesis.speak(utterance);
-  });
 }
 
 function browserRecognition(): RecognitionConstructor | undefined {

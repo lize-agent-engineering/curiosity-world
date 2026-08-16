@@ -17,6 +17,7 @@ import type { CuriosityPipelineArtifact, CuriosityPipelineModel } from './agent-
 import { compileCuriosityExperience, type CompiledCuriosityExperience } from './compiler';
 import { curiosityExperienceSpecSchema, type CuriosityExperienceSpecV1 } from './contracts';
 import { canonicalizeCuriosityQuality, CURIOSITY_QUALITY_CRITERIA } from './quality';
+import { parseCuriosityModelJson } from './model-json';
 
 export interface CuriosityRevisionModels {
   planner: CuriosityPipelineModel;
@@ -81,7 +82,6 @@ const qualityOutputSchema = z.strictObject({
 
 const operationFieldByType = {
   set_age: 'profile.age',
-  set_interests: 'profile.interests',
   replace_instruction: 'presentation.instructions',
   replace_visual_theme: 'presentation.visualTheme',
   set_variable: 'variables',
@@ -104,10 +104,6 @@ function patchOutputSchemaFor(
   const shortText = z.string().trim().min(1).max(240);
   const operationSchemas = [
     z.strictObject({ op: z.literal('set_age'), age: z.number().int().min(6).max(10) }),
-    z.strictObject({
-      op: z.literal('set_interests'),
-      interests: z.array(z.string().trim().min(1).max(30)).max(5),
-    }),
     z.strictObject({
       op: z.literal('replace_instruction'),
       taskId: z.enum(taskIds),
@@ -162,7 +158,7 @@ function parseModelOutput<T>(
   code: CuriosityRevisionErrorCode,
 ): T {
   try {
-    return schema.parse(JSON.parse(raw));
+    return parseCuriosityModelJson(raw, schema);
   } catch (error) {
     throw new CuriosityRevisionPipelineError(code, '修改模型输出不符合严格 Schema。', error);
   }
@@ -268,9 +264,6 @@ function applyExperiencePatch(
       case 'set_age':
         next.profile.age = operation.age;
         break;
-      case 'set_interests':
-        next.profile.interests = [...operation.interests];
-        break;
       case 'replace_instruction': {
         const selected = next.instructions.find((item) => item.taskId === operation.taskId);
         if (!selected) {
@@ -323,9 +316,6 @@ function applyRuntimePatch(
     switch (operation.op) {
       case 'set_age':
         next.profile.age = operation.age;
-        break;
-      case 'set_interests':
-        next.profile.interests = [...operation.interests];
         break;
       case 'replace_instruction': {
         const selected = next.tasks.find((task) => task.id === operation.taskId);

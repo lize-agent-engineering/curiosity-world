@@ -12,8 +12,7 @@ import type {
 
 export interface CuriosityHomeValues {
   question: string;
-  age: number;
-  interests: string;
+  targetAge: number;
 }
 
 export interface CuriosityGenerationStatus {
@@ -42,7 +41,7 @@ interface CuriosityHomeViewProps {
   onOpenExperience: (id: string) => void;
 }
 
-const presets = ['为什么月亮看起来会跟着我们？', '桥为什么不会倒？', '影子为什么会变长？'];
+const presets = ['为什么月亮看起来会跟着我们？', '毛毛虫为什么会变成蝴蝶？', '海水为什么是咸的？'];
 
 export function CuriosityHomeView({
   values,
@@ -197,7 +196,7 @@ export function CuriosityHomeView({
                 </button>
               ))}
             </div>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="mt-5 max-w-xs">
               <label className="text-sm font-bold text-[#314657]">
                 孩子年龄
                 <input
@@ -205,19 +204,9 @@ export function CuriosityHomeView({
                   type="number"
                   min={6}
                   max={10}
-                  value={values.age}
-                  onChange={(event) => onChange('age', Number(event.target.value))}
+                  value={values.targetAge}
+                  onChange={(event) => onChange('targetAge', Number(event.target.value))}
                   className="mt-2 h-12 w-full rounded-xl border border-[#aebfc4] bg-white/70 px-3 text-base outline-none transition focus:border-[#234d69] focus:ring-4 focus:ring-[#234d69]/10"
-                />
-              </label>
-              <label className="text-sm font-bold text-[#314657]">
-                最近感兴趣的事
-                <input
-                  aria-label="兴趣"
-                  value={values.interests}
-                  onChange={(event) => onChange('interests', event.target.value)}
-                  placeholder="散步、星空"
-                  className="mt-2 h-12 w-full rounded-xl border border-[#aebfc4] bg-white/70 px-3 text-base outline-none transition placeholder:text-[#8b9a9e] focus:border-[#234d69] focus:ring-4 focus:ring-[#234d69]/10"
                 />
               </label>
             </div>
@@ -227,7 +216,7 @@ export function CuriosityHomeView({
                 role="alert"
                 className="mt-5 rounded-xl border border-[#d98c79] bg-[#fff0e9] p-4 text-sm font-bold text-[#9b3e2e]"
               >
-                这次探索还没有生成完成，请重新生成。
+                {error}
               </p>
             )}
             <Button

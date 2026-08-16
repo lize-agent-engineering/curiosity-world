@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CURIOSITY_EVENT_TYPES_V2,
+  knowledgeDesignArtifactV1Schema,
   type CuriosityExperienceSpecV2,
 } from '@/lib/curiosity/agent-contracts';
 import { compileCuriosityExperienceV2 } from '@/lib/curiosity/compiler';
@@ -38,7 +39,7 @@ function familySpec(
 
 describe('deterministic knowledge-family registry', () => {
   it('allows an explicit negation of the moon-following misconception', () => {
-    const artifact = {
+    const artifact = knowledgeDesignArtifactV1Schema.parse({
       artifactId: 'art_knowledge_negation',
       runId: 'run_negation',
       agentRole: 'curiosity.knowledge-designer' as const,
@@ -63,7 +64,7 @@ describe('deterministic knowledge-family registry', () => {
       ageExpressionStrategy: '比较路灯和月亮。',
       observationSuggestions: ['散步时比较路灯和月亮。'],
       packReferences: ['relative-motion.moon-following.v1#core'],
-    };
+    });
 
     expect(() => relativeMotionPlugin.validateKnowledge(artifact)).not.toThrow();
     expect(() =>
@@ -107,7 +108,11 @@ describe('deterministic knowledge-family registry', () => {
     ['积木怎么搭才更稳？', 'balance-support', 'balance-support.bridge.v1'],
     ['手电筒靠近时影子为什么变大？', 'light-path', 'light-path.shadow-length.v1'],
   ])('maps %s to exactly one pack', (question, family, packId) => {
-    expect(knowledgeRegistry.classify({ question, age: 8 })).toEqual({ family, packId });
+    expect(knowledgeRegistry.classify({ question, age: 8 })).toEqual({
+      kind: 'curated',
+      family,
+      packId,
+    });
   });
 
   it.each(['relative-motion', 'balance-support', 'light-path'] as const)(
@@ -120,13 +125,17 @@ describe('deterministic knowledge-family registry', () => {
     },
   );
 
-  it('fails when a question matches multiple families or no registered pack', () => {
-    expect(() =>
+  it('routes multiple-family and unmatched questions to open knowledge', () => {
+    expect(
       knowledgeRegistry.classify({ question: '桥为什么不倒，它的影子为什么会变长？', age: 8 }),
-    ).toThrowError(expect.objectContaining({ code: 'AMBIGUOUS_KNOWLEDGE_FAMILY' }));
-    expect(() =>
-      knowledgeRegistry.classify({ question: '彩虹为什么有颜色？', age: 8 }),
-    ).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_QUESTION' }));
+    ).toMatchObject({
+      kind: 'open',
+      matchedFamilies: ['balance-support', 'light-path'],
+    });
+    expect(knowledgeRegistry.classify({ question: '彩虹为什么有颜色？', age: 8 })).toEqual({
+      kind: 'open',
+      matchedFamilies: [],
+    });
   });
 
   it('rejects family-crossing primitives and variable range overflow', () => {

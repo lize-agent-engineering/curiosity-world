@@ -93,6 +93,7 @@ describe('Curiosity request boundary', () => {
     'Why does the moon look like it follows me?',
   ])('maps a supported moon-following question to the only knowledge pack', (question) => {
     expect(classifyCuriosityRequest({ question, age: 8 })).toEqual({
+      kind: 'curated',
       family: 'relative-motion',
       packId: 'relative-motion.moon-following.v1',
     });
@@ -104,10 +105,11 @@ describe('Curiosity request boundary', () => {
     );
   });
 
-  it('rejects a different mechanism instead of returning a generic experience', () => {
-    expect(() => classifyCuriosityRequest({ question: '彩虹为什么会出现？', age: 8 })).toThrowError(
-      expect.objectContaining({ code: 'UNSUPPORTED_QUESTION' }),
-    );
+  it('routes a different mechanism to open knowledge', () => {
+    expect(classifyCuriosityRequest({ question: '彩虹为什么会出现？', age: 8 })).toEqual({
+      kind: 'open',
+      matchedFamilies: [],
+    });
   });
 
   it('rejects high-risk content before knowledge mapping', () => {

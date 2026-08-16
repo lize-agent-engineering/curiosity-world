@@ -13,7 +13,6 @@ import type {
   CuriosityPipelineModels,
 } from './agent-pipeline';
 import { curiosityPipelineArtifactSchema } from './agent-pipeline';
-import { CuriosityGenerationError } from './generation';
 import {
   type CuriosityGenerationInput,
   type CuriosityJobStore,
@@ -26,7 +25,12 @@ import {
   type CuriosityRevisionIdentity,
 } from './revision-pipeline';
 
-const generationInputSchema = z
+const firstGenerationInputSchema = z.strictObject({
+  question: z.string().trim().min(4).max(240),
+  targetAge: z.number().int(),
+});
+
+const regenerationInputSchema = z
   .strictObject({
     question: z.string().trim().min(4).max(240),
     age: z.number().int(),
@@ -56,6 +60,8 @@ const generationInputSchema = z
     }
   });
 
+const generationInputSchema = z.union([firstGenerationInputSchema, regenerationInputSchema]);
+
 const revisionInputSchema = z.strictObject({
   baseSpec: curiosityExperienceSpecSchema,
   experienceSpec: curiosityExperienceSpecV2Schema,
@@ -83,10 +89,9 @@ type RoleModelResolver<TBody> = (
 
 const INITIAL_GENERATION_ROLES = [
   'curiosity.question-modeler',
-  'curiosity.team-assembler',
   'curiosity.knowledge-designer',
   'curiosity.interaction-designer',
-  'curiosity.story-designer',
+  'curiosity.presentation-designer',
   'curiosity.quality-reviewer',
 ] as const;
 
@@ -102,12 +107,6 @@ function errorResponse(error: unknown): NextResponse {
     return NextResponse.json(
       { success: false, errorCode: error.code, error: error.message },
       { status },
-    );
-  }
-  if (error instanceof CuriosityGenerationError) {
-    return NextResponse.json(
-      { success: false, errorCode: error.code, error: error.message },
-      { status: 422 },
     );
   }
   if (error instanceof CuriosityRevisionPipelineError) {
@@ -138,8 +137,19 @@ export function createCuriosityGenerationPostHandler(deps: {
 }) {
   return async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-      const body = generationInputSchema.parse(await request.json());
-      classifyCuriosityRequest(body);
+      const requestBody = generationInputSchema.parse(await request.json());
+      classifyCuriosityRequest(requestBody);
+      const body: CuriosityGenerationInput =
+        'targetAge' in requestBody
+          ? { question: requestBody.question, targetAge: requestBody.targetAge }
+          : {
+              question: requestBody.question,
+              targetAge: requestBody.age,
+              experienceId: requestBody.experienceId,
+              revision: requestBody.revision,
+              perspectiveDirective: requestBody.perspectiveDirective,
+              preservedCausalRelations: requestBody.preservedCausalRelations,
+            };
       const entries = await Promise.all(
         INITIAL_GENERATION_ROLES.map(
           async (role) => [role, await deps.resolveRoleModel(request, body, role)] as const,

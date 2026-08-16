@@ -1,5 +1,7 @@
 # Curiosity World 专属多能力 Agent Web 系统设计
 
+> 当前面试演示边界（以已验证能力为准）：只运行“月亮为什么跟着我？”“恐龙为什么会消失？”和“为什么会下雨？”三个预设问题。受本次笔试时间与 AI Coding 工具额度限制，自由问题输入尚未完成真实浏览器与公网验收，列为后续 P0，不得表述为已上线能力。
+
 > 日期：2026-08-15
 >
 > 状态：已批准
@@ -246,7 +248,7 @@ Agent 之间不共享自由文本聊天历史，只通过版本化 JSON 产物�
 ```bash
 pnpm check
 pnpm lint
-pnpm check:i18n-keys
+pnpm typecheck
 pnpm test
 pnpm build
 pnpm test:e2e

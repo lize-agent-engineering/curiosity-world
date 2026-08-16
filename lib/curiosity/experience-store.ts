@@ -95,7 +95,6 @@ export function buildSnapshotFromGenerationJobs(
       id: experienceId,
       question: latest.result.spec.question.original,
       age: latest.result.spec.profile.age,
-      interests: latest.result.spec.profile.interests,
       createdAt: matching[0]!.result!.spec.createdAt,
       updatedAt: latest.updatedAt,
       activeVersionId: latestVersionId,

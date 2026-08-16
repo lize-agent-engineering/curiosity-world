@@ -62,12 +62,12 @@ function baseExperienceSpec(): CuriosityExperienceSpecV2 {
 function qualityOutput(status: 'pass' | 'reject' = 'pass') {
   const criteria = [
     'age-fit',
-    'interest-link',
-    'knowledge-consistency',
+    'knowledge-grounding',
     'misconception-risk',
+    'scene-safety',
     'interaction-completeness',
-    'transfer-validity',
-    'copy-load',
+    'narration-coverage',
+    'discovery-card-quality',
   ];
   return {
     checks: criteria.map((criterion, index) => ({

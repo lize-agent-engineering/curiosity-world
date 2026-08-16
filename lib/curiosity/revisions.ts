@@ -44,9 +44,6 @@ export function applyCuriosityPatch(
       case 'set_age':
         next.profile.age = operation.age;
         break;
-      case 'set_interests':
-        next.profile.interests = [...operation.interests];
-        break;
       case 'replace_copy':
         next.presentation[operation.field] = operation.value;
         break;

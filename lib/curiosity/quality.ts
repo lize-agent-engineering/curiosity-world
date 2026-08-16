@@ -1,11 +1,11 @@
 export const CURIOSITY_QUALITY_CRITERIA = [
   'age-fit',
-  'interest-link',
-  'knowledge-consistency',
+  'knowledge-grounding',
   'misconception-risk',
+  'scene-safety',
   'interaction-completeness',
-  'transfer-validity',
-  'copy-load',
+  'narration-coverage',
+  'discovery-card-quality',
 ] as const;
 
 type CuriosityQualityCriterion = (typeof CURIOSITY_QUALITY_CRITERIA)[number];

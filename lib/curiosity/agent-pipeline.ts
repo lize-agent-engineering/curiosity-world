@@ -2,28 +2,25 @@ import { z } from 'zod';
 
 import {
   CURIOSITY_EVENT_TYPES_V2,
-  CURIOSITY_KNOWLEDGE_FAMILIES,
   curiosityAgentRunSchema,
   curiosityExperienceSpecV2Schema,
   curiosityPatchV2Schema,
   interactionDesignArtifactV1Schema,
+  knowledgeDesignArtifactV1BaseSchema,
   knowledgeDesignArtifactV1Schema,
   qualityReviewArtifactV1Schema,
   questionModelArtifactV1Schema,
-  teamAssemblyArtifactV1Schema,
-  teamAssemblyOutputSchema,
   revisionImpactArtifactV1Schema,
+  storyDesignArtifactV1BaseSchema,
   storyDesignArtifactV1Schema,
-  storyStageSchema,
-  type CuriosityPatchV2,
   type CuriosityAgentRole,
   type CuriosityAgentRun,
   type CuriosityExperienceSpecV2,
+  type CuriosityPatchV2,
   type InteractionDesignArtifactV1,
   type KnowledgeDesignArtifactV1,
   type QualityReviewArtifactV1,
   type QuestionModelArtifactV1,
-  type TeamAssemblyArtifactV1,
   type RevisionImpactArtifactV1,
   type StoryDesignArtifactV1,
 } from './agent-contracts';
@@ -36,19 +33,17 @@ import {
 import {
   CURIOUSITY_EVENT_TYPES,
   curiosityExperienceSpecSchema,
+  curiosityTaskSchema,
   type CuriosityExperienceSpecV1,
 } from './contracts';
-import type { CuriosityTextModel } from './generation';
-import { isPrimaryInstructionAllowed } from './age-constraints';
+import type { CuriosityTextModel } from './model';
 import { classifyCuriosityRequest } from './knowledge';
 import { knowledgeRegistry } from './knowledge/registry';
-import { canonicalizeCuriosityQuality, CURIOSITY_QUALITY_CRITERIA } from './quality';
+import { CURIOSITY_QUALITY_CRITERIA, canonicalizeCuriosityQuality } from './quality';
 import { renderCuriosityRoleSkill } from './agent-skills';
+import { parseCuriosityModelJson } from './model-json';
 
-type GenerationRole = Exclude<
-  CuriosityAgentRole,
-  'curiosity.revision-planner' | 'curiosity.exploration-guide'
->;
+type GenerationRole = Exclude<CuriosityAgentRole, 'curiosity.revision-planner'>;
 
 export interface CuriosityPipelineModel extends CuriosityTextModel {
   route: CuriosityRoleRoute;
@@ -58,8 +53,7 @@ export type CuriosityPipelineModels = Record<GenerationRole, CuriosityPipelineMo
 
 export interface CuriosityAgentPipelineInput {
   question: string;
-  age: number;
-  interests: string[];
+  targetAge: number;
   perspectiveDirective?: string;
   preservedCausalRelations?: KnowledgeDesignArtifactV1['causalRelations'];
 }
@@ -72,26 +66,23 @@ export interface CuriosityPipelineIdentities {
   createdAt: string;
   artifactIds: {
     question: string;
-    team: string;
     knowledge: string;
-    interaction: string;
-    story: string;
+    scene: string;
+    presentation: string;
     spec: string;
     quality: string;
   };
   agentRunIds: {
     question: string;
-    team: string;
     knowledge: string;
-    interaction: string;
-    story: string;
+    scene: string;
+    presentation: string;
     quality: string;
   };
 }
 
 export type CuriosityPipelineArtifact =
   | QuestionModelArtifactV1
-  | TeamAssemblyArtifactV1
   | KnowledgeDesignArtifactV1
   | InteractionDesignArtifactV1
   | StoryDesignArtifactV1
@@ -102,7 +93,6 @@ export type CuriosityPipelineArtifact =
 
 export const curiosityPipelineArtifactSchema = z.union([
   questionModelArtifactV1Schema,
-  teamAssemblyArtifactV1Schema,
   knowledgeDesignArtifactV1Schema,
   interactionDesignArtifactV1Schema,
   storyDesignArtifactV1Schema,
@@ -113,16 +103,15 @@ export const curiosityPipelineArtifactSchema = z.union([
 ]);
 
 export type CuriosityPipelineStage =
-  | 'question_modeling'
-  | 'knowledge_design'
-  | 'interaction_design'
-  | 'team_assembly'
-  | 'story_design'
-  | 'deterministic_compile'
-  | 'quality_review';
+  | 'question'
+  | 'knowledge'
+  | 'scene'
+  | 'presentation'
+  | 'quality';
 
 export interface CuriosityPipelineStageUpdate {
   stage: CuriosityPipelineStage;
+  artifactId: string;
   artifacts: CuriosityPipelineArtifact[];
   agentRuns: CuriosityAgentRun[];
 }
@@ -133,14 +122,14 @@ export interface CuriosityAgentPipelineResult {
   spec: CuriosityExperienceSpecV2;
   runtimeSpec: CuriosityExperienceSpecV1;
   compiled: CompiledCuriosityExperience;
+  qualityRetryCount: 0 | 1;
 }
 
 export type CuriosityPipelineFailureCode =
   | 'QUESTION_MODEL_INVALID'
-  | 'TEAM_ASSEMBLY_INVALID'
   | 'KNOWLEDGE_DESIGN_INVALID'
-  | 'INTERACTION_DESIGN_INVALID'
-  | 'STORY_DESIGN_INVALID'
+  | 'SCENE_DESIGN_INVALID'
+  | 'PRESENTATION_INVALID'
   | 'DETERMINISTIC_VALIDATION_FAILED'
   | 'QUALITY_REVIEW_INVALID'
   | 'QUALITY_REJECTED';
@@ -169,170 +158,64 @@ const envelopeKeys = {
   knowledgePackVersion: true,
 } as const;
 
-const questionOutputSchema = questionModelArtifactV1Schema.omit(envelopeKeys);
-const teamOutputSchema = teamAssemblyOutputSchema;
-const questionOutputSchemaForMapping = (
-  family: (typeof CURIOSITY_KNOWLEDGE_FAMILIES)[number],
-  age: number,
-) =>
-  questionOutputSchema.extend({
-    ageBand: z.literal(age <= 7 ? '6-7' : '8-10'),
-    supportStatus: z.literal('supported'),
-    knowledgeFamilyCandidates: z.array(z.literal(family)).length(1),
-  });
-const CHILD_COMPLETION_MAX_LENGTH = 180;
-const formatChildCompletion = (cause: string, effect: string) =>
-  `你发现了：${cause}时，${effect}。`;
-const knowledgeOutputSchema = knowledgeDesignArtifactV1Schema
-  .omit(envelopeKeys)
-  .superRefine((output, context) => {
-    const primaryRelation = output.causalRelations[0];
-    if (
-      primaryRelation &&
-      formatChildCompletion(primaryRelation.cause, primaryRelation.effect).length >
-        CHILD_COMPLETION_MAX_LENGTH
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['causalRelations', 0],
-        message: 'primary causal relation exceeds the child completion limit',
-      });
-    }
-  });
-const regenerationKnowledgeOutputSchema = knowledgeDesignArtifactV1Schema.omit({
+const executableContent =
+  /<\/?(?:script|style|html|body)|\b(?:javascript:|function\s*\(|document\.|window\.|eval\s*\()|=>|\{\s*(?:display|color|position)\s*:/i;
+
+function assertNoExecutableModelContent(value: unknown): void {
+  if (typeof value === 'string') {
+    if (executableContent.test(value)) throw new Error('MODEL_CODE_FORBIDDEN');
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach(assertNoExecutableModelContent);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    Object.values(value).forEach(assertNoExecutableModelContent);
+  }
+}
+
+const questionOutputBaseSchema = questionModelArtifactV1Schema.omit(envelopeKeys);
+
+const commonKnowledgeOutputSchema = knowledgeDesignArtifactV1BaseSchema.omit({
   ...envelopeKeys,
-  causalRelations: true,
+  source: true,
+  knowledgeFamily: true,
+  packId: true,
 });
-const interactionOutputSchema = interactionDesignArtifactV1Schema.omit(envelopeKeys);
-const REQUIRED_RUNTIME_TASK_KINDS = [
-  'prediction',
-  'exploration',
-  'transfer',
-  'explanation',
-] as const;
-const SCIENTIFIC_ABSOLUTE_LANGUAGE = /纹丝不动|绝对(?:不会|不可能)|永远(?:不会|不倒|不变)|一定(?:不会|不倒|不变)/;
-const interactionOutputSchemaForAge = (
-  age: number,
-  allowedVariables?: Readonly<Record<string, { min: number; max: number }>>,
-) =>
-  interactionOutputSchema.superRefine((output, context) => {
-    const maxPrimaryTasks = age <= 7 ? 4 : 5;
-    if (output.taskSequence.length > maxPrimaryTasks) {
-      context.addIssue({
-        code: 'custom',
-        path: ['taskSequence'],
-        message: `primary task count exceeds the age ${age} limit`,
-      });
-    }
-    if (output.instructionCopy.length > maxPrimaryTasks) {
-      context.addIssue({
-        code: 'custom',
-        path: ['instructionCopy'],
-        message: `instruction count exceeds the age ${age} limit`,
-      });
-    }
-    output.instructionCopy.forEach((instruction, index) => {
-      if (!isPrimaryInstructionAllowed(age, instruction.text)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['instructionCopy', index, 'text'],
-          message: `primary instruction exceeds the age ${age} limit`,
-        });
-      }
-    });
-    output.feedback.forEach((feedback, index) => {
-      if (SCIENTIFIC_ABSOLUTE_LANGUAGE.test(feedback.message)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['feedback', index, 'message'],
-          message: 'feedback must describe the observed result without absolute scientific claims',
-        });
-      }
-    });
-    for (const kind of REQUIRED_RUNTIME_TASK_KINDS) {
-      if (!output.taskSequence.includes(kind)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['taskSequence'],
-          message: `missing deterministic runtime task: ${kind}`,
-        });
-      }
-      if (!output.instructionCopy.some((instruction) => instruction.kind === kind)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['instructionCopy'],
-          message: `missing deterministic runtime instruction: ${kind}`,
-        });
-      }
-    }
-    if (allowedVariables) {
-      output.variables.forEach((variable, index) => {
-        const bounds = allowedVariables[variable.id];
-        if (!bounds || variable.min < bounds.min || variable.max > bounds.max) {
-          context.addIssue({
-            code: 'custom',
-            path: ['variables', index],
-            message: `variable ${variable.id} is outside the selected knowledge bounds`,
-          });
-        }
-      });
-    }
+
+const openKnowledgeOutputSchema = commonKnowledgeOutputSchema.extend({
+  claims: knowledgeDesignArtifactV1BaseSchema.shape.claims.unwrap().min(1),
+  relations: knowledgeDesignArtifactV1BaseSchema.shape.relations.unwrap().min(1),
+  allowedExplanations: knowledgeDesignArtifactV1BaseSchema.shape.allowedExplanations
+    .unwrap()
+    .min(1),
+  uncertainties: knowledgeDesignArtifactV1BaseSchema.shape.uncertainties.unwrap().min(1),
+  timeSensitive: z.boolean(),
+});
+
+const sceneOutputSchema = interactionDesignArtifactV1Schema.omit(envelopeKeys).extend({
+  sceneType: z.enum(['variable-explorer', 'relation-explorer']),
+  tasks: z.array(curiosityTaskSchema).length(4),
+});
+
+const presentationOutputSchema = storyDesignArtifactV1BaseSchema
+  .omit({
+    ...envelopeKeys,
+    sourceArtifactIds: true,
+    stages: true,
+  })
+  .extend({
+    title: z.string().trim().min(1).max(120),
+    hook: z.string().trim().min(1).max(240),
+    explorePrompt: z.string().trim().min(1).max(240),
+    challengePrompt: z.string().trim().min(1).max(240),
+    completion: z.string().trim().min(1).max(240),
+    narrationLibrary: storyDesignArtifactV1BaseSchema.shape.narrationLibrary.unwrap().min(2),
+    immediateFeedback: storyDesignArtifactV1BaseSchema.shape.immediateFeedback.unwrap().min(1),
+    discoveryPrompts: storyDesignArtifactV1BaseSchema.shape.discoveryPrompts.unwrap().max(3),
   });
-const CHILD_UNSUITABLE_LANGUAGE =
-  /溜须拍马|拍马屁|小菜一碟|笨蛋|傻瓜|连这都|这么简单.{0,8}(?:肯定|应该|还不)/;
-const storyOutputSchemaForTasks = (
-  taskSequence: InteractionDesignArtifactV1['taskSequence'],
-  age: number,
-) => {
-  const narrationLimit = age <= 7 ? 40 : 56;
-  const childHintSchema = z.strictObject({
-    level: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-    text: z.string().trim().min(1).max(36),
-    revealsAnswer: z.literal(false),
-  });
-  const childStoryStageSchema = storyStageSchema.extend({
-    openingNarration: z.string().trim().min(1).max(narrationLimit),
-    prompt: z.string().trim().min(1).max(42),
-    hints: z
-      .array(childHintSchema)
-      .length(3)
-      .refine(
-        (hints) => hints.every((hint, index) => hint.level === index),
-        'hint levels must be ordered from 0 through 2',
-      ),
-    completionCondition: z.string().trim().min(1).max(42),
-  });
-  return z
-    .strictObject({ stages: z.array(childStoryStageSchema).min(3).max(5) })
-    .superRefine((output, context) => {
-      const actual = output.stages.map((stage) => stage.kind);
-      if (
-        actual.length !== taskSequence.length ||
-        actual.some((kind, index) => kind !== taskSequence[index])
-      ) {
-        context.addIssue({
-          code: 'custom',
-          path: ['stages'],
-          message: 'story stages must match the interaction task sequence',
-        });
-      }
-      output.stages.forEach((stage, stageIndex) => {
-        const childCopy = [
-          stage.openingNarration,
-          stage.prompt,
-          stage.completionCondition,
-          ...stage.hints.map((hint) => hint.text),
-        ].join('\n');
-        if (CHILD_UNSUITABLE_LANGUAGE.test(childCopy)) {
-          context.addIssue({
-            code: 'custom',
-            path: ['stages', stageIndex],
-            message: 'child narration contains adult idiom or belittling language',
-          });
-        }
-      });
-    });
-};
+
 const qualityOutputSchema = z.strictObject({
   checks: z
     .array(
@@ -342,43 +225,27 @@ const qualityOutputSchema = z.strictObject({
         findings: z.array(z.string().trim().min(1).max(240)).max(8),
       }),
     )
-    .min(7)
-    .max(10),
+    .length(CURIOSITY_QUALITY_CRITERIA.length),
   verdict: z.enum(['pass', 'reject']),
 });
-
-function qualityOutputSchemaForCandidate(age: number, instructions: Array<{ text: string }>) {
-  const instructionsMeetCopyLimit = instructions.every((instruction) =>
-    isPrimaryInstructionAllowed(age, instruction.text),
-  );
-  return qualityOutputSchema.superRefine((output, context) => {
-    const copyLoadCheck = output.checks.find((check) => check.criterion === 'copy-load');
-    if (instructionsMeetCopyLimit && copyLoadCheck?.status === 'reject') {
-      context.addIssue({
-        code: 'custom',
-        path: ['checks'],
-        message: 'copy-load rejection conflicts with deterministic instruction-length validation',
-      });
-    }
-  });
-}
 
 const MAX_MODEL_OUTPUT_ATTEMPTS = 3;
 
 function parseModelOutput<T>(raw: string, schema: z.ZodType<T>): T {
-  return schema.parse(JSON.parse(raw));
+  const parsed = parseCuriosityModelJson(raw, z.unknown());
+  assertNoExecutableModelContent(parsed);
+  return schema.parse(parsed);
 }
 
 function isRetryableModelOutputError(error: unknown, depth = 0): boolean {
   if (error instanceof z.ZodError || error instanceof SyntaxError) return true;
   if (!(error instanceof Error) || depth >= 4) return false;
-  if (error.name === 'AI_NoObjectGeneratedError' || error.name === 'AI_TypeValidationError') {
+  if (error.name === 'AI_NoObjectGeneratedError' || error.name === 'AI_TypeValidationError')
     return true;
-  }
   return isRetryableModelOutputError(error.cause, depth + 1);
 }
 
-function modelValidationSummary(error: unknown, depth = 0): string {
+function modelValidationSummary(error: unknown): string {
   if (error instanceof z.ZodError) {
     return error.issues
       .slice(0, 8)
@@ -386,23 +253,7 @@ function modelValidationSummary(error: unknown, depth = 0): string {
       .join(',');
   }
   if (error instanceof SyntaxError) return '$:invalid_json';
-  if (error instanceof Error && /^[A-Za-z0-9_]+$/.test(error.name)) {
-    const nested = depth < 4 ? modelValidationSummary(error.cause, depth + 1) : '';
-    return nested && nested !== '$:invalid_output'
-      ? `${depth === 0 ? '$:' : ''}${error.name}>${nested.replace(/^\$:/, '')}`
-      : `$:${error.name}`;
-  }
-  return '$:invalid_output';
-}
-
-function modelCorrectionDetails(error: unknown): string {
-  if (error instanceof z.ZodError) {
-    return error.issues
-      .slice(0, 8)
-      .map((issue) => `${issue.path.join('.') || '$'}: ${issue.message}`)
-      .join('；');
-  }
-  return modelValidationSummary(error);
+  return error instanceof Error ? `$:${error.message}` : '$:invalid_output';
 }
 
 function modelRoute(model: CuriosityPipelineModel) {
@@ -413,195 +264,152 @@ function modelRoute(model: CuriosityPipelineModel) {
   };
 }
 
-function succeededRun(input: {
-  agentRunId: string;
-  runId: string;
-  role: GenerationRole;
-  model: CuriosityPipelineModel;
-  startedAt: string;
-  endedAt: string;
-  inputArtifactIds: string[];
-  outputArtifactId: string;
-  experienceId: string;
-  versionId: string;
-}): CuriosityAgentRun {
-  return curiosityAgentRunSchema.parse({
-    agentRunId: input.agentRunId,
-    runId: input.runId,
-    experienceId: input.experienceId,
-    candidateVersionId: input.versionId,
-    agentRole: input.role,
-    route: modelRoute(input.model),
-    startedAt: input.startedAt,
-    endedAt: input.endedAt,
-    status: 'succeeded',
-    inputArtifactIds: input.inputArtifactIds,
-    outputArtifactIds: [input.outputArtifactId],
-  });
+function suffix(value: string, attempt: number): string {
+  return attempt === 0 ? value : `${value}_retry`;
 }
 
-function failedRun(input: {
-  agentRunId: string;
-  runId: string;
-  role: GenerationRole;
-  model: CuriosityPipelineModel;
-  startedAt: string;
-  endedAt: string;
-  inputArtifactIds: string[];
-  failureCode: CuriosityPipelineFailureCode;
-  experienceId: string;
-  versionId: string;
-}): CuriosityAgentRun {
-  return curiosityAgentRunSchema.parse({
-    agentRunId: input.agentRunId,
-    runId: input.runId,
-    experienceId: input.experienceId,
-    candidateVersionId: input.versionId,
-    agentRole: input.role,
-    route: modelRoute(input.model),
-    startedAt: input.startedAt,
-    endedAt: input.endedAt,
-    status: 'failed',
-    failureCode: input.failureCode,
-    inputArtifactIds: input.inputArtifactIds,
-    outputArtifactIds: [],
-  });
+function childCompletion(knowledge: KnowledgeDesignArtifactV1): string {
+  return (
+    knowledge.allowedExplanations[0] ??
+    `你发现了：${knowledge.causalRelations[0]!.cause}时，${knowledge.causalRelations[0]!.effect}。`
+  );
 }
 
-function instruction(
-  interaction: InteractionDesignArtifactV1,
-  kind: InteractionDesignArtifactV1['instructionCopy'][number]['kind'],
-): string {
-  const selected = interaction.instructionCopy.find((item) => item.kind === kind);
-  if (!selected) throw new Error(`Missing instruction: ${kind}`);
-  return selected.text;
+function validateScene(
+  scene: InteractionDesignArtifactV1,
+  route: ReturnType<typeof classifyCuriosityRequest>,
+): void {
+  const variableIds = new Set(scene.variables.map((variable) => variable.id));
+  for (const relation of scene.relations) {
+    if (!variableIds.has(relation.fromVariableId) || !variableIds.has(relation.toVariableId)) {
+      throw new Error(`SCENE_RELATION_VARIABLE_UNKNOWN: ${relation.id}`);
+    }
+  }
+  if (scene.sceneType === 'relation-explorer' && scene.relations.length === 0) {
+    throw new Error('RELATION_EXPLORER_RELATION_REQUIRED');
+  }
+  if (route.kind === 'curated') {
+    const plugin = knowledgeRegistry.get(route.family);
+    const allowedPrimitives = new Set(plugin.allowedPrimitives);
+    for (const variable of scene.variables) {
+      const bounds = plugin.allowedVariables[variable.id];
+      if (!bounds || variable.min < bounds.min || variable.max > bounds.max) {
+        throw new Error(`SCENE_VARIABLE_OUT_OF_BOUNDS: ${variable.id}`);
+      }
+    }
+    if (scene.primitives.some((primitive) => !allowedPrimitives.has(primitive))) {
+      throw new Error('SCENE_PRIMITIVE_NOT_CURATED');
+    }
+  } else if (
+    scene.primitives.some(
+      (primitive) => primitive !== 'adjust-variable' && primitive !== 'compare-relation',
+    )
+  ) {
+    throw new Error('OPEN_SCENE_PRIMITIVE_NOT_CONTROLLED');
+  }
 }
 
-function buildRuntimeSpec(
-  input: CuriosityAgentPipelineInput,
-  question: QuestionModelArtifactV1,
-  knowledge: KnowledgeDesignArtifactV1,
-  interaction: InteractionDesignArtifactV1,
-  identities: CuriosityPipelineIdentities,
-): CuriosityExperienceSpecV1 {
-  const primaryVariable = interaction.variables[0];
-  if (!primaryVariable) throw new Error('Interaction variables are incomplete');
-  const runtimeByFamily = {
-    'relative-motion': {
-      preset: 'moon-parallax-v1',
-      prediction: [
-        { id: 'near-lamp', label: '近处路灯' },
-        { id: 'far-mountain', label: '远处山峰' },
-        { id: 'moon', label: '月亮' },
-      ],
-      predicted: 'near-lamp',
-      challenge: [
-        { id: 'nearer', label: '放得更近' },
-        { id: 'farther', label: '放得更远' },
-      ],
-      challenged: 'farther',
-      explanations: [
-        { id: 'small-angle-change', label: '距离越远，观察方向变化越小' },
-        { id: 'object-follows', label: '远处物体真的在追着我们移动' },
-      ],
-      explained: 'small-angle-change',
-    },
-    'balance-support': {
-      preset: 'balance-support-v1',
-      prediction: [
-        { id: 'edge-support', label: '支点放在边缘' },
-        { id: 'center-support', label: '支点放在重心下方' },
-      ],
-      predicted: 'center-support',
-      challenge: [
-        { id: 'narrow-base', label: '缩窄底座' },
-        { id: 'wide-base', label: '加宽底座' },
-      ],
-      challenged: 'wide-base',
-      explanations: [
-        { id: 'projection-supported', label: '重心投影落在支撑范围内会更稳' },
-        { id: 'heavier-always-stable', label: '只要更重就一定不会倒' },
-      ],
-      explained: 'projection-supported',
-    },
-    'light-path': {
-      preset: 'light-path-v1',
-      prediction: [
-        { id: 'light-near', label: '光源靠近遮挡物' },
-        { id: 'light-far', label: '光源远离遮挡物' },
-      ],
-      predicted: 'light-near',
-      challenge: [
-        { id: 'move-light', label: '移动光源' },
-        { id: 'ignore-light', label: '遮住眼睛不观察' },
-      ],
-      challenged: 'move-light',
-      explanations: [
-        { id: 'straight-path', label: '光沿直线路径传播，遮挡位置会改变影子' },
-        { id: 'shadow-object', label: '影子是另一个黑色物体' },
-      ],
-      explained: 'straight-path',
-    },
-  } as const;
-  const runtime = runtimeByFamily[knowledge.knowledgeFamily];
+function buildRuntimeSpec(input: {
+  pipelineInput: CuriosityAgentPipelineInput;
+  question: QuestionModelArtifactV1;
+  knowledge: KnowledgeDesignArtifactV1;
+  scene: InteractionDesignArtifactV1;
+  presentation: StoryDesignArtifactV1;
+  identities: CuriosityPipelineIdentities;
+}): CuriosityExperienceSpecV1 {
+  if (!input.scene.tasks) throw new Error('SCENE_TASKS_REQUIRED');
+  const primaryVariable = input.scene.variables[0];
+  if (!primaryVariable) throw new Error('SCENE_VARIABLES_REQUIRED');
+  const preset =
+    input.knowledge.knowledgeFamily === 'relative-motion'
+      ? 'moon-parallax-v1'
+      : input.knowledge.knowledgeFamily === 'balance-support'
+        ? 'balance-support-v1'
+        : input.knowledge.knowledgeFamily === 'light-path'
+          ? 'light-path-v1'
+          : input.scene.sceneType === 'relation-explorer'
+            ? 'relation-explorer-v1'
+            : 'variable-explorer-v1';
   return curiosityExperienceSpecSchema.parse({
     schemaVersion: '1.0',
-    experienceId: identities.experienceId,
-    versionId: identities.versionId,
-    revision: identities.revision ?? 1,
-    createdAt: identities.createdAt,
-    profile: { age: input.age, interests: input.interests },
-    question: { original: input.question, coreQuestion: question.coreQuestion },
-    knowledge: { family: knowledge.knowledgeFamily, packId: knowledge.packId },
+    experienceId: input.identities.experienceId,
+    versionId: input.identities.versionId,
+    revision: input.identities.revision ?? 1,
+    createdAt: input.identities.createdAt,
+    profile: { age: input.pipelineInput.targetAge },
+    question: {
+      original: input.pipelineInput.question,
+      coreQuestion: input.question.coreQuestion,
+    },
+    knowledge: {
+      family: input.knowledge.knowledgeFamily,
+      packId: input.knowledge.packId,
+    },
     presentation: {
-      title: question.equivalentQuestions[0] ?? question.coreQuestion,
-      hook: interaction.scenario,
-      explorePrompt: instruction(interaction, 'exploration'),
-      challengePrompt: instruction(interaction, 'transfer'),
-      completion: formatChildCompletion(
-        knowledge.causalRelations[0]?.cause ?? '',
-        knowledge.causalRelations[0]?.effect ?? '',
-      ),
+      title: input.presentation.title,
+      hook: input.presentation.hook,
+      explorePrompt: input.presentation.explorePrompt,
+      challengePrompt: input.presentation.challengePrompt,
+      completion: input.presentation.completion ?? childCompletion(input.knowledge),
     },
     simulation: {
-      preset: runtime.preset,
-      observerTravel: Math.min(
-        100,
-        Math.max(40, Math.abs(primaryVariable.min), Math.abs(primaryVariable.max)),
-      ),
+      preset,
+      observerTravel: Math.min(100, Math.max(40, Math.abs(primaryVariable.max))),
       nearObjectDistance: 20,
       farObjectDistance: 400,
     },
-    tasks: [
-      {
-        id: 'prediction',
-        kind: 'prediction',
-        prompt: instruction(interaction, 'prediction'),
-        options: [...runtime.prediction],
-        expectedOptionId: runtime.predicted,
-      },
-      {
-        id: 'exploration',
-        kind: 'exploration',
-        prompt: instruction(interaction, 'exploration'),
-        variable: primaryVariable.id,
-      },
-      {
-        id: 'challenge',
-        kind: 'challenge',
-        prompt: instruction(interaction, 'transfer'),
-        options: [...runtime.challenge],
-        expectedOptionId: runtime.challenged,
-      },
-      {
-        id: 'explanation',
-        kind: 'explanation',
-        prompt: instruction(interaction, 'explanation'),
-        options: [...runtime.explanations],
-        expectedOptionId: runtime.explained,
-      },
-    ],
+    tasks: input.scene.tasks,
     eventRequirements: [...CURIOUSITY_EVENT_TYPES],
+  });
+}
+
+function buildExperienceSpec(input: {
+  pipelineInput: CuriosityAgentPipelineInput;
+  question: QuestionModelArtifactV1;
+  knowledge: KnowledgeDesignArtifactV1;
+  scene: InteractionDesignArtifactV1;
+  identities: CuriosityPipelineIdentities;
+  attempt: number;
+}): CuriosityExperienceSpecV2 {
+  return curiosityExperienceSpecV2Schema.parse({
+    artifactId: suffix(input.identities.artifactIds.spec, input.attempt),
+    runId: input.identities.runId,
+    agentRole: 'curiosity.interaction-designer',
+    schemaVersion: '2.0',
+    createdAt: input.identities.createdAt,
+    upstreamArtifactIds: [
+      input.question.artifactId,
+      input.knowledge.artifactId,
+      input.scene.artifactId,
+    ],
+    knowledgePackVersion: input.knowledge.knowledgePackVersion,
+    experienceId: input.identities.experienceId,
+    versionId: input.identities.versionId,
+    revision: input.identities.revision ?? 1,
+    profile: { age: input.pipelineInput.targetAge },
+    sourceArtifactIds: {
+      questionModel: input.question.artifactId,
+      knowledgeDesign: input.knowledge.artifactId,
+      interactionDesign: input.scene.artifactId,
+    },
+    knowledge: {
+      family: input.knowledge.knowledgeFamily,
+      packId: input.knowledge.packId,
+      packVersion: input.knowledge.knowledgePackVersion,
+    },
+    title: input.question.equivalentQuestions[0] ?? input.question.coreQuestion,
+    visualTheme: input.scene.visualTheme,
+    sceneType: input.scene.sceneType,
+    observationSuggestions: input.knowledge.observationSuggestions,
+    instructions: input.scene.instructionCopy,
+    variables: input.scene.variables.map(({ id, min, max, initial }) => ({
+      id,
+      min,
+      max,
+      initial,
+    })),
+    primitives: input.scene.primitives,
+    eventRequirements: [...CURIOSITY_EVENT_TYPES_V2],
   });
 }
 
@@ -611,23 +419,13 @@ export async function runCuriosityAgentPipeline(
   identities: CuriosityPipelineIdentities,
   onStage?: (update: CuriosityPipelineStageUpdate) => void | Promise<void>,
 ): Promise<CuriosityAgentPipelineResult> {
-  const mapping = classifyCuriosityRequest(input);
-  const knowledgePlugin = knowledgeRegistry.get(mapping.family);
-  const selectedPack = knowledgePlugin.packs.find((pack) => pack.id === mapping.packId);
-  if (!selectedPack) {
-    throw new CuriosityAgentPipelineError(
-      'KNOWLEDGE_DESIGN_INVALID',
-      'curiosity.knowledge-designer',
-      '确定性分类结果没有对应知识包。',
-      [],
-      [],
-    );
-  }
+  const route = classifyCuriosityRequest(input);
   const artifacts: CuriosityPipelineArtifact[] = [];
   const agentRuns: CuriosityAgentRun[] = [];
-  const notify = async (stage: CuriosityPipelineStage) =>
+  const notify = async (stage: CuriosityPipelineStage, artifactId: string) =>
     onStage?.({
       stage,
+      artifactId,
       artifacts: structuredClone(artifacts),
       agentRuns: structuredClone(agentRuns),
     });
@@ -646,60 +444,61 @@ export async function runCuriosityAgentPipeline(
     const selectedModel = models[parameters.role];
     const startedAt = new Date().toISOString();
     try {
-      const outputSchema = JSON.stringify(z.toJSONSchema(parameters.schema));
       let output: T | undefined;
       let lastError: unknown;
       for (let attempt = 1; attempt <= MAX_MODEL_OUTPUT_ATTEMPTS; attempt += 1) {
         try {
           const raw = await selectedModel.complete({
-            system: `你是 ${parameters.role}。\n${renderCuriosityRoleSkill(parameters.role)}\n只返回严格 JSON，不得输出隐藏思维链。输出必须严格符合以下 JSON Schema：${outputSchema}`,
+            system: `你是 ${parameters.role}。\n${renderCuriosityRoleSkill(parameters.role)}\n只返回严格 JSON，不得输出隐藏思维链。不得输出 HTML、CSS、JavaScript、函数或表达式。输出必须严格符合以下 JSON Schema：${JSON.stringify(z.toJSONSchema(parameters.schema))}`,
             prompt:
               attempt === 1
                 ? parameters.prompt
-                : `${parameters.prompt}\n上一轮输出未通过 Schema 校验。修正项：${modelCorrectionDetails(lastError)}。请逐项自检后重新生成完整 JSON；不要省略字段、扩大允许范围或改写单位。`,
+                : `${parameters.prompt}\n上一轮输出未通过 Schema：${modelValidationSummary(lastError)}。请完整重写。`,
             schema: parameters.schema,
           });
           output = parseModelOutput(raw, parameters.schema);
           break;
         } catch (error) {
           lastError = error;
-          if (!isRetryableModelOutputError(error) || attempt === MAX_MODEL_OUTPUT_ATTEMPTS) {
+          if (!isRetryableModelOutputError(error) || attempt === MAX_MODEL_OUTPUT_ATTEMPTS)
             throw error;
-          }
         }
       }
       if (output === undefined) throw lastError;
       const artifact = parameters.build(output);
       artifacts.push(artifact);
       agentRuns.push(
-        succeededRun({
+        curiosityAgentRunSchema.parse({
           agentRunId: parameters.agentRunId,
           runId: identities.runId,
-          role: parameters.role,
-          model: selectedModel,
+          experienceId: identities.experienceId,
+          candidateVersionId: identities.versionId,
+          agentRole: parameters.role,
+          route: modelRoute(selectedModel),
           startedAt,
           endedAt: new Date().toISOString(),
+          status: 'succeeded',
           inputArtifactIds: parameters.upstreamArtifactIds,
-          outputArtifactId: parameters.artifactId,
-          experienceId: identities.experienceId,
-          versionId: identities.versionId,
+          outputArtifactIds: [parameters.artifactId],
         }),
       );
-      await notify(parameters.stage);
+      await notify(parameters.stage, parameters.artifactId);
       return artifact;
     } catch (error) {
       agentRuns.push(
-        failedRun({
+        curiosityAgentRunSchema.parse({
           agentRunId: parameters.agentRunId,
           runId: identities.runId,
-          role: parameters.role,
-          model: selectedModel,
+          experienceId: identities.experienceId,
+          candidateVersionId: identities.versionId,
+          agentRole: parameters.role,
+          route: modelRoute(selectedModel),
           startedAt,
           endedAt: new Date().toISOString(),
-          inputArtifactIds: parameters.upstreamArtifactIds,
+          status: 'failed',
           failureCode: parameters.failureCode,
-          experienceId: identities.experienceId,
-          versionId: identities.versionId,
+          inputArtifactIds: parameters.upstreamArtifactIds,
+          outputArtifactIds: [],
         }),
       );
       throw new CuriosityAgentPipelineError(
@@ -713,19 +512,25 @@ export async function runCuriosityAgentPipeline(
     }
   };
 
+  const ageBand = input.targetAge <= 7 ? '6-7' : '8-10';
+  const questionSchema = questionOutputBaseSchema.extend({
+    ageBand: z.literal(ageBand),
+    supportStatus: z.literal('supported'),
+    knowledgeRoute: z.literal(route.kind),
+    knowledgeFamilyCandidates:
+      route.kind === 'curated'
+        ? z.array(z.literal(route.family)).length(1)
+        : z.array(z.enum(['relative-motion', 'balance-support', 'light-path', 'open'])).max(3),
+  });
   const question = (await execute({
     role: 'curiosity.question-modeler',
-    stage: 'question_modeling',
+    stage: 'question',
     failureCode: 'QUESTION_MODEL_INVALID',
     agentRunId: identities.agentRunIds.question,
     artifactId: identities.artifactIds.question,
     upstreamArtifactIds: [],
-    prompt: JSON.stringify({
-      input,
-      allowedKnowledgeFamilies: [mapping.family],
-      perspectiveDirective: input.perspectiveDirective,
-    }),
-    schema: questionOutputSchemaForMapping(mapping.family, input.age),
+    prompt: JSON.stringify({ input, route }),
+    schema: questionSchema,
     build: (output) =>
       questionModelArtifactV1Schema.parse({
         ...output,
@@ -735,52 +540,52 @@ export async function runCuriosityAgentPipeline(
         schemaVersion: '1.0',
         createdAt: identities.createdAt,
         upstreamArtifactIds: [],
-        knowledgePackVersion: 'unselected',
+        knowledgePackVersion: route.kind === 'curated' ? '1.0.0' : 'generated-1',
       }),
   })) as QuestionModelArtifactV1;
 
-  if (
-    question.supportStatus !== 'supported' ||
-    question.ageBand !== (input.age <= 7 ? '6-7' : '8-10') ||
-    question.knowledgeFamilyCandidates.length !== 1 ||
-    question.knowledgeFamilyCandidates[0] !== mapping.family
-  ) {
+  const selectedPack =
+    route.kind === 'curated'
+      ? knowledgeRegistry.get(route.family).packs.find((candidate) => candidate.id === route.packId)
+      : undefined;
+  if (route.kind === 'curated' && !selectedPack) {
     throw new CuriosityAgentPipelineError(
-      'QUESTION_MODEL_INVALID',
-      'curiosity.question-modeler',
-      '问题建模未返回唯一受支持知识模型族。',
-      structuredClone(artifacts),
-      structuredClone(agentRuns),
+      'KNOWLEDGE_DESIGN_INVALID',
+      'curiosity.knowledge-designer',
+      '策展知识包不存在。',
+      artifacts,
+      agentRuns,
     );
   }
-
   const knowledge = (await execute({
     role: 'curiosity.knowledge-designer',
-    stage: 'knowledge_design',
+    stage: 'knowledge',
     failureCode: 'KNOWLEDGE_DESIGN_INVALID',
     agentRunId: identities.agentRunIds.knowledge,
     artifactId: identities.artifactIds.knowledge,
     upstreamArtifactIds: [question.artifactId],
     prompt: JSON.stringify({
-      questionArtifact: question,
-      knowledgePack: {
-        id: selectedPack.id,
-        family: selectedPack.family,
-        version: selectedPack.version,
-      },
-      requiredPackId: selectedPack.id,
-      packIdPolicy: 'copy-required-pack-id-exactly',
+      question,
+      route,
+      curatedKnowledgePack: selectedPack,
+      requiredOpenFields:
+        route.kind === 'open'
+          ? [
+              'claims',
+              'relations',
+              'allowedVocabulary',
+              'allowedExplanations',
+              'forbiddenExplanations',
+              'misconceptions',
+              'uncertainties',
+              'timeSensitive',
+            ]
+          : undefined,
       perspectiveDirective: input.perspectiveDirective,
-      preservedCausalRelations: input.preservedCausalRelations,
-      causalRelationsPolicy: input.preservedCausalRelations
-        ? 'immutable-server-injected-do-not-output-causalRelations'
-        : 'generate-within-approved-knowledge-pack',
     }),
-    schema: input.preservedCausalRelations
-      ? regenerationKnowledgeOutputSchema
-      : knowledgeOutputSchema,
-    build: (output) =>
-      knowledgeDesignArtifactV1Schema.parse({
+    schema: route.kind === 'open' ? openKnowledgeOutputSchema : commonKnowledgeOutputSchema,
+    build: (output) => {
+      const artifact = knowledgeDesignArtifactV1Schema.parse({
         ...output,
         ...(input.preservedCausalRelations
           ? { causalRelations: input.preservedCausalRelations }
@@ -791,292 +596,193 @@ export async function runCuriosityAgentPipeline(
         schemaVersion: '1.0',
         createdAt: identities.createdAt,
         upstreamArtifactIds: [question.artifactId],
-        knowledgePackVersion: selectedPack.version,
-      }),
+        knowledgePackVersion: selectedPack?.version ?? 'generated-1',
+        source: route.kind,
+        knowledgeFamily: route.kind === 'curated' ? route.family : 'open',
+        packId:
+          route.kind === 'curated' ? route.packId : `open.${identities.artifactIds.knowledge}`,
+      });
+      if (route.kind === 'curated') knowledgeRegistry.get(route.family).validateKnowledge(artifact);
+      return artifact;
+    },
   })) as KnowledgeDesignArtifactV1;
 
-  if (knowledge.knowledgeFamily !== mapping.family || knowledge.packId !== mapping.packId) {
-    throw new CuriosityAgentPipelineError(
-      'KNOWLEDGE_DESIGN_INVALID',
-      'curiosity.knowledge-designer',
-      '知识设计与确定性知识包映射不一致。',
-      structuredClone(artifacts),
-      structuredClone(agentRuns),
-    );
-  }
-  knowledgePlugin.validateKnowledge(knowledge);
-
-  const interaction = (await execute({
-    role: 'curiosity.interaction-designer',
-    stage: 'interaction_design',
-    failureCode: 'INTERACTION_DESIGN_INVALID',
-    agentRunId: identities.agentRunIds.interaction,
-    artifactId: identities.artifactIds.interaction,
-    upstreamArtifactIds: [question.artifactId, knowledge.artifactId],
-    prompt: JSON.stringify({
-      questionArtifact: question,
-      knowledgeArtifact: knowledge,
-      allowedVariables: knowledgePlugin.allowedVariables,
-      allowedPrimitives: knowledgePlugin.allowedPrimitives,
-      transferRule: 'only-use-declared-variables-and-primitives',
-      forbiddenInteractionCopy:
-        '不得要求孩子执行未由 allowedVariables 与 allowedPrimitives 支持的换物体、换场景或新增机制操作。',
-      scientificCopyPolicy: {
-        forbiddenExplanations: knowledge.forbiddenExplanations,
-        misconceptions: knowledge.misconceptions,
-        absoluteLanguage:
-          '反馈只能描述这一次观察到的结果；禁止纹丝不动、绝对不会、永远不倒、一定不变等绝对化科学表述。',
-      },
-      primaryInstructionLimit: input.age <= 7 ? 16 : 28,
-      instructionCopyRule: `instructionCopy 中每条 text 去掉标点和空格后不得超过 ${input.age <= 7 ? 16 : 28} 个汉字；必须逐条自行计数并缩短`,
-      requiredTaskKinds: [...REQUIRED_RUNTIME_TASK_KINDS],
-      maxPrimaryTasks: input.age <= 7 ? 4 : 5,
-      variableBoundsPolicy:
-        '每个变量必须使用 allowedVariables 中同名变量的 min 和 max，不得缩小、扩大或改单位。',
-      perspectiveDirective: input.perspectiveDirective,
-    }),
-    schema: interactionOutputSchemaForAge(input.age, knowledgePlugin.allowedVariables),
-    build: (output) =>
-      interactionDesignArtifactV1Schema.parse({
-        ...output,
-        artifactId: identities.artifactIds.interaction,
-        runId: identities.runId,
-        agentRole: 'curiosity.interaction-designer',
-        schemaVersion: '1.0',
-        createdAt: identities.createdAt,
-        upstreamArtifactIds: [question.artifactId, knowledge.artifactId],
-        knowledgePackVersion: selectedPack.version,
+  let rejectionFeedback: string[] = [];
+  for (let attempt = 0; attempt <= 1; attempt += 1) {
+    const sceneArtifactId = suffix(identities.artifactIds.scene, attempt);
+    const presentationArtifactId = suffix(identities.artifactIds.presentation, attempt);
+    const qualityArtifactId = suffix(identities.artifactIds.quality, attempt);
+    const scene = (await execute({
+      role: 'curiosity.interaction-designer',
+      stage: 'scene',
+      failureCode: 'SCENE_DESIGN_INVALID',
+      agentRunId: suffix(identities.agentRunIds.scene, attempt),
+      artifactId: sceneArtifactId,
+      upstreamArtifactIds: [question.artifactId, knowledge.artifactId],
+      prompt: JSON.stringify({
+        question,
+        knowledge,
+        allowedSceneTypes: ['variable-explorer', 'relation-explorer'],
+        allowedOpenPrimitives: ['adjust-variable', 'compare-relation'],
+        modelCodePolicy: 'declarative-data-only',
+        rejectionFeedback,
+        perspectiveDirective: input.perspectiveDirective,
       }),
-  })) as InteractionDesignArtifactV1;
-
-  const team = (await execute({
-    role: 'curiosity.team-assembler',
-    stage: 'team_assembly',
-    failureCode: 'TEAM_ASSEMBLY_INVALID',
-    agentRunId: identities.agentRunIds.team,
-    artifactId: identities.artifactIds.team,
-    upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId],
-    prompt: JSON.stringify({
-      task: '根据本次问题、知识边界和场景计划组建专属探索团队，不得复用固定角色名单。',
-      questionArtifact: question,
-      knowledgeArtifact: knowledge,
-      sceneOutline: {
-        scenario: interaction.scenario,
-        variables: interaction.variables,
-        taskSequence: interaction.taskSequence,
+      schema: sceneOutputSchema,
+      build: (output) => {
+        const artifact = interactionDesignArtifactV1Schema.parse({
+          ...output,
+          artifactId: sceneArtifactId,
+          runId: identities.runId,
+          agentRole: 'curiosity.interaction-designer',
+          schemaVersion: '1.0',
+          createdAt: identities.createdAt,
+          upstreamArtifactIds: [question.artifactId, knowledge.artifactId],
+          knowledgePackVersion: knowledge.knowledgePackVersion,
+        });
+        validateScene(artifact, route);
+        return artifact;
       },
-      constraints: {
-        memberCount: '3-5',
-        exactlyOneLead: true,
-        roles: ['lead', 'science', 'interaction', 'story', 'review'],
-        childFacingLanguage: '简体中文，角色姓名和 persona 必须与本题有关且适合儿童。',
-        distinctColors: true,
-        personaUsage: '后续故事与引导会读取 persona，必须描述具体职责、性格和表达方式。',
-      },
-    }),
-    schema: teamOutputSchema,
-    build: (output) =>
-      teamAssemblyArtifactV1Schema.parse({
-        ...output,
-        artifactId: identities.artifactIds.team,
-        runId: identities.runId,
-        agentRole: 'curiosity.team-assembler',
-        schemaVersion: '1.0',
-        createdAt: identities.createdAt,
-        upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId],
-        knowledgePackVersion: selectedPack.version,
-      }),
-  })) as TeamAssemblyArtifactV1;
+    })) as InteractionDesignArtifactV1;
 
-  const story = (await execute({
-    role: 'curiosity.story-designer',
-    stage: 'story_design',
-    failureCode: 'STORY_DESIGN_INVALID',
-    agentRunId: identities.agentRunIds.story,
-    artifactId: identities.artifactIds.story,
-    upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId, team.artifactId],
-    prompt: JSON.stringify({
-      questionArtifact: question,
-      knowledgeArtifact: knowledge,
-      interactionArtifact: interaction,
-      explorationTeam: team,
-      age: input.age,
-      requiredStageKinds: interaction.taskSequence,
-      perspectiveDirective: input.perspectiveDirective,
-      childLanguagePolicy:
-        '使用孩子日常能直接理解的简体中文；禁止成人成语俗语、讽刺挖苦、贬低智力、反问施压和把错误答案说成事实。',
-      narrationLoadPolicy:
-        input.age <= 7
-          ? '每次旁白只表达一个动作或一个观察问题，最多 40 个汉字。'
-          : '每次旁白最多表达一个动作和一个观察问题，最多 56 个汉字。',
-      hintPolicy: '每条提示最多 36 个汉字；三级提示都只能引导观察，不得直接写出完整因果答案。',
-    }),
-    schema: storyOutputSchemaForTasks(interaction.taskSequence, input.age),
-    build: (output) =>
-      storyDesignArtifactV1Schema.parse({
-        ...output,
-        artifactId: identities.artifactIds.story,
-        runId: identities.runId,
-        agentRole: 'curiosity.story-designer',
-        schemaVersion: '1.0',
-        createdAt: identities.createdAt,
-        upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId, team.artifactId],
-        knowledgePackVersion: selectedPack.version,
-        sourceArtifactIds: {
-          questionModel: question.artifactId,
-          knowledgeDesign: knowledge.artifactId,
-          interactionDesign: interaction.artifactId,
-        },
+    const presentation = (await execute({
+      role: 'curiosity.presentation-designer',
+      stage: 'presentation',
+      failureCode: 'PRESENTATION_INVALID',
+      agentRunId: suffix(identities.agentRunIds.presentation, attempt),
+      artifactId: presentationArtifactId,
+      upstreamArtifactIds: [question.artifactId, knowledge.artifactId, scene.artifactId],
+      prompt: JSON.stringify({
+        question,
+        knowledge,
+        scene,
+        narrationPolicy: 'generate-complete-reviewed-library-now;runtime-generation-forbidden',
+        discoveryPromptLimit: 3,
+        everyDiscoveryPromptSkippable: true,
+        rejectionFeedback,
+        perspectiveDirective: input.perspectiveDirective,
       }),
-  })) as StoryDesignArtifactV1;
+      schema: presentationOutputSchema,
+      build: (output) =>
+        storyDesignArtifactV1Schema.parse({
+          ...output,
+          artifactId: presentationArtifactId,
+          runId: identities.runId,
+          agentRole: 'curiosity.presentation-designer',
+          schemaVersion: '1.0',
+          createdAt: identities.createdAt,
+          upstreamArtifactIds: [question.artifactId, knowledge.artifactId, scene.artifactId],
+          knowledgePackVersion: knowledge.knowledgePackVersion,
+          sourceArtifactIds: {
+            questionModel: question.artifactId,
+            knowledgeDesign: knowledge.artifactId,
+            interactionDesign: scene.artifactId,
+          },
+          stages: [],
+        }),
+    })) as StoryDesignArtifactV1;
 
-  let spec: CuriosityExperienceSpecV2;
-  let runtimeSpec: CuriosityExperienceSpecV1;
-  let compiled: CompiledCuriosityExperience;
-  try {
-    spec = curiosityExperienceSpecV2Schema.parse({
-      artifactId: identities.artifactIds.spec,
-      runId: identities.runId,
-      agentRole: 'curiosity.interaction-designer',
-      schemaVersion: '2.0',
-      createdAt: identities.createdAt,
+    let spec: CuriosityExperienceSpecV2;
+    let runtimeSpec: CuriosityExperienceSpecV1;
+    let compiled: CompiledCuriosityExperience;
+    try {
+      spec = buildExperienceSpec({
+        pipelineInput: input,
+        question,
+        knowledge,
+        scene,
+        identities,
+        attempt,
+      });
+      compileCuriosityExperienceV2(spec);
+      runtimeSpec = buildRuntimeSpec({
+        pipelineInput: input,
+        question,
+        knowledge,
+        scene,
+        presentation,
+        identities,
+      });
+      compiled = compileCuriosityExperience(runtimeSpec);
+      artifacts.push(spec);
+    } catch (error) {
+      throw new CuriosityAgentPipelineError(
+        'DETERMINISTIC_VALIDATION_FAILED',
+        'curiosity.interaction-designer',
+        '确定性 Schema、知识或编译检查失败。',
+        artifacts,
+        agentRuns,
+        error,
+      );
+    }
+
+    const quality = (await execute({
+      role: 'curiosity.quality-reviewer',
+      stage: 'quality',
+      failureCode: 'QUALITY_REVIEW_INVALID',
+      agentRunId: suffix(identities.agentRunIds.quality, attempt),
+      artifactId: qualityArtifactId,
       upstreamArtifactIds: [
-        question.artifactId,
         knowledge.artifactId,
-        interaction.artifactId,
-        story.artifactId,
+        scene.artifactId,
+        presentation.artifactId,
+        spec.artifactId,
       ],
-      knowledgePackVersion: selectedPack.version,
-      experienceId: identities.experienceId,
-      versionId: identities.versionId,
-      revision: identities.revision ?? 1,
-      profile: { age: input.age, interests: input.interests },
-      sourceArtifactIds: {
-        questionModel: question.artifactId,
-        knowledgeDesign: knowledge.artifactId,
-        interactionDesign: interaction.artifactId,
-      },
-      knowledge: {
-        family: knowledge.knowledgeFamily,
-        packId: knowledge.packId,
-        packVersion: selectedPack.version,
-      },
-      title: question.equivalentQuestions[0] ?? question.coreQuestion,
-      visualTheme: interaction.visualTheme,
-      observationSuggestions: knowledge.observationSuggestions,
-      instructions: interaction.instructionCopy,
-      variables: interaction.variables.map(({ id, min, max, initial }) => ({
-        id,
-        min,
-        max,
-        initial,
-      })),
-      primitives: interaction.primitives,
-      eventRequirements: [...CURIOSITY_EVENT_TYPES_V2],
-    });
-    compileCuriosityExperienceV2(spec);
-    runtimeSpec = buildRuntimeSpec(input, question, knowledge, interaction, identities);
-    compiled = compileCuriosityExperience(runtimeSpec);
-    artifacts.push(spec);
-    await notify('deterministic_compile');
-  } catch (error) {
-    throw new CuriosityAgentPipelineError(
-      'DETERMINISTIC_VALIDATION_FAILED',
-      'curiosity.interaction-designer',
-      '确定性 Schema、知识、事件或编译检查失败。',
-      structuredClone(artifacts),
-      structuredClone(agentRuns),
-      error,
-    );
-  }
-
-  const quality = (await execute({
-    role: 'curiosity.quality-reviewer',
-    stage: 'quality_review',
-    failureCode: 'QUALITY_REVIEW_INVALID',
-    agentRunId: identities.agentRunIds.quality,
-    artifactId: identities.artifactIds.quality,
-    upstreamArtifactIds: [
-      question.artifactId,
-      knowledge.artifactId,
-      interaction.artifactId,
-      story.artifactId,
-      spec.artifactId,
-    ],
-    prompt: JSON.stringify({
-      reviewContract: {
-        checksLength: 7,
-        exactlyOnePerCriterion: true,
-        languagePolicy: 'simplified-chinese-is-required',
-        instructionNarrationPolicy:
-          'short-screen-instructions-and-related-spoken-narration-are-intentionally-distinct',
-        reviewScope:
-          'reject-only-explicit-criterion-violations-supported-by-the-supplied-artifacts',
-        copyLoadPolicy: `copy-load 只检查主要屏幕 instructionCopy；每条去掉标点和空格后不得超过 ${input.age <= 7 ? 16 : 28} 个汉字。简体中文、旁白比屏幕指令更完整、指令与旁白语义相关都不是拒绝理由。`,
-        criterionRules: {
-          'age-fit': `在主要屏幕指令超过 ${input.age <= 7 ? 16 : 28} 个汉字、变量超过 ${input.age <= 7 ? 2 : 3} 个、任务超过 ${input.age <= 7 ? 4 : 5} 个，或故事旁白含儿童难懂的成人成语俗语、讽刺挖苦、智力贬低与反问施压时拒绝。`,
-          'interest-link':
-            '只在内容声称了 input.interests 中不存在的具体兴趣事实时拒绝；没有使用兴趣不构成拒绝。',
-          'knowledge-consistency':
-            '只在内容与 knowledgeArtifact 的知识包、因果关系或允许词汇直接冲突时拒绝。',
-          'misconception-risk':
-            'only-reject-when-copy-affirms-a-forbidden-explanation;do-not-require-an-extra-safety-or-fact-confirmation-stage',
-          'interaction-completeness':
-            '只在缺少 requiredTaskKinds、使用未声明变量或使用未授权原语时拒绝。',
-          'transfer-validity': '只在迁移任务引入知识包外机制、未声明变量或未授权原语时拒绝。',
-          'copy-load':
-            '按 copyLoadPolicy 判断；不得因中文、旁白更完整、语义重复或缺少国际化键而拒绝。',
+      prompt: JSON.stringify({
+        reviewContract: {
+          criteria: CURIOSITY_QUALITY_CRITERIA,
+          reviewAllKnowledge: true,
+          reviewCompleteScene: true,
+          reviewEveryNarration: true,
+          reviewEveryDiscoveryPrompt: true,
         },
-        criteria: [
-          'age-fit',
-          'interest-link',
-          'knowledge-consistency',
-          'misconception-risk',
-          'interaction-completeness',
-          'transfer-validity',
-          'copy-load',
-        ],
-      },
-      question,
-      knowledge,
-      interaction,
-      team,
-      story,
-      spec,
-    }),
-    schema: qualityOutputSchemaForCandidate(input.age, interaction.instructionCopy),
-    build: (output) =>
-      qualityReviewArtifactV1Schema.parse({
-        ...canonicalizeCuriosityQuality(output, 8),
-        artifactId: identities.artifactIds.quality,
-        runId: identities.runId,
-        agentRole: 'curiosity.quality-reviewer',
-        schemaVersion: '1.0',
-        createdAt: identities.createdAt,
-        upstreamArtifactIds: [
-          question.artifactId,
-          knowledge.artifactId,
-          interaction.artifactId,
-          story.artifactId,
-          spec.artifactId,
-        ],
-        knowledgePackVersion: '1.0.0',
+        knowledge,
+        scene,
+        presentation,
+        spec,
       }),
-  })) as QualityReviewArtifactV1;
+      schema: qualityOutputSchema,
+      build: (output) =>
+        qualityReviewArtifactV1Schema.parse({
+          ...canonicalizeCuriosityQuality(output, 8),
+          artifactId: qualityArtifactId,
+          runId: identities.runId,
+          agentRole: 'curiosity.quality-reviewer',
+          schemaVersion: '1.0',
+          createdAt: identities.createdAt,
+          upstreamArtifactIds: [
+            knowledge.artifactId,
+            scene.artifactId,
+            presentation.artifactId,
+            spec.artifactId,
+          ],
+          knowledgePackVersion: knowledge.knowledgePackVersion,
+        }),
+    })) as QualityReviewArtifactV1;
 
-  if (quality.verdict !== 'pass') {
-    const rejectionSummary = quality.checks
+    if (quality.verdict === 'pass') {
+      return {
+        artifacts,
+        agentRuns,
+        spec,
+        runtimeSpec,
+        compiled,
+        qualityRetryCount: attempt as 0 | 1,
+      };
+    }
+    rejectionFeedback = quality.checks
       .filter((check) => check.status === 'reject')
-      .map((check) => `${check.criterion}:${check.findings.join('；') || '未提供原因'}`)
-      .join('，');
-    throw new CuriosityAgentPipelineError(
-      'QUALITY_REJECTED',
-      'curiosity.quality-reviewer',
-      `质量审查拒绝候选体验：${rejectionSummary}`,
-      structuredClone(artifacts),
-      structuredClone(agentRuns),
-    );
+      .flatMap((check) => check.findings);
+    if (attempt === 1) {
+      throw new CuriosityAgentPipelineError(
+        'QUALITY_REJECTED',
+        'curiosity.quality-reviewer',
+        `质量审查两次拒绝候选体验：${rejectionFeedback.join('；') || '未提供原因'}`,
+        artifacts,
+        agentRuns,
+      );
+    }
   }
 
-  return { artifacts, agentRuns, spec, runtimeSpec, compiled };
+  throw new Error('UNREACHABLE_PIPELINE_STATE');
 }

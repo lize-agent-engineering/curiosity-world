@@ -12,28 +12,32 @@ const plugins = [relativeMotionPlugin, balanceSupportPlugin, lightPathPlugin] as
 
 export const knowledgeRegistry = {
   plugins,
-  classify(input: { question: string; age: number }): {
-    family: CuriosityKnowledgeFamily;
-    packId: string;
-  } {
+  classify(input: { question: string; age: number }):
+    | {
+        kind: 'curated';
+        family: CuriosityKnowledgeFamily;
+        packId: string;
+      }
+    | {
+        kind: 'open';
+        matchedFamilies: CuriosityKnowledgeFamily[];
+      } {
     const matches: Array<{ plugin: CuriosityKnowledgePlugin; pack: CuriosityKnowledgePack }> = [];
     for (const plugin of plugins) {
       const pack = plugin.classify(input.question.trim());
       if (pack) matches.push({ plugin, pack });
     }
-    if (matches.length === 0) {
-      throw new CuriosityKnowledgePluginError(
-        'UNSUPPORTED_QUESTION',
-        '问题不属于已注册的知识模型族。',
-      );
+    if (matches.length !== 1) {
+      return {
+        kind: 'open',
+        matchedFamilies: matches.map((match) => match.plugin.family),
+      };
     }
-    if (matches.length > 1) {
-      throw new CuriosityKnowledgePluginError(
-        'AMBIGUOUS_KNOWLEDGE_FAMILY',
-        '问题同时匹配多个知识模型族，需要先澄清。',
-      );
-    }
-    return { family: matches[0]!.plugin.family, packId: matches[0]!.pack.id };
+    return {
+      kind: 'curated',
+      family: matches[0]!.plugin.family,
+      packId: matches[0]!.pack.id,
+    };
   },
   get(family: CuriosityKnowledgeFamily): CuriosityKnowledgePlugin {
     const plugin = plugins.find((candidate) => candidate.family === family);

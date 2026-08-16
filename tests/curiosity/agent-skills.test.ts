@@ -7,9 +7,8 @@ describe('Curiosity role skills', () => {
     ['curiosity.question-modeler', '儿童问题澄清'],
     ['curiosity.knowledge-designer', '儿童科学解释'],
     ['curiosity.interaction-designer', '游戏化探索编排'],
-    ['curiosity.story-designer', '游戏主持人旁白'],
+    ['curiosity.presentation-designer', '游戏主持人旁白'],
     ['curiosity.quality-reviewer', '儿童体验质检'],
-    ['curiosity.exploration-guide', '苏格拉底式引导'],
     ['curiosity.revision-planner', '换角度重讲'],
   ] as const)('%s has a deployable skill with workflow and refusal rules', (role, name) => {
     const skill = getCuriosityRoleSkill(role);

@@ -28,6 +28,7 @@ export const MOON_KNOWLEDGE_PACK = {
 export type CuriosityDomainErrorCode =
   | 'AGE_OUT_OF_RANGE'
   | 'UNSAFE_CONTENT'
+  | 'NEEDS_CLARIFICATION'
   | 'UNSUPPORTED_QUESTION'
   | 'AMBIGUOUS_KNOWLEDGE_FAMILY'
   | 'KNOWLEDGE_VIOLATION';
@@ -47,8 +48,13 @@ const UNSAFE_PATTERNS = [
   /bomb|explosive|hurt (?:someone|people)|suicide|poison|sexual/i,
 ];
 
-export function classifyCuriosityRequest(input: { question: string; age: number }) {
-  if (!Number.isInteger(input.age) || input.age < 6 || input.age > 10) {
+export function classifyCuriosityRequest(input: {
+  question: string;
+  targetAge?: number;
+  age?: number;
+}) {
+  const age = input.targetAge ?? input.age;
+  if (!Number.isInteger(age) || age! < 6 || age! > 10) {
     throw new CuriosityDomainError('AGE_OUT_OF_RANGE', '当前体验仅支持 6–10 岁儿童。');
   }
 
@@ -57,8 +63,18 @@ export function classifyCuriosityRequest(input: { question: string; age: number 
     throw new CuriosityDomainError('UNSAFE_CONTENT', '该问题不在当前安全内容边界内。');
   }
 
+  const identifiableSubject = question
+    .replace(/为什么|怎么|如何|会|这样|这个|那个|回事|呢|啊|呀/gi, '')
+    .replace(/[\s，。！？、,.!?]/g, '');
+  if (identifiableSubject.length < 2) {
+    throw new CuriosityDomainError(
+      'NEEDS_CLARIFICATION',
+      '还需要一个更具体的对象或现象，例如“毛毛虫为什么会变成蝴蝶？”。',
+    );
+  }
+
   try {
-    return knowledgeRegistry.classify({ question, age: input.age });
+    return knowledgeRegistry.classify({ question, age: age! });
   } catch (error) {
     if (error instanceof CuriosityKnowledgePluginError) {
       throw new CuriosityDomainError(error.code, error.message);
@@ -68,6 +84,12 @@ export function classifyCuriosityRequest(input: { question: string; age: number 
 }
 
 export function validateKnowledgeBoundaries(spec: CuriosityExperienceSpecV1): void {
+  if (spec.knowledge.family === 'open') {
+    if (!spec.knowledge.packId.startsWith('open.art_')) {
+      throw new CuriosityDomainError('KNOWLEDGE_VIOLATION', '开放知识规格没有绑定生成期知识产物。');
+    }
+    return;
+  }
   const plugin = knowledgeRegistry.get(spec.knowledge.family);
   const pack = plugin.packs.find((candidate) => candidate.id === spec.knowledge.packId);
   if (!pack) {

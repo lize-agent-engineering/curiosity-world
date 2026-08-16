@@ -15,13 +15,11 @@ import type { KnowledgeDesignArtifactV1 } from './agent-contracts';
 
 export type CuriosityGenerationStep =
   | 'queued'
-  | 'question_modeling'
-  | 'knowledge_design'
-  | 'interaction_design'
-  | 'team_assembly'
-  | 'story_design'
-  | 'deterministic_compile'
-  | 'quality_review'
+  | 'question'
+  | 'knowledge'
+  | 'scene'
+  | 'presentation'
+  | 'quality'
   | 'awaiting_runtime_check'
   | 'failed';
 
@@ -29,8 +27,7 @@ export type CuriosityGenerationJobStatus = 'queued' | 'running' | 'candidate_rea
 
 export interface CuriosityGenerationInput {
   question: string;
-  age: number;
-  interests: string[];
+  targetAge: number;
   perspectiveDirective?: string;
   experienceId?: string;
   revision?: number;
@@ -48,6 +45,7 @@ export interface CuriosityGenerationJob {
   updatedAt: string;
   runId: string;
   completedStages: CuriosityPipelineStage[];
+  stageArtifacts?: Partial<Record<CuriosityPipelineStage, string>>;
   artifacts: CuriosityPipelineArtifact[];
   agentRuns: CuriosityAgentRun[];
   result?: {
@@ -165,25 +163,26 @@ export async function runCuriosityGenerationJob(
   try {
     await store.update(jobId, {
       status: 'running',
-      step: 'question_modeling',
+      step: 'question',
       progress: 12,
       message: '正在确认孩子真正想问的是什么',
     });
     const presentation: Record<CuriosityPipelineStage, { progress: number; message: string }> = {
-      question_modeling: { progress: 25, message: '已确认核心问题与安全范围' },
-      knowledge_design: { progress: 45, message: '已完成知识目标与误解边界设计' },
-      interaction_design: { progress: 65, message: '已完成变量、任务与反馈设计' },
-      team_assembly: { progress: 72, message: '本次探索小队已经组建完成' },
-      story_design: { progress: 78, message: '已完成故事阶段与引导设计' },
-      deterministic_compile: { progress: 82, message: '场景已编译，正在进行最终质量检查' },
-      quality_review: { progress: 92, message: '质量检查已完成' },
+      question: { progress: 20, message: '已确认核心问题与安全范围' },
+      knowledge: { progress: 40, message: '已完成知识边界与误解设计' },
+      scene: { progress: 60, message: '已完成受控场景与事件设计' },
+      presentation: { progress: 80, message: '已完成旁白、反馈与发现卡' },
+      quality: { progress: 92, message: '质量检查已完成' },
     };
+    const stageArtifacts: Partial<Record<CuriosityPipelineStage, string>> = {};
     const candidate = await runCuriosityAgentPipeline(input, models, identity, async (update) => {
       if (!completedStages.includes(update.stage)) completedStages.push(update.stage);
+      stageArtifacts[update.stage] = update.artifactId;
       await store.update(jobId, {
         step: update.stage,
         ...presentation[update.stage],
         completedStages: [...completedStages],
+        stageArtifacts: { ...stageArtifacts },
         artifacts: update.artifacts,
         agentRuns: update.agentRuns,
       });

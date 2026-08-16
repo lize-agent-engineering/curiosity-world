@@ -60,9 +60,8 @@ describe('Curiosity role routing', () => {
 
   it('uses the exact role as the server model-routing stage', () => {
     expect(getCuriosityRoleStage('curiosity.revision-planner')).toBe('curiosity.revision-planner');
-    expect(getCuriosityRoleStage('curiosity.story-designer')).toBe('curiosity.story-designer');
-    expect(getCuriosityRoleStage('curiosity.exploration-guide')).toBe(
-      'curiosity.exploration-guide',
+    expect(getCuriosityRoleStage('curiosity.presentation-designer')).toBe(
+      'curiosity.presentation-designer',
     );
   });
 

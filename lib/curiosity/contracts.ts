@@ -73,16 +73,17 @@ export const curiosityExperienceSpecSchema = z
     versionId: identifierSchema.regex(/^ver_/),
     revision: z.number().int().positive(),
     createdAt: z.iso.datetime(),
-    profile: z.strictObject({
-      age: z.number().int().min(6).max(10),
-      interests: z.array(z.string().trim().min(1).max(30)).max(5),
-    }),
+    profile: z
+      .strictObject({
+        age: z.number().int().min(6).max(10),
+      })
+      .passthrough(),
     question: z.strictObject({
       original: z.string().trim().min(4).max(240),
       coreQuestion: z.string().trim().min(4).max(180),
     }),
     knowledge: z.strictObject({
-      family: z.enum(['relative-motion', 'balance-support', 'light-path']),
+      family: z.enum(['relative-motion', 'balance-support', 'light-path', 'open']),
       packId: z.string().trim().min(3).max(128),
     }),
     presentation: z.strictObject({
@@ -93,7 +94,13 @@ export const curiosityExperienceSpecSchema = z
       completion: shortTextSchema,
     }),
     simulation: z.strictObject({
-      preset: z.enum(['moon-parallax-v1', 'balance-support-v1', 'light-path-v1']),
+      preset: z.enum([
+        'moon-parallax-v1',
+        'balance-support-v1',
+        'light-path-v1',
+        'variable-explorer-v1',
+        'relation-explorer-v1',
+      ]),
       observerTravel: z.number().min(40).max(100),
       nearObjectDistance: z.number().min(10).max(30),
       farObjectDistance: z.number().min(200).max(600),
@@ -141,10 +148,6 @@ export const curiosityExperienceSpecSchema = z
 
 const revisionOperationSchema = z.discriminatedUnion('op', [
   z.strictObject({ op: z.literal('set_age'), age: z.number().int().min(6).max(10) }),
-  z.strictObject({
-    op: z.literal('set_interests'),
-    interests: z.array(z.string().trim().min(1).max(30)).max(5),
-  }),
   z.strictObject({
     op: z.literal('replace_copy'),
     field: z.enum(['title', 'hook', 'explorePrompt', 'challengePrompt', 'completion']),

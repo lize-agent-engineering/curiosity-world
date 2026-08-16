@@ -10,14 +10,6 @@ export interface CuriosityRoleSkill {
 }
 
 const SKILLS: Record<CuriosityAgentRole, CuriosityRoleSkill> = {
-  'curiosity.team-assembler': {
-    name: '动态探索组队',
-    version: '1.0.0',
-    workflow: ['读取本题场景计划', '决定三至五名互补成员', '生成可注入后续生成的角色人格'],
-    inputContract: '只读取结构化问题、知识边界与互动场景计划。',
-    outputContract: '只输出符合 Schema 的专属团队 JSON。',
-    refusalRules: ['不得复用固定角色名单。', '必须且只能有一名主引导者。'],
-  },
   'curiosity.question-modeler': {
     name: '儿童问题澄清',
     version: '1.0.0',
@@ -42,7 +34,7 @@ const SKILLS: Record<CuriosityAgentRole, CuriosityRoleSkill> = {
     outputContract: '只输出符合 Schema 的互动设计 JSON。',
     refusalRules: ['不得使用未授权变量或原语。', '不得把变量名和工程术语暴露给孩子。'],
   },
-  'curiosity.story-designer': {
+  'curiosity.presentation-designer': {
     name: '游戏主持人旁白',
     version: '1.0.0',
     workflow: ['为每阶段设定一个情绪目标', '写 5～10 秒单一动作或问题', '设计不泄题的分级提示'],
@@ -57,14 +49,6 @@ const SKILLS: Record<CuriosityAgentRole, CuriosityRoleSkill> = {
     inputContract: '只读取结构化候选产物与审查合同。',
     outputContract: '只输出符合 Schema 的通过或拒绝 JSON。',
     refusalRules: ['必须拒绝正确但粗糙的体验。', '不得修改候选规格或虚构审查证据。'],
-  },
-  'curiosity.exploration-guide': {
-    name: '苏格拉底式引导',
-    version: '1.0.0',
-    workflow: ['确认孩子所处阶段和行为', '回应一个观察或一个问题', '只推进到相邻阶段'],
-    inputContract: '只读取结构化故事阶段、孩子输入和知识边界。',
-    outputContract: '只输出符合 Schema 的单轮引导 JSON。',
-    refusalRules: ['不得直接泄露答案。', '不得跳过阶段或引入未知科学机制。'],
   },
   'curiosity.revision-planner': {
     name: '换角度重讲',

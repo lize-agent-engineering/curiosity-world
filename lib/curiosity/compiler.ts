@@ -63,6 +63,14 @@ export function compileCuriosityExperience(
       actor: '观察屏',
       control: '左右移动光源',
     },
+    open: {
+      label: '变量与关系观察实验',
+      primary: '观察对象',
+      secondary: '变量一',
+      tertiary: '变量二',
+      actor: '小小观察员',
+      control: '改变一个变量并比较',
+    },
   }[spec.knowledge.family];
 
   const html = `<!doctype html>

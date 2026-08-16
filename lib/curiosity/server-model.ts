@@ -7,40 +7,27 @@ import { CuriosityModelUnavailableError } from './api-handlers';
 import type { CuriosityAgentRole } from './agent-contracts';
 import { getCuriosityRoleStage, type CuriosityRoleRoute } from './agent-routing';
 import type { CuriosityExperienceSpecV1 } from './contracts';
-import type { CuriosityTextModel } from './generation';
+import type { CuriosityTextModel } from './model';
 
 function jsonModel(value: unknown): CuriosityTextModel {
   return { complete: async () => JSON.stringify(value) };
 }
 
 function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextModel {
-  if (role === 'curiosity.team-assembler') {
-    return jsonModel({
-      teamName: '月光观察队',
-      rationale: '围绕远近比较和儿童动手观察，组建精简的科学探索团队。',
-      members: [
-        { id: 'member_lead', name: '小满队长', role: 'lead', persona: '温和地串起问题和任务，只给孩子下一步线索。', avatar: '🌙', color: '#4F7DA1', priority: 10, voiceStyle: '温暖清楚，语速舒缓' },
-        { id: 'member_science', name: '远近博士', role: 'science', persona: '专门核对远近物体与观察方向，守住科学解释边界。', avatar: '🔭', color: '#927236', priority: 8, voiceStyle: '沉稳准确，句子简短' },
-        { id: 'member_interaction', name: '动手阿桥', role: 'interaction', persona: '把抽象规律变成孩子可以移动、比较和验证的动作。', avatar: '🧩', color: '#3F8066', priority: 7, voiceStyle: '活泼鼓励，节奏明快' },
-      ],
-    });
-  }
   if (role === 'curiosity.question-modeler') {
     return jsonModel({
       coreQuestion: '为什么我们移动时，月亮看起来还在原来的方向？',
       equivalentQuestions: ['月亮为什么像在跟着我？'],
       ageBand: '8-10',
-      interestSignals: ['散步'],
       safetyTags: [],
       supportStatus: 'supported',
+      knowledgeRoute: 'curated',
       knowledgeFamilyCandidates: ['relative-motion'],
       clarifications: [],
     });
   }
   if (role === 'curiosity.knowledge-designer') {
     return jsonModel({
-      knowledgeFamily: 'relative-motion',
-      packId: 'relative-motion.moon-following.v1',
       objectives: ['比较近处与远处物体的视角变化'],
       causalRelations: [
         {
@@ -51,8 +38,11 @@ function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextMode
       ],
       prerequisites: ['知道远和近'],
       allowedVocabulary: ['远', '近', '观察方向'],
+      allowedExplanations: ['距离越远，观察方向变化越小。'],
       forbiddenExplanations: ['月亮真的在追着观察者移动'],
       misconceptions: ['视角变化等于真实速度'],
+      uncertainties: [],
+      timeSensitive: false,
       ageExpressionStrategy: '比较路灯和月亮。',
       observationSuggestions: ['散步时比较路灯和月亮。'],
       packReferences: ['relative-motion.moon-following.v1#core'],
@@ -62,9 +52,56 @@ function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextMode
     return jsonModel({
       scenario: '走过一盏路灯时，它很快被甩到身后；月亮为什么还在原来的方向？',
       visualTheme: '安静的蓝色夜空',
+      sceneType: 'relation-explorer',
       variables: [
         { id: 'observer-position', label: '观察者位置', min: -80, max: 80, initial: 0 },
         { id: 'object-distance', label: '物体距离', min: 20, max: 400, initial: 200 },
+      ],
+      relations: [
+        {
+          id: 'distance-change',
+          fromVariableId: 'object-distance',
+          toVariableId: 'observer-position',
+          direction: 'inverse',
+        },
+      ],
+      tasks: [
+        {
+          id: 'prediction',
+          kind: 'prediction',
+          prompt: '谁变化得更明显？',
+          options: [
+            { id: 'near-lamp', label: '近处路灯' },
+            { id: 'moon', label: '月亮' },
+          ],
+          expectedOptionId: 'near-lamp',
+        },
+        {
+          id: 'exploration',
+          kind: 'exploration',
+          prompt: '移动看看。',
+          variable: 'observer-position',
+        },
+        {
+          id: 'challenge',
+          kind: 'challenge',
+          prompt: '放远后会怎样？',
+          options: [
+            { id: 'nearer', label: '变化更大' },
+            { id: 'farther', label: '变化更小' },
+          ],
+          expectedOptionId: 'farther',
+        },
+        {
+          id: 'explanation',
+          kind: 'explanation',
+          prompt: '为什么像在跟着？',
+          options: [
+            { id: 'small-angle-change', label: '月亮很远，观察方向变化小' },
+            { id: 'object-follows', label: '月亮真的在追着我们' },
+          ],
+          expectedOptionId: 'small-angle-change',
+        },
       ],
       taskSequence: ['prediction', 'exploration', 'guided-discovery', 'transfer', 'explanation'],
       instructionCopy: [
@@ -85,59 +122,43 @@ function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextMode
       endConditions: ['完成一次远近比较', '选择一个解释'],
     });
   }
-  if (role === 'curiosity.story-designer') {
-    const hints = (subject: string) => [
-      { level: 0, text: `先看看${subject}。`, revealsAnswer: false },
-      { level: 1, text: `再比较${subject}的变化。`, revealsAnswer: false },
-      { level: 2, text: `用刚才看到的${subject}来回答。`, revealsAnswer: false },
-    ];
+  if (role === 'curiosity.presentation-designer') {
     return jsonModel({
-      stages: [
+      title: '月亮为什么像在跟着我？',
+      hook: '先猜猜路灯和月亮谁变化更明显。',
+      explorePrompt: '移动小朋友，比较远近物体。',
+      challengePrompt: '把物体放远再比较。',
+      completion: '你发现了：距离越远，观察方向变化越小。',
+      narrationLibrary: [
         {
-          id: 'predict',
-          kind: 'prediction',
-          openingNarration: '先猜一猜，路灯和月亮谁变化得更快？',
-          prompt: '说出你的猜想。',
-          allowedEventTypes: ['prediction_submitted'],
-          hints: hints('远处和近处'),
-          completionCondition: '提交一次预测',
+          id: 'narration_start',
+          eventType: 'experiment_started',
+          action: '*',
+          text: '先猜一猜，路灯和月亮谁变化得更快？',
         },
         {
-          id: 'explore',
-          kind: 'exploration',
-          openingNarration: '移动小朋友，观察三个物体。',
-          prompt: '拖动看看。',
-          allowedEventTypes: ['variable_changed'],
-          hints: hints('实验变量'),
-          completionCondition: '产生一次变量变化',
+          id: 'narration_move',
+          eventType: 'variable_changed',
+          action: '*',
+          text: '比较远处和近处，找找变化的规律。',
         },
         {
-          id: 'discover',
-          kind: 'guided-discovery',
-          openingNarration: '比较远处和近处，找找规律。',
-          prompt: '距离改变后，看到的移动有什么不同？',
-          allowedEventTypes: ['variable_changed'],
-          hints: hints('远近规律'),
-          completionCondition: '说出一次远近比较结果',
+          id: 'narration_finish',
+          eventType: 'experience_completed',
+          action: '*',
+          text: '你用自己的观察找到了原因。',
         },
+      ],
+      immediateFeedback: [
         {
-          id: 'transfer',
-          kind: 'transfer',
-          openingNarration: '换成坐车看远山，再试一次。',
-          prompt: '哪一个看起来移动得慢？',
-          allowedEventTypes: ['transfer_attempted'],
-          hints: hints('新情境'),
-          completionCondition: '完成一次迁移选择',
+          id: 'feedback_move',
+          eventType: 'variable_changed',
+          outcome: 'observe',
+          text: '记住近处和远处变化的不同。',
         },
-        {
-          id: 'explain',
-          kind: 'explanation',
-          openingNarration: '把你的发现说给家长听。',
-          prompt: '为什么月亮看起来跟着我们？',
-          allowedEventTypes: ['explanation_selected'],
-          hints: hints('观察现象'),
-          completionCondition: '留下一个解释事件',
-        },
+      ],
+      discoveryPrompts: [
+        { id: 'card_mountain', prompt: '远山为什么也像在跟着车走？', skippable: true },
       ],
     });
   }
@@ -145,12 +166,12 @@ function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextMode
     return jsonModel({
       checks: [
         'age-fit',
-        'interest-link',
-        'knowledge-consistency',
+        'knowledge-grounding',
         'misconception-risk',
+        'scene-safety',
         'interaction-completeness',
-        'transfer-validity',
-        'copy-load',
+        'narration-coverage',
+        'discovery-card-quality',
       ].map((criterion) => ({ criterion, status: 'pass', findings: [] })),
       verdict: 'pass',
     });
@@ -258,12 +279,10 @@ function curiosityModelTimeoutMs(): number {
 
 const CURIOSITY_ROLE_OUTPUT_TOKENS: Record<CuriosityAgentRole, number> = {
   'curiosity.question-modeler': 1536,
-  'curiosity.team-assembler': 3072,
   'curiosity.knowledge-designer': 3072,
   'curiosity.interaction-designer': 8192,
-  'curiosity.story-designer': 8192,
+  'curiosity.presentation-designer': 8192,
   'curiosity.quality-reviewer': 4096,
-  'curiosity.exploration-guide': 1024,
   'curiosity.revision-planner': 3072,
 };
 
@@ -274,23 +293,6 @@ function createTestRoleModel(
   let selected: CuriosityTextModel;
   if (role === 'curiosity.revision-planner') {
     selected = createTestRevisionPlannerModel(body);
-  } else if (role === 'curiosity.exploration-guide') {
-    const input = body as {
-      request?: { stageId?: string };
-      story?: { stages?: Array<{ id?: string }> };
-    };
-    const stages = input.story?.stages ?? [];
-    const currentIndex = stages.findIndex((stage) => stage.id === input.request?.stageId);
-    const advanceTo = stages[Math.min(Math.max(currentIndex, 0) + 1, stages.length - 1)]?.id;
-    if (!input.request?.stageId || !advanceTo) {
-      throw new CuriosityModelUnavailableError('测试引导请求缺少有效故事阶段。');
-    }
-    selected = jsonModel({
-      narration: '记住刚才的发现，我们继续试一试。',
-      feedbackKind: 'observation',
-      hintLevel: 0,
-      advanceTo,
-    });
   } else {
     selected = createTestInitialRoleModel(role);
   }
@@ -344,7 +346,7 @@ export async function resolveCuriosityRoleModel(
           : resolved.thinkingConfig;
       const parameters = {
         model: resolved.model,
-        system: input.system,
+        system: input.system ?? '',
         prompt: input.prompt,
         maxOutputTokens: Math.min(
           resolved.modelInfo?.outputWindow ?? CURIOSITY_ROLE_OUTPUT_TOKENS[role],

@@ -154,15 +154,6 @@ describe('IndexedDbCuriosityRepository', () => {
     await repository.createExperienceWithCandidate(spec, 'cw1-first', evidence());
     await repository.activateVersion(spec.experienceId, spec.versionId);
     await repository.appendEvent(curiosityEvent('evt_shared'));
-    const state = {
-      storyArtifactId: 'art_story_1',
-      stageId: 'explore',
-      hintLevel: 0 as const,
-      completedStageIds: ['predict'],
-      lastTriggerEventIds: ['evt_shared'],
-    };
-    await repository.saveGuidanceState(spec.experienceId, spec.versionId, state);
-
     const snapshot = await repository.exportSnapshot(spec.experienceId);
     const otherBrowser = new IndexedDbCuriosityRepository({
       name: `Curiosity-Other-${crypto.randomUUID()}`,
@@ -178,23 +169,13 @@ describe('IndexedDbCuriosityRepository', () => {
     await expect(otherBrowser.listEvents(spec.experienceId, spec.versionId)).resolves.toEqual([
       curiosityEvent('evt_shared'),
     ]);
-    await expect(otherBrowser.getGuidanceState(spec.experienceId, spec.versionId)).resolves.toEqual(
-      state,
-    );
     await otherBrowser.deleteDatabase();
   });
 
-  it('persists version-scoped guidance state and accepted voice evidence without audio', async () => {
+  it('persists accepted voice evidence without storing raw audio', async () => {
     const spec = createValidCuriositySpec();
     await repository.createExperienceWithCandidate(spec, 'cw1-first', evidence());
     await repository.activateVersion(spec.experienceId, spec.versionId);
-    const state = {
-      storyArtifactId: 'art_story_1',
-      stageId: 'explore',
-      hintLevel: 0 as const,
-      completedStageIds: ['predict'],
-      lastTriggerEventIds: ['evt_voice_1'],
-    };
     const voiceEvent = {
       schemaVersion: '1.0' as const,
       eventId: 'evt_voice_1',
@@ -207,13 +188,9 @@ describe('IndexedDbCuriosityRepository', () => {
       occurredAt: '2026-08-15T04:01:00.000Z',
     };
 
-    await repository.saveGuidanceState(spec.experienceId, spec.versionId, state);
     await repository.appendVoiceEvent(voiceEvent);
     await repository.appendVoiceEvent(voiceEvent);
 
-    await expect(repository.getGuidanceState(spec.experienceId, spec.versionId)).resolves.toEqual(
-      state,
-    );
     await expect(repository.listVoiceEvents(spec.experienceId, spec.versionId)).resolves.toEqual([
       voiceEvent,
     ]);

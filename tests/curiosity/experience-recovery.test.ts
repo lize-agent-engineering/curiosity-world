@@ -30,7 +30,6 @@ describe('Curiosity failed experience recovery', () => {
             id: spec.experienceId,
             question: spec.question.original,
             age: spec.profile.age,
-            interests: spec.profile.interests,
             createdAt: spec.createdAt,
             updatedAt: spec.createdAt,
           },

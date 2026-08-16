@@ -31,8 +31,7 @@ import {
 
 const initialValues: CuriosityHomeValues = {
   question: '为什么月亮看起来会跟着我们？',
-  age: 8,
-  interests: '散步、星空',
+  targetAge: 8,
 };
 
 export default function HomePage() {
@@ -79,16 +78,11 @@ export default function HomePage() {
     abortRef.current?.abort();
     abortRef.current = controller;
     try {
-      const interests = values.interests
-        .split(/[，,、]/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .slice(0, 5);
       const created = await readApiJson(
         await fetch('/api/curiosity/generations', {
           method: 'POST',
           headers: getCuriosityApiHeaders('curiosity.interaction-designer'),
-          body: JSON.stringify({ question: values.question, age: values.age, interests }),
+          body: JSON.stringify({ question: values.question, targetAge: values.targetAge }),
           signal: controller.signal,
         }),
       );
@@ -105,17 +99,7 @@ export default function HomePage() {
           progress: Number(job.progress),
           message: String(job.message),
           completedStages: z
-            .array(
-              z.enum([
-                'question_modeling',
-                'knowledge_design',
-                'interaction_design',
-                'team_assembly',
-                'story_design',
-                'deterministic_compile',
-                'quality_review',
-              ]),
-            )
+            .array(z.enum(['question', 'knowledge', 'scene', 'presentation', 'quality']))
             .parse(job.completedStages) as CuriosityPipelineStage[],
           artifacts: z.array(curiosityPipelineArtifactSchema).parse(job.artifacts),
         });

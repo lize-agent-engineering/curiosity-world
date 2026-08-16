@@ -17,15 +17,12 @@ import {
   type CuriosityEventV1,
   type CuriosityExperienceSpecV1,
 } from './contracts';
-import type { GuidanceState } from './guidance';
-
 export type CuriosityVersionStatus = 'candidate' | 'active' | 'superseded' | 'failed';
 
 export interface CuriosityExperienceRecord {
   id: string;
   question: string;
   age: number;
-  interests: string[];
   createdAt: string;
   updatedAt: string;
   activeVersionId?: string;
@@ -65,7 +62,15 @@ interface CuriosityEventRecord {
   event: CuriosityEventV1;
 }
 
-interface GuidanceStateRecord extends GuidanceState {
+interface LegacyRuntimeState {
+  storyArtifactId: string;
+  stageId: string;
+  hintLevel: 0 | 1 | 2;
+  completedStageIds: string[];
+  lastTriggerEventIds: string[];
+}
+
+interface LegacyRuntimeStateRecord extends LegacyRuntimeState {
   experienceId: string;
   versionId: string;
 }
@@ -88,22 +93,23 @@ export interface CuriosityExperienceSnapshot {
   experience: CuriosityExperienceRecord;
   versions: CuriosityVersionRecord[];
   events: CuriosityEventV1[];
-  guidanceStates: Array<{ versionId: string; state: GuidanceState }>;
+  guidanceStates: Array<{ versionId: string; state: LegacyRuntimeState }>;
   voiceEvents: ChildVoiceEventV1[];
 }
 
-const curiosityExperienceRecordSchema = z.strictObject({
-  id: z.string().regex(/^cur_[a-zA-Z0-9_-]+$/),
-  question: z.string().min(1).max(240),
-  age: z.number().int().min(6).max(10),
-  interests: z.array(z.string().min(1).max(30)).max(5),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-  activeVersionId: z
-    .string()
-    .regex(/^ver_[a-zA-Z0-9_-]+$/)
-    .optional(),
-});
+const curiosityExperienceRecordSchema = z
+  .strictObject({
+    id: z.string().regex(/^cur_[a-zA-Z0-9_-]+$/),
+    question: z.string().min(1).max(240),
+    age: z.number().int().min(6).max(10),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+    activeVersionId: z
+      .string()
+      .regex(/^ver_[a-zA-Z0-9_-]+$/)
+      .optional(),
+  })
+  .passthrough();
 
 const curiosityVersionRecordSchema = z.strictObject({
   id: z.string().regex(/^ver_[a-zA-Z0-9_-]+$/),
@@ -167,8 +173,6 @@ export interface CuriosityRepository {
   markVersionFailed(experienceId: string, versionId: string, failureCode: string): Promise<void>;
   appendEvent(event: CuriosityEventV1): Promise<void>;
   listEvents(experienceId: string, versionId: string): Promise<CuriosityEventV1[]>;
-  saveGuidanceState(experienceId: string, versionId: string, state: GuidanceState): Promise<void>;
-  getGuidanceState(experienceId: string, versionId: string): Promise<GuidanceState | null>;
   appendVoiceEvent(event: ChildVoiceEventV1): Promise<void>;
   listVoiceEvents(experienceId: string, versionId: string): Promise<ChildVoiceEventV1[]>;
   getExperience(experienceId: string): Promise<CuriosityExperienceAggregate | null>;
@@ -202,7 +206,7 @@ class CuriosityDatabase extends Dexie {
   events!: Table<CuriosityEventRecord, string>;
   agentRuns!: Table<CuriosityAgentRun, string>;
   artifacts!: Table<CuriosityPipelineArtifact, string>;
-  guidanceStates!: Table<GuidanceStateRecord, [string, string]>;
+  guidanceStates!: Table<LegacyRuntimeStateRecord, [string, string]>;
   voiceEvents!: Table<ChildVoiceEventRecord, string>;
 
   constructor(options: {
@@ -307,7 +311,6 @@ export class IndexedDbCuriosityRepository implements CuriosityRepository {
       id: spec.experienceId,
       question: spec.question.original,
       age: spec.profile.age,
-      interests: [...spec.profile.interests],
       createdAt: spec.createdAt,
       updatedAt: spec.createdAt,
     };
@@ -380,7 +383,6 @@ export class IndexedDbCuriosityRepository implements CuriosityRepository {
         await this.database.experiences.update(experienceId, {
           activeVersionId: versionId,
           age: version.spec.profile.age,
-          interests: [...version.spec.profile.interests],
           updatedAt: new Date().toISOString(),
         });
       },
@@ -450,25 +452,6 @@ export class IndexedDbCuriosityRepository implements CuriosityRepository {
       .equals([experienceId, versionId])
       .sortBy('occurredAt');
     return rows.map((row) => row.event);
-  }
-
-  async saveGuidanceState(
-    experienceId: string,
-    versionId: string,
-    state: GuidanceState,
-  ): Promise<void> {
-    const experience = await this.database.experiences.get(experienceId);
-    if (experience?.activeVersionId !== versionId) {
-      throw new CuriosityRepositoryError('VERSION_NOT_ACTIVE', '引导状态只能写入当前活动版本。');
-    }
-    await this.database.guidanceStates.put({ experienceId, versionId, ...structuredClone(state) });
-  }
-
-  async getGuidanceState(experienceId: string, versionId: string): Promise<GuidanceState | null> {
-    const stored = await this.database.guidanceStates.get([experienceId, versionId]);
-    if (!stored) return null;
-    const { experienceId: _experienceId, versionId: _versionId, ...state } = stored;
-    return state;
   }
 
   async appendVoiceEvent(input: ChildVoiceEventV1): Promise<void> {

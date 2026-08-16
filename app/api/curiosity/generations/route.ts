@@ -23,18 +23,16 @@ const post = createCuriosityGenerationPostHandler({
       artifactIds: {
         question: `art_${nanoid(12)}`,
         knowledge: `art_${nanoid(12)}`,
-        interaction: `art_${nanoid(12)}`,
-        team: `art_${nanoid(12)}`,
-        story: `art_${nanoid(12)}`,
+        scene: `art_${nanoid(12)}`,
+        presentation: `art_${nanoid(12)}`,
         spec: `art_${nanoid(12)}`,
         quality: `art_${nanoid(12)}`,
       },
       agentRunIds: {
         question: `agent_run_${nanoid(12)}`,
         knowledge: `agent_run_${nanoid(12)}`,
-        interaction: `agent_run_${nanoid(12)}`,
-        team: `agent_run_${nanoid(12)}`,
-        story: `agent_run_${nanoid(12)}`,
+        scene: `agent_run_${nanoid(12)}`,
+        presentation: `agent_run_${nanoid(12)}`,
         quality: `agent_run_${nanoid(12)}`,
       },
     };
