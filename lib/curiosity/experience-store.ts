@@ -71,21 +71,18 @@ export function buildSnapshotFromGenerationJobs(
   jobs: CuriosityGenerationJob[],
 ): CuriosityExperienceSnapshot | null {
   const matching = jobs
-    .filter(
-      (job) => job.status === 'candidate_ready' && job.result?.spec.experienceId === experienceId,
-    )
-    .sort((left, right) => left.result!.spec.revision - right.result!.spec.revision);
+    .filter((job) => job.status === 'candidate_ready' && job.result?.experienceId === experienceId)
+    .sort((left, right) => left.result!.revision - right.result!.revision);
   const latest = matching.at(-1);
   if (!latest?.result) return null;
-  const latestVersionId = latest.result.spec.versionId;
+  const latestVersionId = latest.result.versionId;
   const versions: CuriosityVersionRecord[] = matching.map((job) => ({
-    id: job.result!.spec.versionId,
+    id: job.result!.versionId,
     experienceId,
-    revision: job.result!.spec.revision,
-    createdAt: job.result!.spec.createdAt,
-    status: job.result!.spec.versionId === latestVersionId ? 'active' : 'superseded',
+    revision: job.result!.revision,
+    createdAt: job.result!.createdAt,
+    status: job.result!.versionId === latestVersionId ? 'active' : 'superseded',
     spec: job.result!.spec,
-    experienceSpec: job.result!.experienceSpec,
     artifacts: job.artifacts,
     agentRuns: job.agentRuns,
     specHash: job.result!.specHash,
@@ -94,14 +91,13 @@ export function buildSnapshotFromGenerationJobs(
     experience: {
       id: experienceId,
       question: latest.result.spec.question.original,
-      age: latest.result.spec.profile.age,
-      createdAt: matching[0]!.result!.spec.createdAt,
+      age: latest.result.spec.targetAge,
+      createdAt: matching[0]!.result!.createdAt,
       updatedAt: latest.updatedAt,
       activeVersionId: latestVersionId,
     },
     versions,
     events: [],
-    guidanceStates: [],
     voiceEvents: [],
   });
 }

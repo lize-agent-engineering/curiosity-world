@@ -1,9 +1,8 @@
-import type { CuriosityEventV1, CuriosityExperienceSpecV1 } from './contracts';
+import type { CuriosityEventV3, CuriosityExperienceSpecV3 } from './experience-spec-v3';
 
 export function isExperienceComplete(
-  spec: CuriosityExperienceSpecV1,
-  events: ReadonlyArray<Pick<CuriosityEventV1, 'type'>>,
+  _spec: CuriosityExperienceSpecV3,
+  events: ReadonlyArray<Pick<CuriosityEventV3, 'type'>>,
 ): boolean {
-  const observed = new Set(events.map((event) => event.type));
-  return spec.eventRequirements.every((required) => observed.has(required));
+  return events.some((event) => event.type === 'exploration_ended');
 }

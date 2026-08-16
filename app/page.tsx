@@ -16,11 +16,8 @@ import {
   readApiJson,
   syncCuriosityExperience,
 } from '@/lib/curiosity/client';
-import { curiosityExperienceSpecSchema } from '@/lib/curiosity/contracts';
-import {
-  curiosityAgentRunSchema,
-  curiosityExperienceSpecV2Schema,
-} from '@/lib/curiosity/agent-contracts';
+import { curiosityAgentRunSchema } from '@/lib/curiosity/agent-contracts';
+import { curiosityExperienceSpecV3Schema } from '@/lib/curiosity/experience-spec-v3';
 import { curiosityPipelineArtifactSchema } from '@/lib/curiosity/agent-pipeline';
 import type { CuriosityPipelineStage } from '@/lib/curiosity/agent-pipeline';
 import {
@@ -58,7 +55,10 @@ export default function HomePage() {
             return {
               id: experience.id,
               question: experience.question,
-              summary: activeVersion.spec.presentation.completion,
+              summary:
+                activeVersion.spec.narrationLibrary.find(
+                  (line) => line.eventType === 'exploration_ended',
+                )?.text ?? activeVersion.spec.limitations[0],
               age: experience.age,
               updatedAt: experience.updatedAt,
             };
@@ -107,23 +107,27 @@ export default function HomePage() {
           throw new Error(`${String(job.errorCode)}: ${String(job.error)}`);
         if (job.status === 'candidate_ready') {
           const result = job.result as {
+            experienceId?: unknown;
+            versionId?: unknown;
+            revision?: unknown;
+            createdAt?: unknown;
             spec?: unknown;
-            experienceSpec?: unknown;
             specHash?: unknown;
           };
-          const spec = curiosityExperienceSpecSchema.parse(result.spec);
-          const experienceSpec = curiosityExperienceSpecV2Schema.parse(result.experienceSpec);
-          await getCuriosityRepository().createExperienceWithCandidate(
+          const spec = curiosityExperienceSpecV3Schema.parse(result.spec);
+          const experienceId = String(result.experienceId);
+          const versionId = String(result.versionId);
+          await getCuriosityRepository().createExperienceWithCandidate({
+            experienceId,
+            versionId,
+            revision: Number(result.revision),
+            createdAt: String(result.createdAt),
             spec,
-            String(result.specHash),
-            {
-              experienceSpec,
-              artifacts: z.array(curiosityPipelineArtifactSchema).parse(job.artifacts),
-              agentRuns: z.array(curiosityAgentRunSchema).parse(job.agentRuns),
-            },
-          );
-          await syncCuriosityExperience(spec.experienceId);
-          router.push(`/experience/${spec.experienceId}?candidate=${spec.versionId}`);
+            artifacts: z.array(curiosityPipelineArtifactSchema).parse(job.artifacts),
+            agentRuns: z.array(curiosityAgentRunSchema).parse(job.agentRuns),
+          });
+          await syncCuriosityExperience(experienceId);
+          router.push(`/experience/${experienceId}?candidate=${versionId}`);
           return;
         }
       }

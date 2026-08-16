@@ -1,40 +1,24 @@
 import {
-  curiosityEventSchema,
-  curiosityReadyMessageSchema,
-  type CuriosityEventV1,
-  type CuriosityExperienceSpecV1,
-} from './contracts';
+  curiosityEventV3Schema,
+  type CuriosityEventV3,
+  type CuriosityExperienceSpecV3,
+} from './experience-spec-v3';
 
-export type CuriosityFrameMessage = { kind: 'ready' } | { kind: 'event'; event: CuriosityEventV1 };
-
-export function interpretCuriosityFrameMessage(
-  data: unknown,
-  expected: { experienceId: string; versionId: string },
-): CuriosityFrameMessage | null {
-  const ready = curiosityReadyMessageSchema.safeParse(data);
-  if (ready.success) {
-    if (
-      ready.data.experienceId !== expected.experienceId ||
-      ready.data.versionId !== expected.versionId
-    ) {
-      return null;
-    }
-    return { kind: 'ready' };
-  }
-
-  const event = curiosityEventSchema.safeParse(data);
-  if (!event.success) return null;
-  if (
-    event.data.experienceId !== expected.experienceId ||
-    event.data.versionId !== expected.versionId
-  ) {
-    return null;
-  }
-  return { kind: 'event', event: event.data };
+export interface CuriosityRuntimeIdentity {
+  experienceId: string;
+  versionId: string;
+  spec: CuriosityExperienceSpecV3;
 }
 
 export interface CuriositySummaryFact {
-  kind: 'prediction' | 'exploration' | 'challenge' | 'explanation' | 'completion';
+  kind:
+    | 'inspection'
+    | 'movement'
+    | 'change'
+    | 'relationship'
+    | 'response'
+    | 'reflection'
+    | 'completion';
   text: string;
   eventIds: string[];
 }
@@ -48,92 +32,89 @@ export interface CuriosityParentSummary {
 }
 
 export function summarizeCuriosityEvents(
-  spec: CuriosityExperienceSpecV1,
-  input: CuriosityEventV1[],
+  runtime: CuriosityRuntimeIdentity,
+  input: CuriosityEventV3[],
 ): CuriosityParentSummary {
-  const byId = new Map<string, CuriosityEventV1>();
+  const byId = new Map<string, CuriosityEventV3>();
   for (const candidate of input) {
-    const parsed = curiosityEventSchema.safeParse(candidate);
-    if (!parsed.success) continue;
+    const parsed = curiosityEventV3Schema.safeParse(candidate);
     if (
-      parsed.data.experienceId !== spec.experienceId ||
-      parsed.data.versionId !== spec.versionId
+      !parsed.success ||
+      parsed.data.experienceId !== runtime.experienceId ||
+      parsed.data.versionId !== runtime.versionId
     ) {
       continue;
     }
     if (!byId.has(parsed.data.eventId)) byId.set(parsed.data.eventId, parsed.data);
   }
-  const events = [...byId.values()].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+  const events = [...byId.values()].sort((left, right) =>
+    left.occurredAt.localeCompare(right.occurredAt),
+  );
   const facts: CuriositySummaryFact[] = [];
-
-  const prediction = events.findLast((event) => event.type === 'prediction_submitted');
-  if (prediction) {
-    const optionId =
-      typeof prediction.payload.optionId === 'string' ? prediction.payload.optionId : '';
-    const predictionTask = spec.tasks.find((task) => task.kind === 'prediction');
-    const label = predictionTask?.options.find((option) => option.id === optionId)?.label;
+  const grouped = (types: CuriosityEventV3['type'][]) =>
+    events.filter((event) => types.includes(event.type));
+  const inspections = grouped(['object_inspected']);
+  if (inspections.length) {
     facts.push({
-      kind: 'prediction',
-      text: label ? `孩子最初猜的是：“${label}”。` : '孩子提交了一次预测。',
-      eventIds: [prediction.eventId],
+      kind: 'inspection',
+      text: `孩子查看了 ${inspections.length} 个场景对象。`,
+      eventIds: inspections.map((event) => event.eventId),
     });
   }
-
-  const movement = events.filter((event) => event.type === 'variable_changed');
-  if (movement.length > 0) {
-    const explorationText =
-      spec.knowledge.family === 'balance-support'
-        ? `孩子移动桥墩并完成了 ${movement.length} 次承重观察。`
-        : spec.knowledge.family === 'light-path'
-          ? `孩子移动光源并完成了 ${movement.length} 次影子观察。`
-          : `孩子移动观察者 ${movement.length} 次，比较了远近物体的视角变化。`;
+  const movements = grouped(['object_moved']);
+  if (movements.length) {
     facts.push({
-      kind: 'exploration',
-      text: explorationText,
-      eventIds: movement.map((event) => event.eventId),
+      kind: 'movement',
+      text: `孩子移动对象 ${movements.length} 次。`,
+      eventIds: movements.map((event) => event.eventId),
     });
   }
-
-  const attempts = events.filter((event) => event.type === 'challenge_attempted');
-  const completedChallenge = events.filter((event) => event.type === 'challenge_completed');
-  if (attempts.length > 0 || completedChallenge.length > 0) {
+  const changes = grouped(['control_changed']);
+  if (changes.length) {
     facts.push({
-      kind: 'challenge',
-      text: completedChallenge.length
-        ? `迁移挑战尝试 ${attempts.length} 次后完成。`
-        : `迁移挑战已尝试 ${attempts.length} 次，尚未完成。`,
-      eventIds: [...attempts, ...completedChallenge].map((event) => event.eventId),
+      kind: 'change',
+      text: `孩子改变控制条件 ${changes.length} 次。`,
+      eventIds: changes.map((event) => event.eventId),
     });
   }
-
-  const explanation = events.findLast((event) => event.type === 'explanation_selected');
-  if (explanation) {
-    const optionId =
-      typeof explanation.payload.optionId === 'string' ? explanation.payload.optionId : '';
-    const explanationTask = spec.tasks.find((task) => task.kind === 'explanation');
-    const label = explanationTask?.options.find((option) => option.id === optionId)?.label;
+  const relationships = grouped(['relationship_revealed']);
+  if (relationships.length) {
     facts.push({
-      kind: 'explanation',
-      text: label ? `孩子最后选择的解释是：“${label}”。` : '孩子完成了一次解释选择。',
-      eventIds: [explanation.eventId],
+      kind: 'relationship',
+      text: `孩子打开了 ${relationships.length} 条关系。`,
+      eventIds: relationships.map((event) => event.eventId),
     });
   }
-
-  const completion = events.filter((event) => event.type === 'experience_completed');
-  if (completion.length > 0) {
+  const responses = grouped(['response_recorded']);
+  if (responses.length) {
+    facts.push({
+      kind: 'response',
+      text: `孩子记录了 ${responses.length} 次回答。`,
+      eventIds: responses.map((event) => event.eventId),
+    });
+  }
+  const reflections = grouped(['reflection_recorded']);
+  if (reflections.length) {
+    const latest = reflections.at(-1)!;
+    const text =
+      typeof latest.payload.text === 'string'
+        ? `孩子记录：“${latest.payload.text}”。`
+        : '孩子记录了一次发现。';
+    facts.push({ kind: 'reflection', text, eventIds: reflections.map((event) => event.eventId) });
+  }
+  const completions = grouped(['exploration_ended']);
+  if (completions.length) {
     facts.push({
       kind: 'completion',
-      text: '孩子完成了本次探索。',
-      eventIds: completion.map((event) => event.eventId),
+      text: '孩子结束了本次探索。',
+      eventIds: completions.map((event) => event.eventId),
     });
   }
-
   return {
-    experienceId: spec.experienceId,
-    versionId: spec.versionId,
+    experienceId: runtime.experienceId,
+    versionId: runtime.versionId,
     eventCount: events.length,
     facts,
-    recommendation:
-      spec.tabletopExperiment?.title ?? '散步时比较近处路灯和远处月亮在视野里的变化。',
+    recommendation: runtime.spec.knowledge.observationSuggestions[0]!,
   };
 }

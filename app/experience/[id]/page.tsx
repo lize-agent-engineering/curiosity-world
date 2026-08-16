@@ -1,28 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ArrowLeft, Moon, Play, ScrollText } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { z } from 'zod';
 
-import { ExplorationCompletion } from '@/components/curiosity/exploration-completion';
 import { CuriosityParentReview } from '@/components/curiosity/parent-review';
 import { ReviewedNarrationPanel } from '@/components/curiosity/reviewed-narration-panel';
 import { CuriosityRuntimeFrame } from '@/components/curiosity/runtime-frame';
 import { Button } from '@/components/ui/button';
 import { buildCuriosityArchive } from '@/lib/curiosity/archive';
-import {
-  curiosityAgentRunSchema,
-  curiosityExperienceSpecV2Schema,
-  interactionDesignArtifactV1Schema,
-  knowledgeDesignArtifactV1Schema,
-  revisionImpactArtifactV1Schema,
-  storyDesignArtifactV1Schema,
-  type ChildVoiceEventV1,
-  type RevisionImpactArtifactV1,
-  type StoryDesignArtifactV1,
-} from '@/lib/curiosity/agent-contracts';
-import { curiosityPipelineArtifactSchema } from '@/lib/curiosity/agent-pipeline';
 import {
   getCuriosityApiHeaders,
   getCuriosityRepository,
@@ -30,12 +17,11 @@ import {
   readApiJson,
   syncCuriosityExperience,
 } from '@/lib/curiosity/client';
-import { isExperienceComplete } from '@/lib/curiosity/completion';
-import { curiosityExperienceSpecSchema, type CuriosityEventV1 } from '@/lib/curiosity/contracts';
 import {
-  describeExperienceFailure,
-  selectRegenerationBase,
-} from '@/lib/curiosity/experience-recovery';
+  curiosityExperienceSpecV3Schema,
+  type CuriosityEventTypeV3,
+  type CuriosityEventV3,
+} from '@/lib/curiosity/experience-spec-v3';
 import {
   CURIOSITY_GENERATION_POLL_INTERVAL_MS,
   CURIOSITY_GENERATION_TIMEOUT_MS,
@@ -44,10 +30,10 @@ import {
 import { selectReviewedNarration } from '@/lib/curiosity/narration-library';
 import type { CuriosityExperienceAggregate } from '@/lib/curiosity/repository';
 import { summarizeCuriosityEvents } from '@/lib/curiosity/runtime';
-import { ReviewedNarrationPlayer } from '@/lib/curiosity/voice-client';
+import { restoreCuriositySceneState } from '@/lib/curiosity/scenes/registry';
 
 type Mode = 'child' | 'parent';
-type NarrationLine = StoryDesignArtifactV1['narrationLibrary'][number];
+const storedRowsSchema = z.array(z.record(z.string(), z.unknown()));
 
 export default function CuriosityExperiencePage() {
   const params = useParams<{ id: string }>();
@@ -55,176 +41,126 @@ export default function CuriosityExperiencePage() {
   const router = useRouter();
   const experienceId = params.id;
   const initialCandidateId = search.get('candidate');
-  const activationRef = useRef<Promise<void>>(Promise.resolve());
-  const activatedCandidateIdsRef = useRef(new Set<string>());
-  const narrationPlayerRef = useRef<ReviewedNarrationPlayer | null>(null);
   const [aggregate, setAggregate] = useState<CuriosityExperienceAggregate | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(initialCandidateId);
-  const [pendingCandidateId, setPendingCandidateId] = useState<string | null>(initialCandidateId);
-  const [events, setEvents] = useState<CuriosityEventV1[]>([]);
-  const [voiceEvents, setVoiceEvents] = useState<ChildVoiceEventV1[]>([]);
+  const [events, setEvents] = useState<CuriosityEventV3[]>([]);
   const [mode, setMode] = useState<Mode>('child');
   const [instruction, setInstruction] = useState('');
+  const [reflection, setReflection] = useState('');
   const [revising, setRevising] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [revisionImpact, setRevisionImpact] = useState<RevisionImpactArtifactV1>();
   const [narrationStarted, setNarrationStarted] = useState(false);
-  const [narrationError, setNarrationError] = useState<string | null>(null);
-  const [currentNarration, setCurrentNarration] = useState<NarrationLine | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(
     async (preferredId?: string) => {
       let next = await getCuriosityRepository().getExperience(experienceId);
       if (!next && (await hydrateCuriosityExperience(experienceId))) {
         next = await getCuriosityRepository().getExperience(experienceId);
-      } else if (next) {
-        await syncCuriosityExperience(experienceId);
       }
       if (!next) throw new Error('EXPERIENCE_NOT_FOUND: 这台设备上没有该体验。');
-      const picked =
+      let picked =
         next.versions.find((version) => version.id === preferredId) ??
-        next.versions.find((version) => version.id === next.experience.activeVersionId) ??
+        next.versions.find((version) => version.id === next!.experience.activeVersionId) ??
         next.versions.at(-1);
       if (!picked) throw new Error('VERSION_NOT_FOUND: 体验没有可用版本。');
+      if (picked.status === 'candidate') {
+        await getCuriosityRepository().activateVersion(experienceId, picked.id);
+        await syncCuriosityExperience(experienceId);
+        next = (await getCuriosityRepository().getExperience(experienceId))!;
+        picked = next.versions.find((version) => version.id === picked!.id)!;
+      }
       setAggregate(next);
       setSelectedId(picked.id);
-      if (!next.experience.activeVersionId && picked.status === 'candidate')
-        setPendingCandidateId(picked.id);
       setEvents(await getCuriosityRepository().listEvents(experienceId, picked.id));
-      setVoiceEvents(await getCuriosityRepository().listVoiceEvents(experienceId, picked.id));
     },
     [experienceId],
   );
 
   useEffect(() => {
-    refresh(initialCandidateId ?? undefined).catch((cause) =>
+    void refresh(initialCandidateId ?? undefined).catch((cause) =>
       setError(cause instanceof Error ? cause.message : String(cause)),
     );
   }, [initialCandidateId, refresh]);
-  useEffect(() => () => narrationPlayerRef.current?.stop(), []);
 
   const selected = aggregate?.versions.find((version) => version.id === selectedId) ?? null;
-  const presentation = useMemo(() => {
-    const artifact = selected?.artifacts.find(
-      (candidate) => candidate.agentRole === 'curiosity.presentation-designer',
-    );
-    return artifact ? storyDesignArtifactV1Schema.parse(artifact) : null;
-  }, [selected]);
-  const interaction = useMemo(() => {
-    const artifact = selected?.artifacts.find(
-      (candidate) =>
-        candidate.agentRole === 'curiosity.interaction-designer' &&
-        candidate.schemaVersion === '1.0',
-    );
-    return artifact ? interactionDesignArtifactV1Schema.parse(artifact) : null;
-  }, [selected]);
-
-  useEffect(() => {
-    if (!presentation) return;
-    const opening = selectReviewedNarration(presentation.narrationLibrary, {
-      type: 'experiment_started',
-      action: 'start',
-    });
-    setCurrentNarration(
-      opening ??
-        presentation.narrationLibrary.toSorted((a, b) => a.id.localeCompare(b.id))[0] ??
-        null,
-    );
-    setNarrationStarted(false);
-    setNarrationError(null);
-  }, [presentation, selectedId]);
-
   const summary = useMemo(
-    () => (selected ? summarizeCuriosityEvents(selected.spec, events) : null),
-    [events, selected],
+    () =>
+      selected
+        ? summarizeCuriosityEvents(
+            { experienceId, versionId: selected.id, spec: selected.spec },
+            events,
+          )
+        : null,
+    [events, experienceId, selected],
   );
   const archive = useMemo(
-    () => (selected && aggregate ? buildCuriosityArchive(aggregate, selected.id, events) : null),
+    () =>
+      selected && aggregate ? buildCuriosityArchive(aggregate, selected.id, events) : undefined,
     [aggregate, events, selected],
   );
-  const visibleRevisionImpact = useMemo(() => {
-    if (revisionImpact) return revisionImpact;
-    const artifact = selected?.artifacts.findLast(
-      (candidate) =>
-        candidate.agentRole === 'curiosity.revision-planner' &&
-        candidate.schemaVersion === '1.0' &&
-        'changedFields' in candidate,
-    );
-    return artifact ? revisionImpactArtifactV1Schema.parse(artifact) : undefined;
-  }, [revisionImpact, selected]);
+  const restoredState = useMemo(() => restoreCuriositySceneState(events), [events]);
+  const latestEvent = events.at(-1);
+  const narration = selected
+    ? (selectReviewedNarration(
+        selected.spec.narrationLibrary,
+        latestEvent ?? { type: 'exploration_started', action: '*' },
+      ) ?? selected.spec.narrationLibrary[0])
+    : null;
 
-  const playNarration = useCallback(async (line: NarrationLine | null) => {
-    if (!line) return;
-    setNarrationError(null);
-    try {
-      narrationPlayerRef.current ??= new ReviewedNarrationPlayer();
-      await narrationPlayerRef.current.play(line);
-    } catch (cause) {
-      setNarrationError(cause instanceof Error ? cause.message : String(cause));
-    }
-  }, []);
-
-  const handleReady = useCallback(() => {
-    if (!pendingCandidateId || activatedCandidateIdsRef.current.has(pendingCandidateId)) return;
-    const candidateId = pendingCandidateId;
-    activatedCandidateIdsRef.current.add(candidateId);
-    const operation = getCuriosityRepository()
-      .activateVersion(experienceId, candidateId)
-      .then(async () => {
-        setPendingCandidateId(null);
-        await syncCuriosityExperience(experienceId);
-        await refresh(candidateId);
-        router.replace(`/experience/${experienceId}`);
-      })
-      .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
-    activationRef.current = operation;
-  }, [experienceId, pendingCandidateId, refresh, router]);
-
-  const handleEvent = useCallback(
-    async (event: CuriosityEventV1) => {
-      await activationRef.current;
-      try {
-        await getCuriosityRepository().appendEvent(event);
-        await syncCuriosityExperience(event.experienceId);
-        setEvents(await getCuriosityRepository().listEvents(event.experienceId, event.versionId));
-        if (presentation) {
-          const line = selectReviewedNarration(presentation.narrationLibrary, event);
-          if (line) {
-            setCurrentNarration(line);
-            if (narrationStarted) void playNarration(line);
-          }
-        }
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : String(cause));
-      }
-    },
-    [narrationStarted, playNarration, presentation],
-  );
-
-  const handleRuntimeFailure = useCallback(
-    async (message: string) => {
-      setError(message);
-      if (!pendingCandidateId) return;
-      await getCuriosityRepository().markVersionFailed(
+  const emit = useCallback(
+    async (type: CuriosityEventTypeV3, action: string, payload: Record<string, unknown> = {}) => {
+      if (!selected) return;
+      const event: CuriosityEventV3 = {
+        source: 'curiosity-world',
+        protocolVersion: '3.0',
+        eventId: `evt_${crypto.randomUUID()}`,
         experienceId,
-        pendingCandidateId,
-        'RUNTIME_FAILED',
-      );
+        versionId: selected.id,
+        type,
+        action,
+        occurredAt: new Date().toISOString(),
+        payload,
+      };
+      await getCuriosityRepository().appendEvent(event);
+      setEvents((current) => [...current, event]);
       await syncCuriosityExperience(experienceId);
-      setPendingCandidateId(null);
-      await refresh();
-      setMode('parent');
     },
-    [experienceId, pendingCandidateId, refresh],
+    [experienceId, selected],
   );
+
+  const handleRuntimeEvent = async (event: CuriosityEventV3) => {
+    await getCuriosityRepository().appendEvent(event);
+    setEvents((current) =>
+      current.some((item) => item.eventId === event.eventId) ? current : [...current, event],
+    );
+    await syncCuriosityExperience(experienceId);
+  };
+
+  const addCandidateFromResult = async (
+    result: Record<string, unknown>,
+    artifacts: unknown,
+    agentRuns: unknown,
+  ) => {
+    const spec = curiosityExperienceSpecV3Schema.parse(result.spec);
+    const versionId = String(result.versionId);
+    await getCuriosityRepository().addCandidateVersion({
+      experienceId,
+      versionId,
+      revision: Number(result.revision),
+      createdAt: String(result.createdAt),
+      spec,
+      artifacts: storedRowsSchema.parse(artifacts),
+      agentRuns: storedRowsSchema.parse(agentRuns),
+    });
+    await getCuriosityRepository().activateVersion(experienceId, versionId);
+    await syncCuriosityExperience(experienceId);
+    await refresh(versionId);
+  };
 
   const handleRevision = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const active = aggregate?.versions.find(
-      (version) => version.id === aggregate.experience.activeVersionId,
-    );
-    if (!active) return setError('VERSION_NOT_ACTIVE: 需要先完成当前候选版本的运行检查。');
+    if (!selected) return;
     setRevising(true);
     setError(null);
     try {
@@ -232,25 +168,11 @@ export default function CuriosityExperiencePage() {
         await fetch(`/api/curiosity/experiences/${experienceId}/revisions`, {
           method: 'POST',
           headers: getCuriosityApiHeaders('curiosity.revision-planner'),
-          body: JSON.stringify({
-            baseSpec: active.spec,
-            experienceSpec: active.experienceSpec,
-            sourceArtifacts: active.artifacts,
-            instruction,
-          }),
+          body: JSON.stringify({ baseVersionId: selected.id, instruction }),
         }),
       );
-      const spec = curiosityExperienceSpecSchema.parse(body.spec);
-      await getCuriosityRepository().addCandidateVersion(spec, String(body.specHash), {
-        experienceSpec: curiosityExperienceSpecV2Schema.parse(body.experienceSpec),
-        artifacts: z.array(curiosityPipelineArtifactSchema).parse(body.artifacts),
-        agentRuns: z.array(curiosityAgentRunSchema).parse(body.agentRuns),
-      });
-      setRevisionImpact(revisionImpactArtifactV1Schema.parse(body.impact));
+      await addCandidateFromResult(body, body.artifacts, body.agentRuns);
       setInstruction('');
-      setPendingCandidateId(spec.versionId);
-      setMode('child');
-      await refresh(spec.versionId);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -259,27 +181,18 @@ export default function CuriosityExperiencePage() {
   };
 
   const handleRegenerate = async () => {
-    if (!aggregate) return setError('EXPERIENCE_NOT_FOUND: 这台设备上没有该体验。');
-    const active = selectRegenerationBase(aggregate, selectedId);
-    if (!active) return setError('EXPERIENCE_NOT_FOUND: 没有可用于重新生成的版本。');
+    if (!selected) return;
     setRegenerating(true);
     setError(null);
     try {
-      const activeKnowledge = knowledgeDesignArtifactV1Schema.parse(
-        active.artifacts.find((artifact) => artifact.agentRole === 'curiosity.knowledge-designer'),
-      );
       const created = await readApiJson(
-        await fetch('/api/curiosity/generations', {
+        await fetch(`/api/curiosity/experiences/${experienceId}/regenerations`, {
           method: 'POST',
           headers: getCuriosityApiHeaders('curiosity.interaction-designer'),
           body: JSON.stringify({
-            question: aggregate.experience.question,
-            age: active.spec.profile.age,
-            experienceId,
-            revision: Math.max(...aggregate.versions.map((version) => version.revision)) + 1,
-            perspectiveDirective:
-              '换一种贴近儿童生活的观察角度；保持科学因果不变，重新设计情境、互动任务和旁白。',
-            preservedCausalRelations: activeKnowledge.causalRelations,
+            baseVersionId: selected.id,
+            targetAge: selected.spec.targetAge,
+            directive: '换一种方式呈现',
           }),
         }),
       );
@@ -290,26 +203,17 @@ export default function CuriosityExperiencePage() {
         const job = await readApiJson(await fetch(String(created.pollUrl), { cache: 'no-store' }));
         if (job.status === 'failed')
           throw new Error(`${String(job.errorCode)}: ${String(job.error)}`);
-        if (job.status !== 'candidate_ready') continue;
-        const result = job.result as {
-          spec?: unknown;
-          specHash?: unknown;
-          experienceSpec?: unknown;
-        };
-        const spec = curiosityExperienceSpecSchema.parse(result.spec);
-        await getCuriosityRepository().addCandidateVersion(spec, String(result.specHash), {
-          experienceSpec: curiosityExperienceSpecV2Schema.parse(result.experienceSpec),
-          artifacts: z.array(curiosityPipelineArtifactSchema).parse(job.artifacts),
-          agentRuns: z.array(curiosityAgentRunSchema).parse(job.agentRuns),
-        });
-        setRevisionImpact(undefined);
-        setPendingCandidateId(spec.versionId);
-        setMode('child');
-        await refresh(spec.versionId);
-        return;
+        if (job.status === 'candidate_ready') {
+          await addCandidateFromResult(
+            job.result as Record<string, unknown>,
+            job.artifacts,
+            job.agentRuns,
+          );
+          return;
+        }
       }
       throw new Error(
-        `GENERATION_TIMEOUT: 生成未在 ${CURIOSITY_GENERATION_TIMEOUT_MS / 60_000} 分钟内返回候选体验。`,
+        `GENERATION_TIMEOUT: 生成未在 ${CURIOSITY_GENERATION_TIMEOUT_MS / 60_000} 分钟内完成。`,
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -319,43 +223,28 @@ export default function CuriosityExperiencePage() {
   };
 
   const selectVersion = async (versionId: string) => {
-    setSelectedId(versionId);
-    setEvents(await getCuriosityRepository().listEvents(experienceId, versionId));
+    try {
+      await getCuriosityRepository().activateVersion(experienceId, versionId);
+      await syncCuriosityExperience(experienceId);
+      await refresh(versionId);
+      setMode('parent');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
   };
 
-  if (!aggregate || !selected || !summary || !archive || !presentation || !interaction) {
+  if (!aggregate || !selected || !summary) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#07152f] p-6 text-white">
-        <div className="max-w-md text-center">
-          <p>{describeExperienceFailure(error) ?? '正在恢复探索…'}</p>
-          {error && (
-            <Button onClick={() => router.push('/')} className="mt-5 bg-[#ffd76a] text-[#173047]">
-              返回新的问题
-            </Button>
-          )}
-        </div>
+      <main className="grid min-h-screen place-items-center bg-[#07152f] text-white">
+        <p role="status">正在恢复这次探索…</p>
       </main>
     );
   }
 
-  const completed = isExperienceComplete(selected.spec, events);
-  const activeStageKind = !events.some((event) => event.type === 'prediction_submitted')
-    ? 'prediction'
-    : !events.some((event) => event.type === 'variable_changed') ||
-        (interaction.sceneType === 'relation-explorer' &&
-          !events.some((event) => event.action.startsWith('compare-')))
-      ? 'exploration'
-      : !events.some((event) => event.type === 'challenge_completed')
-        ? 'transfer'
-        : 'explanation';
   return (
-    <main className="min-h-dvh bg-[#08152d] p-4 text-white sm:p-6">
-      <header className="mx-auto mb-5 flex max-w-[1450px] items-center justify-between gap-4">
-        <Button
-          variant="ghost"
-          onClick={() => router.push('/')}
-          className="text-white hover:bg-white/10 hover:text-white"
-        >
+    <main className="min-h-screen bg-[#07152f] px-4 py-5 text-white sm:px-6">
+      <header className="mx-auto mb-5 flex max-w-[1450px] items-center justify-between gap-3">
+        <Button variant="ghost" onClick={() => router.push('/')} className="text-white">
           <ArrowLeft className="size-4" />
           新的问题
         </Button>
@@ -390,51 +279,93 @@ export default function CuriosityExperiencePage() {
             role="alert"
             className="mb-4 rounded-2xl border border-[#ff8066]/40 bg-[#ff8066]/10 p-4 text-sm font-bold text-[#ffb8a9]"
           >
-            {describeExperienceFailure(error)}
+            {error}
           </p>
         )}
         {mode === 'child' ? (
-          completed ? (
-            <ExplorationCompletion
-              spec={selected.spec}
-              presentation={presentation}
-              summary={summary}
-              onParentReview={() => setMode('parent')}
-              onNewQuestion={() => router.push('/')}
-            />
-          ) : (
-            <>
-              {currentNarration && selected.id === aggregate.experience.activeVersionId && (
-                <ReviewedNarrationPanel
-                  narration={currentNarration.text}
-                  started={narrationStarted}
-                  error={narrationError}
-                  onStart={() => {
-                    setNarrationStarted(true);
-                    void playNarration(currentNarration);
-                  }}
-                  onReplay={() => void playNarration(currentNarration)}
-                  onSkip={() => narrationPlayerRef.current?.stop()}
-                />
-              )}
-              <CuriosityRuntimeFrame
-                key={selected.id}
-                spec={selected.spec}
-                interaction={interaction}
-                activeStageKind={activeStageKind}
-                onReady={handleReady}
-                onEvent={handleEvent}
-                onRuntimeFailure={handleRuntimeFailure}
+          <>
+            {narration && (
+              <ReviewedNarrationPanel
+                narration={narration.text}
+                started={narrationStarted}
+                onStart={() => {
+                  setNarrationStarted(true);
+                  if (!events.some((event) => event.type === 'exploration_started'))
+                    void emit('exploration_started', 'start');
+                }}
+                onReplay={() => undefined}
+                onSkip={() => undefined}
               />
-            </>
-          )
+            )}
+            <CuriosityRuntimeFrame
+              key={selected.id}
+              experienceId={experienceId}
+              versionId={selected.id}
+              spec={selected.spec}
+              restoredState={restoredState}
+              onEvent={handleRuntimeEvent}
+              onStateChange={() => undefined}
+            />
+            <section className="mx-auto mt-5 grid max-w-4xl gap-4 rounded-2xl border border-white/10 bg-white/[.06] p-5 sm:grid-cols-2">
+              <div>
+                <h2 className="font-black text-[#ffe08a]">试试看</h2>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selected.spec.discoveryPrompts.map((prompt) => (
+                    <button
+                      key={prompt.id}
+                      type="button"
+                      className="min-h-11 rounded-full border border-white/15 px-4 text-sm font-bold"
+                      onClick={() =>
+                        void emit('discovery_prompt_opened', 'open_prompt', { promptId: prompt.id })
+                      }
+                    >
+                      {prompt.prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="font-black text-[#ffe08a]" htmlFor="reflection">
+                  记录我的发现
+                </label>
+                <textarea
+                  id="reflection"
+                  value={reflection}
+                  onChange={(event) => setReflection(event.target.value)}
+                  className="mt-3 min-h-24 w-full rounded-xl border border-white/15 bg-[#091d3b] p-3"
+                />
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    type="button"
+                    disabled={!reflection.trim()}
+                    onClick={() =>
+                      void emit('reflection_recorded', 'record_reflection', {
+                        text: reflection.trim(),
+                      })
+                    }
+                  >
+                    保存发现
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      void emit('exploration_ended', 'end').then(() => setMode('parent'))
+                    }
+                  >
+                    结束探索
+                  </Button>
+                </div>
+              </div>
+            </section>
+          </>
         ) : (
           <CuriosityParentReview
             spec={selected.spec}
+            revision={selected.revision}
             summary={summary}
-            voiceEvents={voiceEvents}
+            voiceEvents={[]}
             archive={archive}
-            revisionImpact={visibleRevisionImpact}
             versions={aggregate.versions.map(({ id, revision, status, createdAt }) => ({
               id,
               revision,
@@ -444,11 +375,11 @@ export default function CuriosityExperiencePage() {
             revisionInstruction={instruction}
             revising={revising}
             regenerating={regenerating}
-            error={describeExperienceFailure(error)}
+            error={error}
             onRevisionInstructionChange={setInstruction}
             onSubmitRevision={handleRevision}
             onRegenerate={() => void handleRegenerate()}
-            onSelectVersion={selectVersion}
+            onSelectVersion={(versionId) => void selectVersion(versionId)}
           />
         )}
       </div>

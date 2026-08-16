@@ -1,47 +1,34 @@
 import { z } from 'zod';
 
 import {
-  CURIOSITY_EVENT_TYPES_V2,
   curiosityAgentRunSchema,
-  curiosityExperienceSpecV2Schema,
-  curiosityPatchV2Schema,
-  interactionDesignArtifactV1Schema,
   knowledgeDesignArtifactV1BaseSchema,
   knowledgeDesignArtifactV1Schema,
   qualityReviewArtifactV1Schema,
   questionModelArtifactV1Schema,
-  revisionImpactArtifactV1Schema,
-  storyDesignArtifactV1BaseSchema,
-  storyDesignArtifactV1Schema,
   type CuriosityAgentRole,
   type CuriosityAgentRun,
-  type CuriosityExperienceSpecV2,
-  type CuriosityPatchV2,
-  type InteractionDesignArtifactV1,
   type KnowledgeDesignArtifactV1,
   type QualityReviewArtifactV1,
   type QuestionModelArtifactV1,
-  type RevisionImpactArtifactV1,
-  type StoryDesignArtifactV1,
 } from './agent-contracts';
 import type { CuriosityRoleRoute } from './agent-routing';
+import { renderCuriosityRoleSkill } from './agent-skills';
 import {
-  compileCuriosityExperience,
-  compileCuriosityExperienceV2,
-  type CompiledCuriosityExperience,
-} from './compiler';
-import {
-  CURIOUSITY_EVENT_TYPES,
-  curiosityExperienceSpecSchema,
-  curiosityTaskSchema,
-  type CuriosityExperienceSpecV1,
-} from './contracts';
-import type { CuriosityTextModel } from './model';
+  CURIOSITY_EVENT_TYPES_V3,
+  curiosityEventTypeV3Schema,
+  curiosityExperienceSpecV3Schema,
+  curiositySceneV3Schema,
+  curiosityShortTextV3Schema,
+  validateCuriosityExperienceSpecV3,
+  type CuriosityExperienceSpecV3,
+} from './experience-spec-v3';
 import { classifyCuriosityRequest } from './knowledge';
 import { knowledgeRegistry } from './knowledge/registry';
-import { CURIOSITY_QUALITY_CRITERIA, canonicalizeCuriosityQuality } from './quality';
-import { renderCuriosityRoleSkill } from './agent-skills';
+import type { CuriosityTextModel } from './model';
 import { parseCuriosityModelJson } from './model-json';
+import { canonicalizeCuriosityQuality, CURIOSITY_QUALITY_CRITERIA } from './quality';
+import { getCuriositySceneEntry, type CuriositySceneType } from './scenes/registry';
 
 type GenerationRole = Exclude<CuriosityAgentRole, 'curiosity.revision-planner'>;
 
@@ -56,6 +43,7 @@ export interface CuriosityAgentPipelineInput {
   targetAge: number;
   perspectiveDirective?: string;
   preservedCausalRelations?: KnowledgeDesignArtifactV1['causalRelations'];
+  preservedKnowledge?: CuriosityExperienceSpecV3['knowledge'];
 }
 
 export interface CuriosityPipelineIdentities {
@@ -69,7 +57,7 @@ export interface CuriosityPipelineIdentities {
     knowledge: string;
     scene: string;
     presentation: string;
-    spec: string;
+    spec?: string;
     quality: string;
   };
   agentRunIds: {
@@ -81,24 +69,82 @@ export interface CuriosityPipelineIdentities {
   };
 }
 
+const identifierSchema = z
+  .string()
+  .min(3)
+  .max(96)
+  .regex(/^[a-zA-Z0-9_-]+$/);
+const artifactEnvelope = {
+  artifactId: identifierSchema,
+  runId: identifierSchema,
+  createdAt: z.iso.datetime(),
+  upstreamArtifactIds: z.array(identifierSchema).max(8),
+  knowledgePackVersion: z.string().trim().min(1).max(96),
+};
+
+export const curiositySceneDesignArtifactSchema = z.strictObject({
+  ...artifactEnvelope,
+  agentRole: z.literal('curiosity.interaction-designer'),
+  schemaVersion: z.literal('3.0'),
+  scene: curiositySceneV3Schema,
+  feedback: z
+    .array(
+      z.strictObject({
+        trigger: identifierSchema,
+        message: curiosityShortTextV3Schema,
+        explains: curiosityShortTextV3Schema,
+      }),
+    )
+    .min(1)
+    .max(12),
+});
+
+export const curiosityPresentationArtifactSchema = z.strictObject({
+  ...artifactEnvelope,
+  agentRole: z.literal('curiosity.presentation-designer'),
+  schemaVersion: z.literal('3.0'),
+  sourceArtifactIds: z.strictObject({
+    questionModel: identifierSchema,
+    knowledgeDesign: identifierSchema,
+    sceneDesign: identifierSchema,
+  }),
+  narrationLibrary: z
+    .array(
+      z.strictObject({
+        id: identifierSchema,
+        eventType: curiosityEventTypeV3Schema,
+        action: z.union([z.literal('*'), identifierSchema]),
+        text: curiosityShortTextV3Schema,
+      }),
+    )
+    .min(2)
+    .max(32),
+  discoveryPrompts: z
+    .array(
+      z.strictObject({
+        id: identifierSchema,
+        prompt: curiosityShortTextV3Schema,
+        skippable: z.literal(true),
+      }),
+    )
+    .max(3),
+  limitations: z.array(curiosityShortTextV3Schema).min(1).max(12),
+});
+
+export type CuriositySceneDesignArtifact = z.infer<typeof curiositySceneDesignArtifactSchema>;
+export type CuriosityPresentationArtifact = z.infer<typeof curiosityPresentationArtifactSchema>;
 export type CuriosityPipelineArtifact =
   | QuestionModelArtifactV1
   | KnowledgeDesignArtifactV1
-  | InteractionDesignArtifactV1
-  | StoryDesignArtifactV1
-  | RevisionImpactArtifactV1
-  | CuriosityPatchV2
-  | CuriosityExperienceSpecV2
+  | CuriositySceneDesignArtifact
+  | CuriosityPresentationArtifact
   | QualityReviewArtifactV1;
 
 export const curiosityPipelineArtifactSchema = z.union([
   questionModelArtifactV1Schema,
   knowledgeDesignArtifactV1Schema,
-  interactionDesignArtifactV1Schema,
-  storyDesignArtifactV1Schema,
-  revisionImpactArtifactV1Schema,
-  curiosityPatchV2Schema,
-  curiosityExperienceSpecV2Schema,
+  curiositySceneDesignArtifactSchema,
+  curiosityPresentationArtifactSchema,
   qualityReviewArtifactV1Schema,
 ]);
 
@@ -119,9 +165,8 @@ export interface CuriosityPipelineStageUpdate {
 export interface CuriosityAgentPipelineResult {
   artifacts: CuriosityPipelineArtifact[];
   agentRuns: CuriosityAgentRun[];
-  spec: CuriosityExperienceSpecV2;
-  runtimeSpec: CuriosityExperienceSpecV1;
-  compiled: CompiledCuriosityExperience;
+  spec: CuriosityExperienceSpecV3;
+  specHash: string;
   qualityRetryCount: 0 | 1;
 }
 
@@ -157,7 +202,6 @@ const envelopeKeys = {
   upstreamArtifactIds: true,
   knowledgePackVersion: true,
 } as const;
-
 const executableContent =
   /<\/?(?:script|style|html|body)|\b(?:javascript:|function\s*\(|document\.|window\.|eval\s*\()|=>|\{\s*(?:display|color|position)\s*:/i;
 
@@ -166,24 +210,18 @@ function assertNoExecutableModelContent(value: unknown): void {
     if (executableContent.test(value)) throw new Error('MODEL_CODE_FORBIDDEN');
     return;
   }
-  if (Array.isArray(value)) {
-    value.forEach(assertNoExecutableModelContent);
-    return;
-  }
-  if (value && typeof value === 'object') {
+  if (Array.isArray(value)) return value.forEach(assertNoExecutableModelContent);
+  if (value && typeof value === 'object')
     Object.values(value).forEach(assertNoExecutableModelContent);
-  }
 }
 
 const questionOutputBaseSchema = questionModelArtifactV1Schema.omit(envelopeKeys);
-
 const commonKnowledgeOutputSchema = knowledgeDesignArtifactV1BaseSchema.omit({
   ...envelopeKeys,
   source: true,
   knowledgeFamily: true,
   packId: true,
 });
-
 const openKnowledgeOutputSchema = commonKnowledgeOutputSchema.extend({
   claims: knowledgeDesignArtifactV1BaseSchema.shape.claims.unwrap().min(1),
   relations: knowledgeDesignArtifactV1BaseSchema.shape.relations.unwrap().min(1),
@@ -193,29 +231,16 @@ const openKnowledgeOutputSchema = commonKnowledgeOutputSchema.extend({
   uncertainties: knowledgeDesignArtifactV1BaseSchema.shape.uncertainties.unwrap().min(1),
   timeSensitive: z.boolean(),
 });
-
-const sceneOutputSchema = interactionDesignArtifactV1Schema.omit(envelopeKeys).extend({
-  sceneType: z.enum(['variable-explorer', 'relation-explorer']),
-  tasks: z.array(curiosityTaskSchema).length(4),
+const sceneOutputSchema = z.strictObject({
+  scene: curiositySceneV3Schema,
+  feedback: curiositySceneDesignArtifactSchema.shape.feedback,
 });
-
-const presentationOutputSchema = storyDesignArtifactV1BaseSchema
-  .omit({
-    ...envelopeKeys,
-    sourceArtifactIds: true,
-    stages: true,
-  })
-  .extend({
-    title: z.string().trim().min(1).max(120),
-    hook: z.string().trim().min(1).max(240),
-    explorePrompt: z.string().trim().min(1).max(240),
-    challengePrompt: z.string().trim().min(1).max(240),
-    completion: z.string().trim().min(1).max(240),
-    narrationLibrary: storyDesignArtifactV1BaseSchema.shape.narrationLibrary.unwrap().min(2),
-    immediateFeedback: storyDesignArtifactV1BaseSchema.shape.immediateFeedback.unwrap().min(1),
-    discoveryPrompts: storyDesignArtifactV1BaseSchema.shape.discoveryPrompts.unwrap().max(3),
-  });
-
+const presentationOutputSchema = curiosityPresentationArtifactSchema.omit({
+  ...envelopeKeys,
+  agentRole: true,
+  schemaVersion: true,
+  sourceArtifactIds: true,
+});
 const qualityOutputSchema = z.strictObject({
   checks: z
     .array(
@@ -268,149 +293,56 @@ function suffix(value: string, attempt: number): string {
   return attempt === 0 ? value : `${value}_retry`;
 }
 
-function childCompletion(knowledge: KnowledgeDesignArtifactV1): string {
-  return (
-    knowledge.allowedExplanations[0] ??
-    `你发现了：${knowledge.causalRelations[0]!.cause}时，${knowledge.causalRelations[0]!.effect}。`
-  );
-}
-
-function validateScene(
-  scene: InteractionDesignArtifactV1,
-  route: ReturnType<typeof classifyCuriosityRequest>,
-): void {
-  const variableIds = new Set(scene.variables.map((variable) => variable.id));
-  for (const relation of scene.relations) {
-    if (!variableIds.has(relation.fromVariableId) || !variableIds.has(relation.toVariableId)) {
-      throw new Error(`SCENE_RELATION_VARIABLE_UNKNOWN: ${relation.id}`);
-    }
-  }
-  if (scene.sceneType === 'relation-explorer' && scene.relations.length === 0) {
-    throw new Error('RELATION_EXPLORER_RELATION_REQUIRED');
-  }
-  if (route.kind === 'curated') {
-    const plugin = knowledgeRegistry.get(route.family);
-    const allowedPrimitives = new Set(plugin.allowedPrimitives);
-    for (const variable of scene.variables) {
-      const bounds = plugin.allowedVariables[variable.id];
-      if (!bounds || variable.min < bounds.min || variable.max > bounds.max) {
-        throw new Error(`SCENE_VARIABLE_OUT_OF_BOUNDS: ${variable.id}`);
-      }
-    }
-    if (scene.primitives.some((primitive) => !allowedPrimitives.has(primitive))) {
-      throw new Error('SCENE_PRIMITIVE_NOT_CURATED');
-    }
-  } else if (
-    scene.primitives.some(
-      (primitive) => primitive !== 'adjust-variable' && primitive !== 'compare-relation',
-    )
-  ) {
-    throw new Error('OPEN_SCENE_PRIMITIVE_NOT_CONTROLLED');
-  }
-}
-
-function buildRuntimeSpec(input: {
-  pipelineInput: CuriosityAgentPipelineInput;
-  question: QuestionModelArtifactV1;
-  knowledge: KnowledgeDesignArtifactV1;
-  scene: InteractionDesignArtifactV1;
-  presentation: StoryDesignArtifactV1;
-  identities: CuriosityPipelineIdentities;
-}): CuriosityExperienceSpecV1 {
-  if (!input.scene.tasks) throw new Error('SCENE_TASKS_REQUIRED');
-  const primaryVariable = input.scene.variables[0];
-  if (!primaryVariable) throw new Error('SCENE_VARIABLES_REQUIRED');
-  const preset =
-    input.knowledge.knowledgeFamily === 'relative-motion'
-      ? 'moon-parallax-v1'
-      : input.knowledge.knowledgeFamily === 'balance-support'
-        ? 'balance-support-v1'
-        : input.knowledge.knowledgeFamily === 'light-path'
-          ? 'light-path-v1'
-          : input.scene.sceneType === 'relation-explorer'
-            ? 'relation-explorer-v1'
-            : 'variable-explorer-v1';
-  return curiosityExperienceSpecSchema.parse({
-    schemaVersion: '1.0',
-    experienceId: input.identities.experienceId,
-    versionId: input.identities.versionId,
-    revision: input.identities.revision ?? 1,
-    createdAt: input.identities.createdAt,
-    profile: { age: input.pipelineInput.targetAge },
-    question: {
-      original: input.pipelineInput.question,
-      coreQuestion: input.question.coreQuestion,
-    },
-    knowledge: {
-      family: input.knowledge.knowledgeFamily,
-      packId: input.knowledge.packId,
-    },
-    presentation: {
-      title: input.presentation.title,
-      hook: input.presentation.hook,
-      explorePrompt: input.presentation.explorePrompt,
-      challengePrompt: input.presentation.challengePrompt,
-      completion: input.presentation.completion ?? childCompletion(input.knowledge),
-    },
-    simulation: {
-      preset,
-      observerTravel: Math.min(100, Math.max(40, Math.abs(primaryVariable.max))),
-      nearObjectDistance: 20,
-      farObjectDistance: 400,
-    },
-    tasks: input.scene.tasks,
-    eventRequirements: [...CURIOUSITY_EVENT_TYPES],
-  });
-}
-
 function buildExperienceSpec(input: {
   pipelineInput: CuriosityAgentPipelineInput;
+  route: ReturnType<typeof classifyCuriosityRequest>;
   question: QuestionModelArtifactV1;
   knowledge: KnowledgeDesignArtifactV1;
-  scene: InteractionDesignArtifactV1;
-  identities: CuriosityPipelineIdentities;
-  attempt: number;
-}): CuriosityExperienceSpecV2 {
-  return curiosityExperienceSpecV2Schema.parse({
-    artifactId: suffix(input.identities.artifactIds.spec, input.attempt),
-    runId: input.identities.runId,
-    agentRole: 'curiosity.interaction-designer',
-    schemaVersion: '2.0',
-    createdAt: input.identities.createdAt,
-    upstreamArtifactIds: [
-      input.question.artifactId,
-      input.knowledge.artifactId,
-      input.scene.artifactId,
-    ],
-    knowledgePackVersion: input.knowledge.knowledgePackVersion,
-    experienceId: input.identities.experienceId,
-    versionId: input.identities.versionId,
-    revision: input.identities.revision ?? 1,
-    profile: { age: input.pipelineInput.targetAge },
-    sourceArtifactIds: {
-      questionModel: input.question.artifactId,
-      knowledgeDesign: input.knowledge.artifactId,
-      interactionDesign: input.scene.artifactId,
+  scene: CuriositySceneDesignArtifact;
+  presentation: CuriosityPresentationArtifact;
+}): CuriosityExperienceSpecV3 {
+  const claims =
+    input.knowledge.claims.length > 0
+      ? input.knowledge.claims.map((claim) => claim.statement)
+      : input.knowledge.causalRelations.map(
+          (relation) => `${relation.cause}${relation.relation}${relation.effect}。`,
+        );
+  const spec = curiosityExperienceSpecV3Schema.parse({
+    question: {
+      original: input.pipelineInput.question,
+      core: input.question.coreQuestion,
     },
-    knowledge: {
-      family: input.knowledge.knowledgeFamily,
+    targetAge: input.pipelineInput.targetAge,
+    route:
+      input.route.kind === 'curated'
+        ? { kind: 'curated', family: input.route.family }
+        : { kind: 'open' },
+    knowledge: input.pipelineInput.preservedKnowledge ?? {
+      source: input.route.kind,
       packId: input.knowledge.packId,
-      packVersion: input.knowledge.knowledgePackVersion,
+      claims,
+      relations: input.knowledge.relations.map((relation) => ({
+        id: relation.id,
+        from: relation.fromClaimId,
+        relation: relation.relation,
+        to: relation.toClaimId,
+      })),
+      misconceptions: input.knowledge.misconceptions,
+      uncertainties: input.knowledge.uncertainties,
+      observationSuggestions: input.knowledge.observationSuggestions,
+      timeSensitive: input.knowledge.timeSensitive ?? false,
     },
-    title: input.question.equivalentQuestions[0] ?? input.question.coreQuestion,
-    visualTheme: input.scene.visualTheme,
-    sceneType: input.scene.sceneType,
-    observationSuggestions: input.knowledge.observationSuggestions,
-    instructions: input.scene.instructionCopy,
-    variables: input.scene.variables.map(({ id, min, max, initial }) => ({
-      id,
-      min,
-      max,
-      initial,
-    })),
-    primitives: input.scene.primitives,
-    eventRequirements: [...CURIOSITY_EVENT_TYPES_V2],
+    scene: input.scene.scene,
+    narrationLibrary: input.presentation.narrationLibrary,
+    discoveryPrompts: input.presentation.discoveryPrompts,
+    limitations: input.presentation.limitations,
+    eventRequirements: [...CURIOSITY_EVENT_TYPES_V3],
   });
+  getCuriositySceneEntry(spec.scene.type as CuriositySceneType).validate(
+    spec.scene,
+    spec.targetAge,
+  );
+  return spec;
 }
 
 export async function runCuriosityAgentPipeline(
@@ -568,20 +500,8 @@ export async function runCuriosityAgentPipeline(
       question,
       route,
       curatedKnowledgePack: selectedPack,
-      requiredOpenFields:
-        route.kind === 'open'
-          ? [
-              'claims',
-              'relations',
-              'allowedVocabulary',
-              'allowedExplanations',
-              'forbiddenExplanations',
-              'misconceptions',
-              'uncertainties',
-              'timeSensitive',
-            ]
-          : undefined,
       perspectiveDirective: input.perspectiveDirective,
+      preservedKnowledge: input.preservedKnowledge,
     }),
     schema: route.kind === 'open' ? openKnowledgeOutputSchema : commonKnowledgeOutputSchema,
     build: (output) => {
@@ -612,6 +532,10 @@ export async function runCuriosityAgentPipeline(
     const sceneArtifactId = suffix(identities.artifactIds.scene, attempt);
     const presentationArtifactId = suffix(identities.artifactIds.presentation, attempt);
     const qualityArtifactId = suffix(identities.artifactIds.quality, attempt);
+    const allowedSceneTypes =
+      route.kind === 'curated'
+        ? [route.family]
+        : ['variable', 'relation', 'timeline', 'comparison', 'process', 'situation'];
     const scene = (await execute({
       role: 'curiosity.interaction-designer',
       stage: 'scene',
@@ -622,28 +546,32 @@ export async function runCuriosityAgentPipeline(
       prompt: JSON.stringify({
         question,
         knowledge,
-        allowedSceneTypes: ['variable-explorer', 'relation-explorer'],
-        allowedOpenPrimitives: ['adjust-variable', 'compare-relation'],
+        allowedSceneTypes,
         modelCodePolicy: 'declarative-data-only',
         rejectionFeedback,
         perspectiveDirective: input.perspectiveDirective,
       }),
       schema: sceneOutputSchema,
       build: (output) => {
-        const artifact = interactionDesignArtifactV1Schema.parse({
+        if (!allowedSceneTypes.includes(output.scene.type)) {
+          throw new Error(`SCENE_TYPE_NOT_ALLOWED: ${output.scene.type}`);
+        }
+        getCuriositySceneEntry(output.scene.type as CuriositySceneType).validate(
+          output.scene,
+          input.targetAge,
+        );
+        return curiositySceneDesignArtifactSchema.parse({
           ...output,
           artifactId: sceneArtifactId,
           runId: identities.runId,
           agentRole: 'curiosity.interaction-designer',
-          schemaVersion: '1.0',
+          schemaVersion: '3.0',
           createdAt: identities.createdAt,
           upstreamArtifactIds: [question.artifactId, knowledge.artifactId],
           knowledgePackVersion: knowledge.knowledgePackVersion,
         });
-        validateScene(artifact, route);
-        return artifact;
       },
-    })) as InteractionDesignArtifactV1;
+    })) as CuriositySceneDesignArtifact;
 
     const presentation = (await execute({
       role: 'curiosity.presentation-designer',
@@ -656,6 +584,7 @@ export async function runCuriosityAgentPipeline(
         question,
         knowledge,
         scene,
+        eventTypes: CURIOSITY_EVENT_TYPES_V3,
         narrationPolicy: 'generate-complete-reviewed-library-now;runtime-generation-forbidden',
         discoveryPromptLimit: 3,
         everyDiscoveryPromptSkippable: true,
@@ -664,52 +593,40 @@ export async function runCuriosityAgentPipeline(
       }),
       schema: presentationOutputSchema,
       build: (output) =>
-        storyDesignArtifactV1Schema.parse({
+        curiosityPresentationArtifactSchema.parse({
           ...output,
           artifactId: presentationArtifactId,
           runId: identities.runId,
           agentRole: 'curiosity.presentation-designer',
-          schemaVersion: '1.0',
+          schemaVersion: '3.0',
           createdAt: identities.createdAt,
           upstreamArtifactIds: [question.artifactId, knowledge.artifactId, scene.artifactId],
           knowledgePackVersion: knowledge.knowledgePackVersion,
           sourceArtifactIds: {
             questionModel: question.artifactId,
             knowledgeDesign: knowledge.artifactId,
-            interactionDesign: scene.artifactId,
+            sceneDesign: scene.artifactId,
           },
-          stages: [],
         }),
-    })) as StoryDesignArtifactV1;
+    })) as CuriosityPresentationArtifact;
 
-    let spec: CuriosityExperienceSpecV2;
-    let runtimeSpec: CuriosityExperienceSpecV1;
-    let compiled: CompiledCuriosityExperience;
+    let spec: CuriosityExperienceSpecV3;
+    let specHash: string;
     try {
       spec = buildExperienceSpec({
         pipelineInput: input,
-        question,
-        knowledge,
-        scene,
-        identities,
-        attempt,
-      });
-      compileCuriosityExperienceV2(spec);
-      runtimeSpec = buildRuntimeSpec({
-        pipelineInput: input,
+        route,
         question,
         knowledge,
         scene,
         presentation,
-        identities,
       });
-      compiled = compileCuriosityExperience(runtimeSpec);
-      artifacts.push(spec);
+      ({ spec, specHash } = validateCuriosityExperienceSpecV3(spec));
     } catch (error) {
       throw new CuriosityAgentPipelineError(
         'DETERMINISTIC_VALIDATION_FAILED',
         'curiosity.interaction-designer',
-        '确定性 Schema、知识或编译检查失败。',
+        'V3 Schema、知识或场景检查失败。',
         artifacts,
         agentRuns,
         error,
@@ -722,12 +639,7 @@ export async function runCuriosityAgentPipeline(
       failureCode: 'QUALITY_REVIEW_INVALID',
       agentRunId: suffix(identities.agentRunIds.quality, attempt),
       artifactId: qualityArtifactId,
-      upstreamArtifactIds: [
-        knowledge.artifactId,
-        scene.artifactId,
-        presentation.artifactId,
-        spec.artifactId,
-      ],
+      upstreamArtifactIds: [knowledge.artifactId, scene.artifactId, presentation.artifactId],
       prompt: JSON.stringify({
         reviewContract: {
           criteria: CURIOSITY_QUALITY_CRITERIA,
@@ -750,12 +662,7 @@ export async function runCuriosityAgentPipeline(
           agentRole: 'curiosity.quality-reviewer',
           schemaVersion: '1.0',
           createdAt: identities.createdAt,
-          upstreamArtifactIds: [
-            knowledge.artifactId,
-            scene.artifactId,
-            presentation.artifactId,
-            spec.artifactId,
-          ],
+          upstreamArtifactIds: [knowledge.artifactId, scene.artifactId, presentation.artifactId],
           knowledgePackVersion: knowledge.knowledgePackVersion,
         }),
     })) as QualityReviewArtifactV1;
@@ -765,8 +672,7 @@ export async function runCuriosityAgentPipeline(
         artifacts,
         agentRuns,
         spec,
-        runtimeSpec,
-        compiled,
+        specHash,
         qualityRetryCount: attempt as 0 | 1,
       };
     }
@@ -783,6 +689,5 @@ export async function runCuriosityAgentPipeline(
       );
     }
   }
-
   throw new Error('UNREACHABLE_PIPELINE_STATE');
 }

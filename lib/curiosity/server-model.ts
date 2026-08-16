@@ -6,7 +6,7 @@ import { resolveModelFromRequest, type ResolvedModel } from '@/lib/server/resolv
 import { CuriosityModelUnavailableError } from './api-handlers';
 import type { CuriosityAgentRole } from './agent-contracts';
 import { getCuriosityRoleStage, type CuriosityRoleRoute } from './agent-routing';
-import type { CuriosityExperienceSpecV1 } from './contracts';
+import type { CuriosityExperienceSpecV3 } from './experience-spec-v3';
 import type { CuriosityTextModel } from './model';
 
 function jsonModel(value: unknown): CuriosityTextModel {
@@ -50,68 +50,14 @@ function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextMode
   }
   if (role === 'curiosity.interaction-designer') {
     return jsonModel({
-      scenario: '走过一盏路灯时，它很快被甩到身后；月亮为什么还在原来的方向？',
-      visualTheme: '安静的蓝色夜空',
-      sceneType: 'relation-explorer',
-      variables: [
-        { id: 'observer-position', label: '观察者位置', min: -80, max: 80, initial: 0 },
-        { id: 'object-distance', label: '物体距离', min: 20, max: 400, initial: 200 },
-      ],
-      relations: [
-        {
-          id: 'distance-change',
-          fromVariableId: 'object-distance',
-          toVariableId: 'observer-position',
-          direction: 'inverse',
-        },
-      ],
-      tasks: [
-        {
-          id: 'prediction',
-          kind: 'prediction',
-          prompt: '谁变化得更明显？',
-          options: [
-            { id: 'near-lamp', label: '近处路灯' },
-            { id: 'moon', label: '月亮' },
-          ],
-          expectedOptionId: 'near-lamp',
-        },
-        {
-          id: 'exploration',
-          kind: 'exploration',
-          prompt: '移动看看。',
-          variable: 'observer-position',
-        },
-        {
-          id: 'challenge',
-          kind: 'challenge',
-          prompt: '放远后会怎样？',
-          options: [
-            { id: 'nearer', label: '变化更大' },
-            { id: 'farther', label: '变化更小' },
-          ],
-          expectedOptionId: 'farther',
-        },
-        {
-          id: 'explanation',
-          kind: 'explanation',
-          prompt: '为什么像在跟着？',
-          options: [
-            { id: 'small-angle-change', label: '月亮很远，观察方向变化小' },
-            { id: 'object-follows', label: '月亮真的在追着我们' },
-          ],
-          expectedOptionId: 'small-angle-change',
-        },
-      ],
-      taskSequence: ['prediction', 'exploration', 'guided-discovery', 'transfer', 'explanation'],
-      instructionCopy: [
-        { taskId: 'prediction', kind: 'prediction', text: '先猜一猜' },
-        { taskId: 'exploration', kind: 'exploration', text: '拖动看看' },
-        { taskId: 'guided-discovery', kind: 'guided-discovery', text: '比较远和近' },
-        { taskId: 'transfer', kind: 'transfer', text: '换个距离试试' },
-        { taskId: 'explanation', kind: 'explanation', text: '选一个说给家长听' },
-      ],
-      primitives: ['move-observer', 'compare-near-far'],
+      scene: {
+        type: 'relative-motion',
+        title: '月亮真的在跟着我吗？',
+        instructions: ['拖动小朋友，再比较近处路灯和远处月亮。'],
+        observerTravel: 80,
+        nearObjectDistance: 20,
+        farObjectDistance: 400,
+      },
       feedback: [
         {
           trigger: 'observer-moved',
@@ -119,47 +65,34 @@ function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextMode
           explains: '距离会影响观察方向的变化大小。',
         },
       ],
-      endConditions: ['完成一次远近比较', '选择一个解释'],
     });
   }
   if (role === 'curiosity.presentation-designer') {
     return jsonModel({
-      title: '月亮为什么像在跟着我？',
-      hook: '先猜猜路灯和月亮谁变化更明显。',
-      explorePrompt: '移动小朋友，比较远近物体。',
-      challengePrompt: '把物体放远再比较。',
-      completion: '你发现了：距离越远，观察方向变化越小。',
       narrationLibrary: [
         {
           id: 'narration_start',
-          eventType: 'experiment_started',
+          eventType: 'exploration_started',
           action: '*',
           text: '先猜一猜，路灯和月亮谁变化得更快？',
         },
         {
           id: 'narration_move',
-          eventType: 'variable_changed',
+          eventType: 'control_changed',
           action: '*',
           text: '比较远处和近处，找找变化的规律。',
         },
         {
           id: 'narration_finish',
-          eventType: 'experience_completed',
+          eventType: 'exploration_ended',
           action: '*',
           text: '你用自己的观察找到了原因。',
-        },
-      ],
-      immediateFeedback: [
-        {
-          id: 'feedback_move',
-          eventType: 'variable_changed',
-          outcome: 'observe',
-          text: '记住近处和远处变化的不同。',
         },
       ],
       discoveryPrompts: [
         { id: 'card_mountain', prompt: '远山为什么也像在跟着车走？', skippable: true },
       ],
+      limitations: ['这个场景只比较观察方向，不表示月亮真的移动。'],
     });
   }
   if (role === 'curiosity.quality-reviewer') {
@@ -181,55 +114,45 @@ function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextMode
 
 function createTestRevisionPlannerModel(body: unknown): CuriosityTextModel {
   const revision = body as {
-    baseSpec?: CuriosityExperienceSpecV1;
+    baseVersionId?: string;
+    spec?: CuriosityExperienceSpecV3;
     instruction?: string;
   };
-  if (!revision.baseSpec || typeof revision.instruction !== 'string') {
+  if (!revision.baseVersionId || !revision.spec || typeof revision.instruction !== 'string') {
     throw new CuriosityModelUnavailableError('测试修改请求缺少基础版本或修改指令。');
   }
-  const baseSpec = revision.baseSpec;
   const instruction = revision.instruction;
   return {
-    async complete({ prompt }) {
+    async complete() {
       const changedFields: string[] = [];
       const operations: Array<Record<string, unknown>> = [];
       if (/6\s*岁|六岁/.test(instruction)) {
-        changedFields.push('profile.age');
-        operations.push({ op: 'set_age', age: 6 });
+        changedFields.push('targetAge');
+        operations.push({ op: 'set_target_age', value: 6 });
       }
       if (/10\s*岁|十岁/.test(instruction)) {
-        changedFields.push('profile.age');
-        operations.push({ op: 'set_age', age: 10 });
+        changedFields.push('targetAge');
+        operations.push({ op: 'set_target_age', value: 10 });
       }
       if (/文字.*(?:少|减)|减少.*文字/.test(instruction)) {
-        changedFields.push('presentation.instructions');
+        changedFields.push('scene.instructions');
         operations.push({
           op: 'replace_instruction',
-          taskId: 'exploration',
+          index: 0,
           value: '拖动看看',
         });
       }
       if (/桌上|动手|手指/.test(instruction)) {
-        changedFields.push('observationSuggestions');
+        changedFields.push('scene.title');
         operations.push({
-          op: 'replace_observation_suggestion',
-          index: 0,
-          value: '桌上用手指比较近处和远处物体的视角变化。',
+          op: 'replace_scene_title',
+          value: '用手指比较远近变化',
         });
       }
       if (changedFields.length === 0) {
         return JSON.stringify({ unsupported: true });
       }
-      if (prompt.includes('"phase":"impact"')) {
-        return JSON.stringify({
-          baseVersionId: baseSpec.versionId,
-          summary: '只调整年龄表达或现实观察建议，保持知识模型不变。',
-          changedFields: [...new Set(changedFields)],
-          preservedFields: ['knowledge.packId', 'knowledge.packVersion'],
-          knowledgeFamily: baseSpec.knowledge.family,
-        });
-      }
-      return JSON.stringify({ operations });
+      return JSON.stringify({ baseVersionId: revision.baseVersionId, operations });
     },
   };
 }

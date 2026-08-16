@@ -1,7 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import type { CuriosityExperienceSpecV1 } from './contracts';
 import {
   CuriosityAgentPipelineError,
   runCuriosityAgentPipeline,
@@ -10,8 +9,8 @@ import {
   type CuriosityPipelineModels,
   type CuriosityPipelineStage,
 } from './agent-pipeline';
-import type { CuriosityAgentRun, CuriosityExperienceSpecV2 } from './agent-contracts';
-import type { KnowledgeDesignArtifactV1 } from './agent-contracts';
+import type { CuriosityAgentRun } from './agent-contracts';
+import type { CuriosityExperienceSpecV3 } from './experience-spec-v3';
 
 export type CuriosityGenerationStep =
   | 'queued'
@@ -31,7 +30,7 @@ export interface CuriosityGenerationInput {
   perspectiveDirective?: string;
   experienceId?: string;
   revision?: number;
-  preservedCausalRelations?: KnowledgeDesignArtifactV1['causalRelations'];
+  preservedKnowledge?: CuriosityExperienceSpecV3['knowledge'];
 }
 
 export interface CuriosityGenerationJob {
@@ -49,8 +48,11 @@ export interface CuriosityGenerationJob {
   artifacts: CuriosityPipelineArtifact[];
   agentRuns: CuriosityAgentRun[];
   result?: {
-    spec: CuriosityExperienceSpecV1;
-    experienceSpec: CuriosityExperienceSpecV2;
+    experienceId: string;
+    versionId: string;
+    revision: number;
+    createdAt: string;
+    spec: CuriosityExperienceSpecV3;
     specHash: string;
   };
   errorCode?: string;
@@ -196,9 +198,12 @@ export async function runCuriosityGenerationJob(
       artifacts: candidate.artifacts,
       agentRuns: candidate.agentRuns,
       result: {
-        spec: candidate.runtimeSpec,
-        experienceSpec: candidate.spec,
-        specHash: candidate.compiled.specHash,
+        experienceId: identity.experienceId,
+        versionId: identity.versionId,
+        revision: identity.revision ?? 1,
+        createdAt: identity.createdAt,
+        spec: candidate.spec,
+        specHash: candidate.specHash,
       },
       error: undefined,
       errorCode: undefined,

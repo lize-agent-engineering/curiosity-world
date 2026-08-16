@@ -45,9 +45,14 @@ export async function PUT(
     }
     await curiosityExperienceStore.write(snapshot);
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
     return NextResponse.json(
-      { success: false, errorCode: 'EXPERIENCE_SNAPSHOT_INVALID', error: '体验快照无效。' },
+      {
+        success: false,
+        errorCode: 'EXPERIENCE_SNAPSHOT_INVALID',
+        error: `体验快照无效：${detail}`,
+      },
       { status: 400 },
     );
   }

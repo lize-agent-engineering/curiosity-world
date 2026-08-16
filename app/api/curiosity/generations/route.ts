@@ -11,21 +11,20 @@ const post = createCuriosityGenerationPostHandler({
   store: curiosityJobStore,
   resolveRoleModel: (request, body, role) => resolveCuriosityRoleModel(request, body, role),
   schedule: (work) => after(work),
-  identityFactory: (body) => {
+  identityFactory: (_body) => {
     const createdAt = new Date().toISOString();
     return {
       jobId: `job_${nanoid(10)}`,
       runId: `run_${nanoid(12)}`,
-      experienceId: body.experienceId ?? `cur_${nanoid(12)}`,
+      experienceId: `cur_${nanoid(12)}`,
       versionId: `ver_${nanoid(12)}`,
-      revision: body.revision,
+      revision: 1,
       createdAt,
       artifactIds: {
         question: `art_${nanoid(12)}`,
         knowledge: `art_${nanoid(12)}`,
         scene: `art_${nanoid(12)}`,
         presentation: `art_${nanoid(12)}`,
-        spec: `art_${nanoid(12)}`,
         quality: `art_${nanoid(12)}`,
       },
       agentRunIds: {

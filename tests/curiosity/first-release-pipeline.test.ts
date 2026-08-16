@@ -45,70 +45,24 @@ const knowledgeOutput = {
   packReferences: ['generated:open'],
 };
 
-const tasks = [
-  {
-    id: 'prediction',
-    kind: 'prediction',
-    prompt: '哪一滴水会先变小？',
-    options: [
-      { id: 'warm-drop', label: '温暖处的水滴' },
-      { id: 'cool-drop', label: '阴凉处的水滴' },
-    ],
-    expectedOptionId: 'warm-drop',
-  },
-  {
-    id: 'exploration',
-    kind: 'exploration',
-    prompt: '改变温度，比较水滴。',
-    variable: 'temperature',
-  },
-  {
-    id: 'challenge',
-    kind: 'challenge',
-    prompt: '哪里晾衣服更容易干？',
-    options: [
-      { id: 'warm-place', label: '温暖通风处' },
-      { id: 'closed-box', label: '密闭盒子里' },
-    ],
-    expectedOptionId: 'warm-place',
-  },
-  {
-    id: 'explanation',
-    kind: 'explanation',
-    prompt: '水为什么变少了？',
-    options: [
-      { id: 'became-vapor', label: '一部分水变成水蒸气了' },
-      { id: 'vanished', label: '水凭空消失了' },
-    ],
-    expectedOptionId: 'became-vapor',
-  },
-] as const;
-
 const sceneOutput = {
-  scenario: '比较两滴水在不同温度下的变化。',
-  visualTheme: '清晨窗边的两滴水',
-  sceneType: 'relation-explorer',
-  variables: [
-    { id: 'temperature', label: '温度', min: 0, max: 10, initial: 4 },
-    { id: 'water-size', label: '水滴大小', min: 0, max: 10, initial: 8 },
-  ],
-  relations: [
-    {
-      id: 'temperature-water',
-      fromVariableId: 'temperature',
-      toVariableId: 'water-size',
-      direction: 'inverse',
-    },
-  ],
-  tasks,
-  taskSequence: ['prediction', 'exploration', 'transfer', 'explanation'],
-  instructionCopy: [
-    { taskId: 'prediction', kind: 'prediction', text: '先猜哪滴水变小' },
-    { taskId: 'exploration', kind: 'exploration', text: '改变温度看看' },
-    { taskId: 'transfer', kind: 'transfer', text: '换到晾衣服想想' },
-    { taskId: 'explanation', kind: 'explanation', text: '选出你的解释' },
-  ],
-  primitives: ['adjust-variable', 'compare-relation'],
+  scene: {
+    type: 'relation',
+    title: '水去哪儿了？',
+    instructions: ['点一点水滴和温度，再打开它们的关系。'],
+    objects: [
+      { id: 'temperature', label: '温度' },
+      { id: 'water_size', label: '水滴大小' },
+    ],
+    relations: [
+      {
+        id: 'temperature_water',
+        from: 'temperature',
+        to: 'water_size',
+        label: '温度越高，蒸发越快',
+      },
+    ],
+  },
   feedback: [
     {
       trigger: 'set-temperature',
@@ -116,44 +70,31 @@ const sceneOutput = {
       explains: '温度会影响蒸发速度。',
     },
   ],
-  endConditions: ['改变一次温度', '比较一次关系', '选择解释'],
 };
 
 const presentationOutput = {
-  title: '水去哪儿了？',
-  hook: '两滴一样大的水，谁会先变小？',
-  explorePrompt: '改变温度，比较水滴。',
-  challengePrompt: '把发现用到晾衣服上。',
-  completion: '你发现了：水会从表面慢慢变成水蒸气。',
   narrationLibrary: [
     {
       id: 'narration_start',
-      eventType: 'experiment_started',
+      eventType: 'exploration_started',
       action: '*',
       text: '先猜哪滴水会先变小。',
     },
     {
       id: 'narration_temperature',
-      eventType: 'variable_changed',
+      eventType: 'control_changed',
       action: 'set-temperature',
       text: '温暖的一边变化得更快。',
     },
     {
       id: 'narration_finish',
-      eventType: 'experience_completed',
+      eventType: 'exploration_ended',
       action: '*',
       text: '你用观察找到了水的去向。',
     },
   ],
-  immediateFeedback: [
-    {
-      id: 'feedback_temperature',
-      eventType: 'variable_changed',
-      outcome: 'observe',
-      text: '记住前后两次的不同。',
-    },
-  ],
   discoveryPrompts: [{ id: 'card_puddle', prompt: '阴天的水洼也会变小吗？', skippable: true }],
+  limitations: ['这个场景没有模拟湿度和风速。'],
 };
 
 const qualityCriteria = [
@@ -243,12 +184,26 @@ describe('first-release five-stage pipeline', () => {
       ['presentation', 'art_presentation_free'],
       ['quality', 'art_quality_free'],
     ]);
-    expect(result.artifacts).toHaveLength(6);
-    expect(result.runtimeSpec.knowledge.family).toBe('open');
-    expect(result.spec.sceneType).toBe('relation-explorer');
-    expect(result.compiled.specHash).toMatch(/^cw1-/);
+    expect(result.artifacts).toHaveLength(5);
+    expect(result.spec.route).toEqual({ kind: 'open' });
+    expect(result.spec.scene.type).toBe('relation');
+    expect(result.spec.eventRequirements).toEqual([
+      'exploration_started',
+      'object_inspected',
+      'object_moved',
+      'control_changed',
+      'relationship_revealed',
+      'response_recorded',
+      'feedback_presented',
+      'discovery_prompt_opened',
+      'reflection_recorded',
+      'exploration_ended',
+    ]);
+    expect(result.specHash).toMatch(/^cw3-/);
+    expect(result).not.toHaveProperty('runtimeSpec');
+    expect(result).not.toHaveProperty('compiled');
     expect(qualityCalls[0]?.prompt).toContain('claim_evaporation');
-    expect(qualityCalls[0]?.prompt).toContain('relation-explorer');
+    expect(qualityCalls[0]?.prompt).toContain('"type":"relation"');
     expect(qualityCalls[0]?.prompt).toContain('温暖的一边变化得更快');
     expect(qualityCalls[0]?.prompt).toContain('阴天的水洼也会变小吗');
   });

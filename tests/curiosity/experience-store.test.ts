@@ -5,15 +5,11 @@ import {
   MemoryCuriosityExperienceStore,
 } from '@/lib/curiosity/experience-store';
 import type { CuriosityGenerationJob } from '@/lib/curiosity/jobs';
-import {
-  createValidCuriosityAgentRun,
-  createValidCuriosityExperienceSpecV2,
-  createValidCuriositySpec,
-} from './fixture';
+import { curiosityExperienceSpecV3Schema } from '@/lib/curiosity/experience-spec-v3';
+import { validV3Spec } from './v3-fixture';
 
 function completedJob(): CuriosityGenerationJob {
-  const spec = createValidCuriositySpec();
-  const experienceSpec = createValidCuriosityExperienceSpecV2();
+  const spec = curiosityExperienceSpecV3Schema.parse(validV3Spec);
   return {
     id: 'job_public_1',
     status: 'candidate_ready',
@@ -21,13 +17,20 @@ function completedJob(): CuriosityGenerationJob {
     progress: 95,
     message: '等待浏览器运行检查',
     input: { question: spec.question.original, targetAge: 8 },
-    createdAt: spec.createdAt,
+    createdAt: '2026-08-15T00:00:00.000Z',
     updatedAt: '2026-08-15T00:01:00.000Z',
     runId: 'run_generation_1',
     completedStages: ['question', 'knowledge', 'scene', 'presentation', 'quality'],
-    artifacts: [experienceSpec],
-    agentRuns: [createValidCuriosityAgentRun()],
-    result: { spec, experienceSpec, specHash: 'cw1-public' },
+    artifacts: [],
+    agentRuns: [],
+    result: {
+      experienceId: 'cur_moon_demo',
+      versionId: 'ver_moon_demo_1',
+      revision: 1,
+      createdAt: '2026-08-15T00:00:00.000Z',
+      spec,
+      specHash: 'cw3-12345678',
+    },
   };
 }
 
@@ -36,7 +39,7 @@ describe('server curiosity experience store', () => {
     const snapshot = buildSnapshotFromGenerationJobs('cur_moon_demo', [completedJob()]);
     expect(snapshot).toMatchObject({
       experience: { id: 'cur_moon_demo', activeVersionId: 'ver_moon_demo_1' },
-      versions: [{ id: 'ver_moon_demo_1', status: 'active', specHash: 'cw1-public' }],
+      versions: [{ id: 'ver_moon_demo_1', status: 'active', specHash: 'cw3-12345678' }],
       events: [],
     });
   });
@@ -48,7 +51,7 @@ describe('server curiosity experience store', () => {
     snapshot!.experience.question = '被调用方修改';
 
     await expect(store.read('cur_moon_demo')).resolves.toMatchObject({
-      experience: { question: '为什么月亮看起来会跟着我们？' },
+      experience: { question: '为什么月亮看起来会跟着我？' },
     });
   });
 });

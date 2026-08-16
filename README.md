@@ -10,7 +10,7 @@ The current runnable demo is strictly limited to three preset questions:
 - Why did dinosaurs disappear?
 - Why does it rain?
 
-Free-form questions are not yet implemented and publicly verified end to end. Given the interview timebox and AI coding-tool credit constraints, they are a post-demo P0 direction and must not be presented as a shipped capability until implementation, real-browser verification, and public-release acceptance are complete.
+Free-form questions are not yet supported. Given the interview timebox and AI coding-tool credit constraints, they are a post-demo P0 direction and must not be presented as a shipped capability.
 
 The first release focuses on one complete experience: **“Why does the moon seem to follow me?”** A team of specialized agents models the question, checks the science, designs one-action-at-a-time interactions, writes child-friendly narration, and reviews the result before a deterministic React/SVG/Motion scene is shown.
 

@@ -1,41 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  CURIOSITY_EVENT_TYPES_V2,
-  knowledgeDesignArtifactV1Schema,
-  type CuriosityExperienceSpecV2,
-} from '@/lib/curiosity/agent-contracts';
-import { compileCuriosityExperienceV2 } from '@/lib/curiosity/compiler';
+import { knowledgeDesignArtifactV1Schema } from '@/lib/curiosity/agent-contracts';
 import { relativeMotionPlugin } from '@/lib/curiosity/knowledge/relative-motion';
 import { knowledgeRegistry } from '@/lib/curiosity/knowledge/registry';
-import { createValidCuriosityExperienceSpecV2 } from './fixture';
-
-function familySpec(
-  family: CuriosityExperienceSpecV2['knowledge']['family'],
-): CuriosityExperienceSpecV2 {
-  const spec = createValidCuriosityExperienceSpecV2();
-  if (family === 'balance-support') {
-    spec.knowledge = {
-      family,
-      packId: 'balance-support.bridge.v1',
-      packVersion: '1.0.0',
-    };
-    spec.primitives = ['place-support', 'move-center-of-mass', 'run-load-test'];
-    spec.variables = [
-      { id: 'support-position', min: -50, max: 50, initial: 0 },
-      { id: 'load', min: 1, max: 50, initial: 10 },
-    ];
-  }
-  if (family === 'light-path') {
-    spec.knowledge = { family, packId: 'light-path.shadow-length.v1', packVersion: '1.0.0' };
-    spec.primitives = ['move-light-source', 'move-occluder', 'trace-light-path'];
-    spec.variables = [
-      { id: 'light-position', min: -80, max: 80, initial: 0 },
-      { id: 'occluder-position', min: -80, max: 80, initial: 20 },
-    ];
-  }
-  return spec;
-}
 
 describe('deterministic knowledge-family registry', () => {
   it('allows an explicit negation of the moon-following misconception', () => {
@@ -115,16 +82,6 @@ describe('deterministic knowledge-family registry', () => {
     });
   });
 
-  it.each(['relative-motion', 'balance-support', 'light-path'] as const)(
-    'compiles bounded %s interactions with the unified event protocol',
-    (family) => {
-      const compiled = compileCuriosityExperienceV2(familySpec(family));
-      expect(compiled.eventTypes).toEqual(CURIOSITY_EVENT_TYPES_V2);
-      expect(compiled.interactions.length).toBeGreaterThanOrEqual(2);
-      expect(compiled.family).toBe(family);
-    },
-  );
-
   it('routes multiple-family and unmatched questions to open knowledge', () => {
     expect(
       knowledgeRegistry.classify({ question: '桥为什么不倒，它的影子为什么会变长？', age: 8 }),
@@ -138,17 +95,12 @@ describe('deterministic knowledge-family registry', () => {
     });
   });
 
-  it('rejects family-crossing primitives and variable range overflow', () => {
-    const primitiveCrossing = familySpec('balance-support');
-    primitiveCrossing.primitives = ['place-support', 'move-light-source'];
-    expect(() => compileCuriosityExperienceV2(primitiveCrossing)).toThrowError(
-      expect.objectContaining({ code: 'KNOWLEDGE_VIOLATION' }),
-    );
-
-    const rangeOverflow = familySpec('light-path');
-    rangeOverflow.variables[0] = { id: 'light-position', min: -500, max: 500, initial: 0 };
-    expect(() => compileCuriosityExperienceV2(rangeOverflow)).toThrowError(
-      expect.objectContaining({ code: 'KNOWLEDGE_VIOLATION' }),
-    );
+  it('keeps family bounds declarative for migration and V3 scene validation', () => {
+    expect(knowledgeRegistry.get('relative-motion').allowedVariables).toEqual({
+      'observer-position': { min: -100, max: 100 },
+      'object-distance': { min: 10, max: 600 },
+    });
+    expect(knowledgeRegistry.get('balance-support').allowedPrimitives).toContain('place-support');
+    expect(knowledgeRegistry.get('light-path').allowedPrimitives).toContain('trace-light-path');
   });
 });

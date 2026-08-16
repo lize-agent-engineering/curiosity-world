@@ -55,7 +55,7 @@ describe('first-release public surface', () => {
     expect(experiencePage).toContain('selectReviewedNarration');
   });
 
-  it('keeps the Next after scheduler and V1/V2 compiler gate', () => {
+  it('keeps the Next after scheduler and removes the V1/V2 compiler gate', () => {
     const route = readFileSync(
       resolve(process.cwd(), 'app/api/curiosity/generations/route.ts'),
       'utf8',
@@ -66,7 +66,7 @@ describe('first-release public surface', () => {
     );
     expect(route).toContain("import { after } from 'next/server'");
     expect(route).toContain('after(work)');
-    expect(pipeline).toContain('compileCuriosityExperienceV2(spec)');
-    expect(pipeline).toContain('compileCuriosityExperience(runtimeSpec)');
+    expect(pipeline).toContain('validateCuriosityExperienceSpecV3');
+    expect(pipeline).not.toContain('compileCuriosityExperience');
   });
 });

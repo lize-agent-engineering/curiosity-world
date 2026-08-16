@@ -1,7 +1,5 @@
 import { z } from 'zod';
 
-import { curiosityEventTypeSchema, curiosityTaskSchema } from './contracts';
-
 export const CURIOSITY_AGENT_ROLES = [
   'curiosity.question-modeler',
   'curiosity.knowledge-designer',
@@ -33,20 +31,9 @@ export const CURIOSITY_PRIMITIVES = [
   'compare-relation',
 ] as const;
 
-export const CURIOSITY_EVENT_TYPES_V2 = [
-  'experience_started',
-  'prediction_submitted',
-  'variable_changed',
-  'feedback_shown',
-  'transfer_attempted',
-  'explanation_selected',
-  'experience_completed',
-] as const;
-
 export const curiosityAgentRoleSchema = z.enum(CURIOSITY_AGENT_ROLES);
 export const curiosityKnowledgeFamilySchema = z.enum(CURIOSITY_KNOWLEDGE_FAMILIES);
 export const curiosityPrimitiveSchema = z.enum(CURIOSITY_PRIMITIVES);
-export const curiosityEventTypeV2Schema = z.enum(CURIOSITY_EVENT_TYPES_V2);
 
 const identifierSchema = z
   .string()
@@ -102,12 +89,7 @@ export const knowledgeDesignArtifactV1BaseSchema = z.strictObject({
   objectives: z.array(shortTextSchema).min(1).max(5),
   causalRelations: z.array(causalRelationSchema).min(1).max(8),
   claims: z
-    .array(
-      z.strictObject({
-        id: identifierSchema,
-        statement: shortTextSchema,
-      }),
-    )
+    .array(z.strictObject({ id: identifierSchema, statement: shortTextSchema }))
     .max(12)
     .default([]),
   relations: z
@@ -163,169 +145,6 @@ export const knowledgeDesignArtifactV1Schema = knowledgeDesignArtifactV1BaseSche
         path: ['timeSensitive'],
         message: 'open knowledge must declare timeSensitive',
       });
-    }
-  },
-);
-
-const boundedVariableSchema = z
-  .strictObject({
-    id: identifierSchema,
-    label: z.string().trim().min(1).max(48),
-    min: z.number().finite(),
-    max: z.number().finite(),
-    initial: z.number().finite(),
-  })
-  .superRefine((variable, context) => {
-    if (variable.min >= variable.max) {
-      context.addIssue({ code: 'custom', path: ['max'], message: 'max must be greater than min' });
-    }
-    if (variable.initial < variable.min || variable.initial > variable.max) {
-      context.addIssue({
-        code: 'custom',
-        path: ['initial'],
-        message: 'initial must be within the declared range',
-      });
-    }
-  });
-
-const taskKindSchema = z.enum([
-  'prediction',
-  'exploration',
-  'guided-discovery',
-  'transfer',
-  'explanation',
-]);
-
-export const interactionDesignArtifactV1Schema = z.strictObject({
-  ...artifactEnvelopeShape,
-  agentRole: z.literal('curiosity.interaction-designer'),
-  schemaVersion: z.literal('1.0'),
-  scenario: shortTextSchema,
-  visualTheme: z.string().trim().min(1).max(120),
-  sceneType: z.enum(['variable-explorer', 'relation-explorer']).default('variable-explorer'),
-  variables: z.array(boundedVariableSchema).min(1).max(3),
-  relations: z
-    .array(
-      z.strictObject({
-        id: identifierSchema,
-        fromVariableId: identifierSchema,
-        toVariableId: identifierSchema,
-        direction: z.enum(['same', 'inverse']),
-      }),
-    )
-    .max(6)
-    .default([]),
-  tasks: z.array(curiosityTaskSchema).length(4).optional(),
-  taskSequence: z.array(taskKindSchema).min(4).max(5),
-  instructionCopy: z
-    .array(
-      z.strictObject({
-        taskId: identifierSchema,
-        kind: taskKindSchema,
-        text: shortTextSchema,
-      }),
-    )
-    .min(4)
-    .max(5),
-  primitives: z.array(curiosityPrimitiveSchema).min(2).max(8),
-  feedback: z
-    .array(
-      z.strictObject({
-        trigger: identifierSchema,
-        message: shortTextSchema,
-        explains: shortTextSchema,
-      }),
-    )
-    .min(1)
-    .max(12),
-  endConditions: z.array(shortTextSchema).min(1).max(5),
-});
-
-const storyHintSchema = z.strictObject({
-  level: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-  text: shortTextSchema,
-  revealsAnswer: z.literal(false),
-});
-
-export const storyStageSchema = z.strictObject({
-  id: identifierSchema,
-  kind: taskKindSchema,
-  openingNarration: shortTextSchema,
-  prompt: shortTextSchema,
-  allowedEventTypes: z.array(curiosityEventTypeV2Schema).min(1).max(4),
-  hints: z
-    .array(storyHintSchema)
-    .length(3)
-    .refine(
-      (hints) => hints.every((hint, index) => hint.level === index),
-      'hint levels must be ordered from 0 through 2',
-    ),
-  completionCondition: shortTextSchema,
-});
-
-export const storyDesignArtifactV1BaseSchema = z.strictObject({
-  ...artifactEnvelopeShape,
-  agentRole: z.literal('curiosity.presentation-designer'),
-  schemaVersion: z.literal('1.0'),
-  sourceArtifactIds: z.strictObject({
-    questionModel: identifierSchema.regex(/^art_/),
-    knowledgeDesign: identifierSchema.regex(/^art_/),
-    interactionDesign: identifierSchema.regex(/^art_/),
-  }),
-  title: shortTextSchema.optional(),
-  hook: shortTextSchema.optional(),
-  explorePrompt: shortTextSchema.optional(),
-  challengePrompt: shortTextSchema.optional(),
-  completion: shortTextSchema.optional(),
-  narrationLibrary: z
-    .array(
-      z.strictObject({
-        id: identifierSchema,
-        eventType: curiosityEventTypeSchema,
-        action: z.union([z.literal('*'), identifierSchema]),
-        text: shortTextSchema,
-      }),
-    )
-    .max(24)
-    .default([]),
-  immediateFeedback: z
-    .array(
-      z.strictObject({
-        id: identifierSchema,
-        eventType: curiosityEventTypeSchema,
-        outcome: z.enum(['observe', 'correct', 'retry']),
-        text: shortTextSchema,
-      }),
-    )
-    .max(16)
-    .default([]),
-  discoveryPrompts: z
-    .array(
-      z.strictObject({
-        id: identifierSchema,
-        prompt: shortTextSchema,
-        skippable: z.literal(true),
-      }),
-    )
-    .max(3)
-    .default([]),
-  stages: z.array(storyStageSchema).max(5).default([]),
-});
-
-export const storyDesignArtifactV1Schema = storyDesignArtifactV1BaseSchema.superRefine(
-  (story, context) => {
-    if (new Set(story.stages.map((stage) => stage.id)).size !== story.stages.length) {
-      context.addIssue({ code: 'custom', path: ['stages'], message: 'stage ids must be unique' });
-    }
-    const upstream = new Set(story.upstreamArtifactIds);
-    for (const [key, artifactId] of Object.entries(story.sourceArtifactIds)) {
-      if (!upstream.has(artifactId)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['upstreamArtifactIds'],
-          message: `Missing ${key} source artifact reference`,
-        });
-      }
     }
   },
 );
@@ -399,150 +218,6 @@ export const qualityReviewArtifactV1Schema = z
     }
   });
 
-const revisionFieldSchema = z.enum([
-  'profile.age',
-  'presentation.instructions',
-  'presentation.visualTheme',
-  'variables',
-  'observationSuggestions',
-  'knowledge.packId',
-  'knowledge.packVersion',
-]);
-
-export const revisionImpactArtifactV1Schema = z.strictObject({
-  ...artifactEnvelopeShape,
-  agentRole: z.literal('curiosity.revision-planner'),
-  schemaVersion: z.literal('1.0'),
-  baseVersionId: identifierSchema.regex(/^ver_/),
-  summary: shortTextSchema,
-  changedFields: z.array(revisionFieldSchema).min(1).max(6),
-  preservedFields: z.array(revisionFieldSchema).min(1).max(8),
-  knowledgeFamily: curiosityKnowledgeFamilySchema,
-});
-
-const patchOperationSchema = z.discriminatedUnion('op', [
-  z.strictObject({ op: z.literal('set_age'), age: z.number().int().min(6).max(10) }),
-  z.strictObject({
-    op: z.literal('replace_instruction'),
-    taskId: identifierSchema,
-    value: shortTextSchema,
-  }),
-  z.strictObject({
-    op: z.literal('replace_visual_theme'),
-    value: z.string().trim().min(1).max(120),
-  }),
-  z.strictObject({
-    op: z.literal('set_variable'),
-    variableId: identifierSchema,
-    value: z.number().finite(),
-  }),
-  z.strictObject({
-    op: z.literal('replace_observation_suggestion'),
-    index: z.number().int().min(0).max(4),
-    value: shortTextSchema,
-  }),
-]);
-
-export const curiosityPatchV2Schema = z.strictObject({
-  ...artifactEnvelopeShape,
-  agentRole: z.literal('curiosity.revision-planner'),
-  schemaVersion: z.literal('2.0'),
-  baseVersionId: identifierSchema.regex(/^ver_/),
-  impactArtifactId: identifierSchema.regex(/^art_/),
-  operations: z.array(patchOperationSchema).min(1).max(8),
-});
-
-const compiledVariableSchema = z
-  .strictObject({
-    id: identifierSchema,
-    min: z.number().finite(),
-    max: z.number().finite(),
-    initial: z.number().finite(),
-  })
-  .superRefine((variable, context) => {
-    if (
-      variable.min >= variable.max ||
-      variable.initial < variable.min ||
-      variable.initial > variable.max
-    ) {
-      context.addIssue({ code: 'custom', path: ['initial'], message: 'invalid variable bounds' });
-    }
-  });
-
-export const curiosityExperienceSpecV2Schema = z
-  .strictObject({
-    ...artifactEnvelopeShape,
-    agentRole: z.union([
-      z.literal('curiosity.interaction-designer'),
-      z.literal('curiosity.revision-planner'),
-    ]),
-    schemaVersion: z.literal('2.0'),
-    experienceId: identifierSchema.regex(/^cur_/),
-    versionId: identifierSchema.regex(/^ver_/),
-    revision: z.number().int().positive(),
-    profile: z
-      .strictObject({
-        age: z.number().int().min(6).max(10),
-      })
-      .passthrough(),
-    sourceArtifactIds: z.strictObject({
-      questionModel: identifierSchema.regex(/^art_/),
-      knowledgeDesign: identifierSchema.regex(/^art_/),
-      interactionDesign: identifierSchema.regex(/^art_/),
-    }),
-    knowledge: z.strictObject({
-      family: curiosityKnowledgeFamilySchema,
-      packId: z.string().trim().min(3).max(128),
-      packVersion: z.string().trim().min(1).max(96),
-    }),
-    title: z.string().trim().min(1).max(120),
-    visualTheme: z.string().trim().min(1).max(120),
-    sceneType: z.enum(['variable-explorer', 'relation-explorer']).optional(),
-    observationSuggestions: z.array(shortTextSchema).min(1).max(5),
-    instructions: z
-      .array(
-        z.strictObject({
-          taskId: identifierSchema,
-          kind: taskKindSchema,
-          text: shortTextSchema,
-        }),
-      )
-      .min(4)
-      .max(5),
-    variables: z.array(compiledVariableSchema).min(1).max(3),
-    primitives: z.array(curiosityPrimitiveSchema).min(2).max(8),
-    eventRequirements: z.array(curiosityEventTypeV2Schema).length(CURIOSITY_EVENT_TYPES_V2.length),
-  })
-  .superRefine((spec, context) => {
-    const upstream = new Set(spec.upstreamArtifactIds);
-    for (const artifactId of Object.values(spec.sourceArtifactIds)) {
-      if (!upstream.has(artifactId)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['upstreamArtifactIds'],
-          message: `Missing source artifact reference: ${artifactId}`,
-        });
-      }
-    }
-    if (spec.knowledge.packVersion !== spec.knowledgePackVersion) {
-      context.addIssue({
-        code: 'custom',
-        path: ['knowledge', 'packVersion'],
-        message: 'knowledge pack versions must match',
-      });
-    }
-    const events = new Set(spec.eventRequirements);
-    for (const eventType of CURIOSITY_EVENT_TYPES_V2) {
-      if (!events.has(eventType)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['eventRequirements'],
-          message: `Missing event requirement: ${eventType}`,
-        });
-      }
-    }
-  });
-
 const routeSchema = z.strictObject({
   providerId: z.string().trim().min(1).max(64),
   modelId: z.string().trim().min(1).max(128),
@@ -600,11 +275,6 @@ export type CuriosityKnowledgeFamily = z.infer<typeof curiosityKnowledgeFamilySc
 export type CuriosityPrimitive = z.infer<typeof curiosityPrimitiveSchema>;
 export type QuestionModelArtifactV1 = z.infer<typeof questionModelArtifactV1Schema>;
 export type KnowledgeDesignArtifactV1 = z.infer<typeof knowledgeDesignArtifactV1Schema>;
-export type InteractionDesignArtifactV1 = z.infer<typeof interactionDesignArtifactV1Schema>;
-export type StoryDesignArtifactV1 = z.infer<typeof storyDesignArtifactV1Schema>;
 export type ChildVoiceEventV1 = z.infer<typeof childVoiceEventV1Schema>;
-export type CuriosityExperienceSpecV2 = z.infer<typeof curiosityExperienceSpecV2Schema>;
 export type QualityReviewArtifactV1 = z.infer<typeof qualityReviewArtifactV1Schema>;
-export type RevisionImpactArtifactV1 = z.infer<typeof revisionImpactArtifactV1Schema>;
-export type CuriosityPatchV2 = z.infer<typeof curiosityPatchV2Schema>;
 export type CuriosityAgentRun = z.infer<typeof curiosityAgentRunSchema>;

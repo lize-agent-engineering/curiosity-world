@@ -1,22 +1,21 @@
 'use client';
 
 import type { FormEvent } from 'react';
-import { FlaskConical, History, Link2, RefreshCw } from 'lucide-react';
+import { History, Link2, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import type { CuriosityExperienceSpecV1 } from '@/lib/curiosity/contracts';
-import type { CuriosityParentSummary } from '@/lib/curiosity/runtime';
-import type { CuriosityVersionStatus } from '@/lib/curiosity/repository';
-import type { ChildVoiceEventV1, RevisionImpactArtifactV1 } from '@/lib/curiosity/agent-contracts';
 import type { CuriosityArchive } from '@/lib/curiosity/archive';
+import type { CuriosityExperienceSpecV3 } from '@/lib/curiosity/experience-spec-v3';
+import type { CuriosityVersionStatus, CuriosityVoiceEvidence } from '@/lib/curiosity/repository';
+import type { CuriosityParentSummary } from '@/lib/curiosity/runtime';
 import { CuriosityArchiveView } from './archive-view';
 
 interface CuriosityParentReviewProps {
-  spec: CuriosityExperienceSpecV1;
+  spec: CuriosityExperienceSpecV3;
+  revision: number;
   summary: CuriosityParentSummary;
-  voiceEvents?: ChildVoiceEventV1[];
+  voiceEvents?: CuriosityVoiceEvidence[];
   archive?: CuriosityArchive;
-  revisionImpact?: Pick<RevisionImpactArtifactV1, 'summary' | 'changedFields' | 'preservedFields'>;
   versions: Array<{
     id: string;
     revision: number;
@@ -35,10 +34,10 @@ interface CuriosityParentReviewProps {
 
 export function CuriosityParentReview({
   spec,
+  revision,
   summary,
   voiceEvents = [],
   archive,
-  revisionImpact,
   versions,
   revisionInstruction,
   revising,
@@ -53,10 +52,10 @@ export function CuriosityParentReview({
     <div className="grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
       <section className="rounded-[1.75rem] border border-[#d8cda4]/40 bg-[#faf5e7] p-6 text-[#17283d] shadow-[0_18px_45px_rgba(0,0,0,.15)] sm:p-8">
         <p className="text-xs font-black tracking-[.18em] text-[#856c31]">
-          观察回看 · 版本 {spec.revision}
+          观察回看 · 版本 {revision}
         </p>
         <h2 className="mt-3 text-3xl font-black">孩子实际做了什么</h2>
-        <p className="mt-2 text-sm text-[#48647d]">这里只归约行为事实，不推断孩子的能力或结论。</p>
+        <p className="mt-2 text-sm text-[#48647d]">这里只记录真实操作，不推断能力或掌握程度。</p>
         <div className="mt-6 space-y-3">
           {summary.facts.length === 0 ? (
             <p className="rounded-2xl bg-white p-4 text-sm">还没有收到互动事件。</p>
@@ -85,88 +84,38 @@ export function CuriosityParentReview({
         {voiceEvents.length > 0 && (
           <section className="mt-6 rounded-2xl border border-[#cfdeea] bg-white p-5">
             <h3 className="font-black">语音识别记录</h3>
-            <p className="mt-1 text-xs text-[#48647d]">
-              这里只记录识别文字，不据此判断孩子的表现。
-            </p>
-            <div className="mt-3 space-y-3">
-              {voiceEvents.map((event) => (
-                <article key={event.eventId}>
-                  <p className="font-bold">“{event.transcript}”</p>
-                  <code className="mt-2 inline-block rounded-full bg-[#e7f2fb] px-2 py-1 text-[11px] text-[#315773]">
-                    <Link2 className="mr-1 inline size-3" />
-                    {event.eventId}
-                  </code>
-                </article>
-              ))}
-            </div>
+            {voiceEvents.map((event) => (
+              <p key={event.eventId} className="mt-3 font-bold">
+                “{event.transcript}”
+              </p>
+            ))}
           </section>
         )}
-        {archive ? (
-          <CuriosityArchiveView archive={archive} />
-        ) : (
-          <div className="mt-6 rounded-2xl border border-[#ffd76a] bg-[#fff8d9] p-5">
-            <p className="flex items-center gap-2 text-sm font-black">
-              <FlaskConical className="size-4" />
-              来自知识包的现实观察建议
-            </p>
-            <p className="mt-2 leading-7">{summary.recommendation}</p>
-            {spec.tabletopExperiment && (
-              <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm">
-                {spec.tabletopExperiment.steps.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-            )}
-          </div>
-        )}
+        {archive && <CuriosityArchiveView archive={archive} />}
       </section>
       <div className="space-y-6">
-        <section className="rounded-[1.75rem] border border-[#ffe08a]/25 bg-[#133657] p-6 shadow-[0_18px_40px_rgba(0,0,0,.16)]">
-          <h2 className="text-xl font-black">还没听懂？换一种讲法</h2>
+        <section className="rounded-[1.75rem] border border-[#ffe08a]/25 bg-[#133657] p-6">
+          <h2 className="text-xl font-black">换一种方式呈现</h2>
           <p className="mt-2 text-sm leading-6 text-[#c8dbef]">
-            从另一个生活情境重新讲一遍；当前版本会保留在历史中，随时可以回看。
+            完整重生成会保留当前知识和历史版本。
           </p>
           <Button
             type="button"
             disabled={regenerating || revising}
             onClick={onRegenerate}
-            className="mt-4 h-12 w-full rounded-xl bg-[#fff0ae] font-black text-[#173047] shadow-[0_3px_0_#c99d38] hover:bg-[#fff5c9]"
+            className="mt-4 h-12 w-full rounded-xl bg-[#fff0ae] font-black text-[#173047] hover:bg-[#fff5c9]"
           >
             <RefreshCw className={`size-4 ${regenerating ? 'animate-spin' : ''}`} />
-            {regenerating ? '正在换一个角度' : '换个角度再讲一遍'}
+            {regenerating ? '正在换一种方式' : '换一种方式呈现'}
           </Button>
         </section>
-        {revisionImpact && (
-          <section className="rounded-[1.75rem] border border-[#ffd76a]/35 bg-[#ffd76a]/10 p-6">
-            <p className="text-xs font-black tracking-[.16em] text-[#ffd76a]">修改影响</p>
-            <p className="mt-2 font-bold">{revisionImpact.summary}</p>
-            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <p className="font-black text-[#ffcf67]">已改变</p>
-                <ul className="mt-2 space-y-1 text-[#e7f2fb]">
-                  {revisionImpact.changedFields.map((field) => (
-                    <li key={field}>{field}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p className="font-black text-[#9fd8b8]">保持不变</p>
-                <ul className="mt-2 space-y-1 text-[#e7f2fb]">
-                  {revisionImpact.preservedFields.map((field) => (
-                    <li key={field}>{field}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-        )}
         <form
           onSubmit={onSubmitRevision}
           className="rounded-[1.75rem] border border-white/12 bg-white/[.07] p-6"
         >
-          <h2 className="text-xl font-black">做一个受控修改</h2>
+          <h2 className="text-xl font-black">做一个小修改</h2>
           <p className="mt-2 text-sm leading-6 text-[#b8cde2]">
-            支持年龄适配、精简文字、调整白名单任务与加入桌上远近实验。
+            只修改年龄、提示、旁白、发现卡或限制说明；知识与场景类型保持不变。
           </p>
           <textarea
             aria-label="修改要求"
@@ -174,8 +123,7 @@ export function CuriosityParentReview({
             onChange={(event) => onRevisionInstructionChange(event.target.value)}
             required
             rows={4}
-            placeholder="例如：改成适合 6 岁，并加入桌上远近实验"
-            className="mt-4 w-full resize-none rounded-2xl border border-white/15 bg-[#091d3b] p-4 text-white outline-none transition focus:border-[#ffe08a] focus:ring-4 focus:ring-[#ffe08a]/10"
+            className="mt-4 w-full resize-none rounded-2xl border border-white/15 bg-[#091d3b] p-4 text-white"
           />
           {error && (
             <p role="alert" className="mt-3 text-sm font-bold text-[#ff9d89]">
@@ -184,7 +132,7 @@ export function CuriosityParentReview({
           )}
           <Button
             disabled={revising}
-            className="mt-4 h-12 w-full rounded-xl bg-[#d87355] font-black text-white shadow-[0_3px_0_#9f4637] hover:bg-[#c96349]"
+            className="mt-4 h-12 w-full rounded-xl bg-[#d87355] font-black text-white hover:bg-[#c96349]"
           >
             <RefreshCw className={`size-4 ${revising ? 'animate-spin' : ''}`} />
             {revising ? '正在校验候选版本' : '生成候选版本'}
@@ -208,6 +156,7 @@ export function CuriosityParentReview({
               </button>
             ))}
           </div>
+          <p className="mt-4 text-xs text-[#9fc0dd]">当前限制：{spec.limitations[0]}</p>
         </section>
       </div>
     </div>

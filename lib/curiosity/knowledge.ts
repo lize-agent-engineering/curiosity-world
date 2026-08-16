@@ -1,4 +1,3 @@
-import type { CuriosityExperienceSpecV1 } from './contracts';
 import { knowledgeRegistry } from './knowledge/registry';
 import { CuriosityKnowledgePluginError } from './knowledge/types';
 
@@ -80,31 +79,5 @@ export function classifyCuriosityRequest(input: {
       throw new CuriosityDomainError(error.code, error.message);
     }
     throw error;
-  }
-}
-
-export function validateKnowledgeBoundaries(spec: CuriosityExperienceSpecV1): void {
-  if (spec.knowledge.family === 'open') {
-    if (!spec.knowledge.packId.startsWith('open.art_')) {
-      throw new CuriosityDomainError('KNOWLEDGE_VIOLATION', '开放知识规格没有绑定生成期知识产物。');
-    }
-    return;
-  }
-  const plugin = knowledgeRegistry.get(spec.knowledge.family);
-  const pack = plugin.packs.find((candidate) => candidate.id === spec.knowledge.packId);
-  if (!pack) {
-    throw new CuriosityDomainError('KNOWLEDGE_VIOLATION', '规格引用了未批准的知识包。');
-  }
-
-  const correctExplanations = spec.tasks.flatMap((task) => {
-    if (!('options' in task)) return [];
-    return task.options
-      .filter((option) => option.id === task.expectedOptionId)
-      .map((option) => option.label);
-  });
-  const assertedContent = [spec.presentation.completion, ...correctExplanations].join('\n');
-
-  if (pack.forbiddenPatterns.some((pattern) => pattern.test(assertedContent))) {
-    throw new CuriosityDomainError('KNOWLEDGE_VIOLATION', '规格包含知识包禁止的解释。');
   }
 }

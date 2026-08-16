@@ -1,0 +1,55 @@
+export const validV3Spec = {
+  question: {
+    original: '为什么月亮看起来会跟着我？',
+    core: '为什么移动时远处物体的方向变化更小？',
+  },
+  targetAge: 8,
+  route: { kind: 'curated', family: 'relative-motion' },
+  knowledge: {
+    source: 'curated',
+    packId: 'relative-motion.moon-following.v1',
+    claims: ['距离越远，同样移动距离造成的观察方向变化通常越小。'],
+    relations: [
+      {
+        id: 'relation_distance_angle',
+        from: '观察距离',
+        relation: 'changes',
+        to: '方向变化',
+      },
+    ],
+    misconceptions: ['月亮在主动追着观察者移动。'],
+    uncertainties: [],
+    observationSuggestions: ['比较近处路灯和远处月亮。'],
+    timeSensitive: false,
+  },
+  scene: {
+    type: 'relative-motion',
+    title: '月亮真的在跟着我吗？',
+    instructions: ['拖动小朋友，再比较近处路灯和远处月亮。'],
+    observerTravel: 80,
+    nearObjectDistance: 20,
+    farObjectDistance: 400,
+  },
+  narrationLibrary: [
+    {
+      id: 'narration_start',
+      eventType: 'exploration_started',
+      action: '*',
+      text: '先随便走走看，远近两个东西有什么不同？',
+    },
+  ],
+  discoveryPrompts: [{ id: 'prompt_compare', prompt: '试着只盯住远处的月亮。', skippable: true }],
+  limitations: ['这个场景只比较观察方向，不表示月亮真的移动。'],
+  eventRequirements: [
+    'exploration_started',
+    'object_inspected',
+    'object_moved',
+    'control_changed',
+    'relationship_revealed',
+    'response_recorded',
+    'feedback_presented',
+    'discovery_prompt_opened',
+    'reflection_recorded',
+    'exploration_ended',
+  ],
+} as const;

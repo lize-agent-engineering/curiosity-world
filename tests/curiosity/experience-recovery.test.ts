@@ -4,38 +4,38 @@ import {
   describeExperienceFailure,
   selectRegenerationBase,
 } from '@/lib/curiosity/experience-recovery';
-import { createValidCuriositySpec } from './fixture';
+import { validateCuriosityExperienceSpecV3 } from '@/lib/curiosity/experience-spec-v3';
+import { validV3Spec } from './v3-fixture';
 
 describe('Curiosity failed experience recovery', () => {
   it('regenerates from the selected failed version when no active version exists', () => {
-    const spec = createValidCuriositySpec();
+    const { spec, specHash } = validateCuriosityExperienceSpecV3(validV3Spec);
     const version = {
-      id: spec.versionId,
-      experienceId: spec.experienceId,
-      revision: spec.revision,
-      createdAt: spec.createdAt,
+      id: 'ver_moon_demo_1',
+      experienceId: 'cur_moon_demo',
+      revision: 1,
+      createdAt: '2026-08-15T00:00:00.000Z',
       status: 'failed' as const,
       failureCode: 'RUNTIME_FAILED',
       spec,
-      specHash: 'cw1-failed',
+      specHash,
       artifacts: [],
       agentRuns: [],
-      experienceSpec: {},
-    } as never;
+    };
 
     expect(
       selectRegenerationBase(
         {
           experience: {
-            id: spec.experienceId,
+            id: 'cur_moon_demo',
             question: spec.question.original,
-            age: spec.profile.age,
-            createdAt: spec.createdAt,
-            updatedAt: spec.createdAt,
+            age: spec.targetAge,
+            createdAt: version.createdAt,
+            updatedAt: version.createdAt,
           },
           versions: [version],
         },
-        spec.versionId,
+        version.id,
       ),
     ).toBe(version);
   });

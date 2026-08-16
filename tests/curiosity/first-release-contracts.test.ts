@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  knowledgeDesignArtifactV1Schema,
-  storyDesignArtifactV1Schema,
-} from '@/lib/curiosity/agent-contracts';
+import { knowledgeDesignArtifactV1Schema } from '@/lib/curiosity/agent-contracts';
+import { curiosityPresentationArtifactSchema } from '@/lib/curiosity/agent-pipeline';
 
 const envelope = {
   artifactId: 'art_open_knowledge',
@@ -72,45 +70,37 @@ describe('first-release knowledge and presentation contracts', () => {
   });
 
   it('accepts a reviewed narration library, immediate feedback, and at most three skippable cards', () => {
-    const parsed = storyDesignArtifactV1Schema.parse({
+    const parsed = curiosityPresentationArtifactSchema.parse({
       artifactId: 'art_presentation_open',
       runId: 'run_open_knowledge',
       agentRole: 'curiosity.presentation-designer',
-      schemaVersion: '1.0',
+      schemaVersion: '3.0',
       createdAt: '2026-08-17T00:00:00.000Z',
       upstreamArtifactIds: ['art_question_open', 'art_open_knowledge', 'art_scene_open'],
       knowledgePackVersion: 'generated-1',
       sourceArtifactIds: {
         questionModel: 'art_question_open',
         knowledgeDesign: 'art_open_knowledge',
-        interactionDesign: 'art_scene_open',
+        sceneDesign: 'art_scene_open',
       },
-      title: '水去哪儿了？',
       narrationLibrary: [
         {
           id: 'narration_start',
-          eventType: 'experiment_started',
+          eventType: 'exploration_started',
           action: '*',
           text: '先看看两滴水有什么不同。',
         },
         {
           id: 'narration_warmer',
-          eventType: 'variable_changed',
+          eventType: 'control_changed',
           action: 'set-warmer',
           text: '温暖的一边变化得更快。',
-        },
-      ],
-      immediateFeedback: [
-        {
-          id: 'feedback_compare',
-          eventType: 'variable_changed',
-          outcome: 'observe',
-          text: '记住前后两次的不同。',
         },
       ],
       discoveryPrompts: [
         { id: 'card_surface', prompt: '水只会在烧开时变成水蒸气吗？', skippable: true },
       ],
+      limitations: ['这里只比较表面水迹的变化。'],
     });
 
     expect(parsed.discoveryPrompts).toHaveLength(1);
@@ -122,27 +112,32 @@ describe('first-release knowledge and presentation contracts', () => {
       artifactId: 'art_presentation_open',
       runId: 'run_open_knowledge',
       agentRole: 'curiosity.presentation-designer',
-      schemaVersion: '1.0',
+      schemaVersion: '3.0',
       createdAt: '2026-08-17T00:00:00.000Z',
       upstreamArtifactIds: ['art_question_open', 'art_open_knowledge', 'art_scene_open'],
       knowledgePackVersion: 'generated-1',
       sourceArtifactIds: {
         questionModel: 'art_question_open',
         knowledgeDesign: 'art_open_knowledge',
-        interactionDesign: 'art_scene_open',
+        sceneDesign: 'art_scene_open',
       },
-      title: '水去哪儿了？',
       narrationLibrary: [
-        { id: 'narration_start', eventType: 'experiment_started', action: '*', text: '开始观察。' },
+        {
+          id: 'narration_start',
+          eventType: 'exploration_started',
+          action: '*',
+          text: '开始观察。',
+        },
+        { id: 'narration_end', eventType: 'exploration_ended', action: '*', text: '探索结束。' },
       ],
-      immediateFeedback: [],
       discoveryPrompts: Array.from({ length: 4 }, (_, index) => ({
         id: `card_${index}`,
         prompt: `发现问题 ${index}`,
         skippable: true,
       })),
+      limitations: ['这里只比较表面水迹的变化。'],
     };
 
-    expect(storyDesignArtifactV1Schema.safeParse(base).success).toBe(false);
+    expect(curiosityPresentationArtifactSchema.safeParse(base).success).toBe(false);
   });
 });

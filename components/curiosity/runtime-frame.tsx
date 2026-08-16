@@ -1,87 +1,76 @@
 'use client';
 
-import { useEffect } from 'react';
-import type { InteractionDesignArtifactV1 } from '@/lib/curiosity/agent-contracts';
-import type { CuriosityEventV1, CuriosityExperienceSpecV1 } from '@/lib/curiosity/contracts';
-import type { ControlledSceneEvent } from '@/lib/curiosity/controlled-scenes';
+import { useReducer } from 'react';
+
+import type {
+  CuriosityEventV3,
+  CuriosityExperienceSpecV3,
+} from '@/lib/curiosity/experience-spec-v3';
+import {
+  getCuriositySceneEntry,
+  type CuriositySceneAction,
+  type CuriositySceneState,
+  type CuriositySceneType,
+} from '@/lib/curiosity/scenes/registry';
 import { ChildTaskShell } from './child-task-shell';
-import { RelativeMotionScene } from './scenes/relative-motion-scene';
-import { FamilyExperimentScene } from './scenes/family-experiment-scene';
-import { RelationExplorerScene, VariableExplorerScene } from './scenes/controlled-scene-renderer';
 
 interface CuriosityRuntimeFrameProps {
-  spec: CuriosityExperienceSpecV1;
-  onReady: () => void;
-  onEvent: (event: CuriosityEventV1) => void;
-  onRuntimeFailure: (message: string) => void;
-  readinessTimeoutMs?: number;
-  activeStageKind?: 'prediction' | 'exploration' | 'transfer' | 'explanation';
-  interaction: InteractionDesignArtifactV1;
+  experienceId: string;
+  versionId: string;
+  spec: CuriosityExperienceSpecV3;
+  restoredState?: Partial<CuriositySceneState>;
+  onEvent: (event: CuriosityEventV3) => void | Promise<void>;
+  onStateChange: (state: CuriositySceneState) => void;
+}
+
+function payloadFor(action: Exclude<CuriositySceneAction, { type: 'restore' }>) {
+  switch (action.type) {
+    case 'inspect':
+      return { objectId: action.objectId };
+    case 'move':
+      return { objectId: action.objectId, x: action.x, y: action.y };
+    case 'change-control':
+      return { controlId: action.controlId, value: action.value };
+    case 'reveal':
+      return { relationId: action.relationId };
+    case 'respond':
+      return { promptId: action.promptId, response: action.response };
+  }
 }
 
 export function CuriosityRuntimeFrame({
+  experienceId,
+  versionId,
   spec,
-  onReady,
+  restoredState = {},
   onEvent,
-  onRuntimeFailure,
-  readinessTimeoutMs: _readinessTimeoutMs = 5_000,
-  activeStageKind,
-  interaction,
+  onStateChange,
 }: CuriosityRuntimeFrameProps) {
-  useEffect(() => {
-    if (
-      !['relative-motion', 'balance-support', 'light-path', 'open'].includes(spec.knowledge.family)
-    ) {
-      onRuntimeFailure(`RUNTIME_FAILED: 尚未实现 ${spec.knowledge.family} 的 React 场景。`);
-      return;
-    }
-    onReady();
-  }, [onReady, onRuntimeFailure, spec.knowledge.family]);
-
-  const controlledDescriptor = {
-    sceneType: interaction.sceneType,
-    variables: interaction.variables,
-    relations: interaction.relations,
-  };
-  const handleControlledEvent = (event: ControlledSceneEvent) =>
-    onEvent({
+  const entry = getCuriositySceneEntry(spec.scene.type as CuriositySceneType);
+  const [state, reduce] = useReducer(entry.reducer, undefined, () =>
+    entry.reducer(undefined, { type: 'restore', state: restoredState }),
+  );
+  const dispatch = (action: CuriositySceneAction) => {
+    const next = entry.reducer(state, action);
+    reduce(action);
+    onStateChange(next);
+    if (action.type === 'restore') return;
+    void onEvent({
       source: 'curiosity-world',
-      protocolVersion: '1.0',
-      eventId: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      experienceId: spec.experienceId,
-      versionId: spec.versionId,
+      protocolVersion: '3.0',
+      eventId: `evt_${crypto.randomUUID()}`,
+      experienceId,
+      versionId,
+      type: entry.mapEvent(action),
+      action: action.type.replaceAll('-', '_'),
       occurredAt: new Date().toISOString(),
-      ...event,
+      payload: payloadFor(action),
     });
-
+  };
+  const Renderer = entry.Renderer;
   return (
-    <ChildTaskShell title={spec.presentation.title}>
-      {spec.knowledge.family === 'open' ? (
-        interaction.sceneType === 'variable-explorer' ? (
-          <VariableExplorerScene
-            descriptor={controlledDescriptor}
-            tasks={spec.tasks}
-            activeStageKind={activeStageKind}
-            onEvent={handleControlledEvent}
-          />
-        ) : (
-          <RelationExplorerScene
-            descriptor={controlledDescriptor}
-            tasks={spec.tasks}
-            activeStageKind={activeStageKind}
-            onEvent={handleControlledEvent}
-          />
-        )
-      ) : spec.knowledge.family === 'relative-motion' ? (
-        <RelativeMotionScene spec={spec} activeStageKind={activeStageKind} onEvent={onEvent} />
-      ) : (
-        <FamilyExperimentScene
-          family={spec.knowledge.family}
-          spec={spec}
-          activeStageKind={activeStageKind}
-          onEvent={onEvent}
-        />
-      )}
+    <ChildTaskShell title={spec.scene.title}>
+      <Renderer scene={spec.scene} state={state} dispatch={dispatch} />
     </ChildTaskShell>
   );
 }

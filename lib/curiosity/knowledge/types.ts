@@ -1,6 +1,4 @@
 import {
-  CURIOSITY_EVENT_TYPES_V2,
-  type CuriosityExperienceSpecV2,
   type CuriosityKnowledgeFamily,
   type CuriosityPrimitive,
   type KnowledgeDesignArtifactV1,
@@ -15,18 +13,6 @@ export interface CuriosityKnowledgePack {
   migrationQuestions: readonly string[];
 }
 
-export interface CuriosityCompiledInteraction {
-  primitive: CuriosityPrimitive;
-  variableIds: string[];
-}
-
-export interface CompiledCuriosityExperienceV2 {
-  family: CuriosityKnowledgeFamily;
-  packId: string;
-  eventTypes: typeof CURIOSITY_EVENT_TYPES_V2;
-  interactions: CuriosityCompiledInteraction[];
-}
-
 export interface CuriosityKnowledgePlugin {
   family: CuriosityKnowledgeFamily;
   packs: readonly CuriosityKnowledgePack[];
@@ -34,9 +20,6 @@ export interface CuriosityKnowledgePlugin {
   allowedPrimitives: readonly CuriosityPrimitive[];
   classify(question: string): CuriosityKnowledgePack | null;
   validateKnowledge(artifact: KnowledgeDesignArtifactV1): void;
-  validateVariables(spec: CuriosityExperienceSpecV2): void;
-  validatePrimitives(spec: CuriosityExperienceSpecV2): void;
-  compile(spec: CuriosityExperienceSpecV2): CompiledCuriosityExperienceV2;
   migrationQuestions(packId: string): readonly string[];
 }
 
@@ -62,7 +45,6 @@ export function createKnowledgePlugin(config: {
   primitives: readonly CuriosityPrimitive[];
 }): CuriosityKnowledgePlugin {
   const pack = config.pack;
-  const allowedPrimitives = new Set<CuriosityPrimitive>(config.primitives);
   const fail = (message: string): never => {
     throw new CuriosityKnowledgePluginError('KNOWLEDGE_VIOLATION', message);
   };
@@ -91,32 +73,6 @@ export function createKnowledgePlugin(config: {
       ) {
         fail(`知识设计越过 ${config.family} 的确定性边界。`);
       }
-    },
-    validateVariables(spec) {
-      for (const variable of spec.variables) {
-        const bounds = config.variables[variable.id];
-        if (!bounds || variable.min < bounds.min || variable.max > bounds.max) {
-          fail(`变量 ${variable.id} 不属于 ${config.family} 或超出范围。`);
-        }
-      }
-    },
-    validatePrimitives(spec) {
-      if (spec.primitives.some((primitive) => !allowedPrimitives.has(primitive))) {
-        fail(`交互原语越过 ${config.family} 边界。`);
-      }
-    },
-    compile(spec) {
-      this.validateVariables(spec);
-      this.validatePrimitives(spec);
-      return {
-        family: config.family,
-        packId: pack.id,
-        eventTypes: CURIOSITY_EVENT_TYPES_V2,
-        interactions: spec.primitives.map((primitive) => ({
-          primitive,
-          variableIds: spec.variables.map((variable) => variable.id),
-        })),
-      };
     },
     migrationQuestions(packId) {
       if (packId !== pack.id) fail(`未知知识包：${packId}`);

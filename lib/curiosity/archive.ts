@@ -1,4 +1,4 @@
-import type { CuriosityEventV1 } from './contracts';
+import type { CuriosityEventV3 } from './experience-spec-v3';
 import { knowledgeRegistry } from './knowledge/registry';
 import type { CuriosityExperienceAggregate } from './repository';
 import { summarizeCuriosityEvents, type CuriositySummaryFact } from './runtime';
@@ -16,25 +16,35 @@ export interface CuriosityArchive {
 export function buildCuriosityArchive(
   aggregate: CuriosityExperienceAggregate,
   versionId: string,
-  events: CuriosityEventV1[],
+  events: CuriosityEventV3[],
 ): CuriosityArchive {
   const version = aggregate.versions.find((candidate) => candidate.id === versionId);
   if (!version) throw new Error(`VERSION_NOT_FOUND: ${versionId}`);
   const selectedEvents = events.filter(
     (event) => event.experienceId === aggregate.experience.id && event.versionId === versionId,
   );
-  const summary = summarizeCuriosityEvents(version.spec, selectedEvents);
-  const plugin = knowledgeRegistry.get(version.experienceSpec.knowledge.family);
+  const summary = summarizeCuriosityEvents(
+    { experienceId: aggregate.experience.id, versionId, spec: version.spec },
+    selectedEvents,
+  );
+  const nextQuestions =
+    version.spec.route.kind === 'curated' && version.spec.knowledge.packId
+      ? [
+          ...knowledgeRegistry
+            .get(version.spec.route.family)
+            .migrationQuestions(version.spec.knowledge.packId),
+        ]
+      : [];
   return {
     experienceId: aggregate.experience.id,
     versionId,
     question: aggregate.experience.question,
     facts: summary.facts,
-    observationSuggestions: [...version.experienceSpec.observationSuggestions],
+    observationSuggestions: [...version.spec.knowledge.observationSuggestions],
     ageGuidance:
-      version.spec.profile.age <= 7
-        ? '一次只问一个短问题，让孩子先指、拖或选择，再说一句发现。'
-        : '先让孩子预测，再要求用一次观察证据解释选择。',
-    nextQuestions: [...plugin.migrationQuestions(version.experienceSpec.knowledge.packId)],
+      version.spec.targetAge <= 7
+        ? '一次只问一个短问题，让孩子先点、拖或选择，再说一句发现。'
+        : '先让孩子自由操作，再请孩子用一次真实观察说说发现。',
+    nextQuestions,
   };
 }

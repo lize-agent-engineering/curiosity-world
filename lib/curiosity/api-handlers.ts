@@ -1,18 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import { curiosityExperienceSpecSchema } from './contracts';
-import {
-  curiosityExperienceSpecV2Schema,
-  knowledgeDesignArtifactV1Schema,
-  type CuriosityAgentRole,
-} from './agent-contracts';
 import type {
   CuriosityPipelineIdentities,
   CuriosityPipelineModel,
   CuriosityPipelineModels,
 } from './agent-pipeline';
-import { curiosityPipelineArtifactSchema } from './agent-pipeline';
+import type { CuriosityAgentRole } from './agent-contracts';
+import type { CuriosityExperienceSnapshot } from './repository';
 import {
   type CuriosityGenerationInput,
   type CuriosityJobStore,
@@ -20,58 +15,27 @@ import {
 } from './jobs';
 import { classifyCuriosityRequest, CuriosityDomainError } from './knowledge';
 import {
-  createCuriosityRevisionCandidateV2,
+  createCuriosityRevisionCandidateV3,
   CuriosityRevisionPipelineError,
   type CuriosityRevisionIdentity,
 } from './revision-pipeline';
 
-const firstGenerationInputSchema = z.strictObject({
+const generationInputSchema = z.strictObject({
   question: z.string().trim().min(4).max(240),
-  targetAge: z.number().int(),
+  targetAge: z.number().int().min(6).max(10),
 });
-
-const regenerationInputSchema = z
-  .strictObject({
-    question: z.string().trim().min(4).max(240),
-    age: z.number().int(),
-    interests: z.array(z.string().trim().min(1).max(30)).max(5).default([]),
-    perspectiveDirective: z.string().trim().min(4).max(120).optional(),
-    experienceId: z
-      .string()
-      .regex(/^cur_[a-zA-Z0-9_-]+$/)
-      .optional(),
-    revision: z.number().int().min(2).optional(),
-    preservedCausalRelations: knowledgeDesignArtifactV1Schema.shape.causalRelations.optional(),
-  })
-  .superRefine((input, context) => {
-    if (Boolean(input.experienceId) !== Boolean(input.revision)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['experienceId'],
-        message: 'existing experience and revision must be supplied together',
-      });
-    }
-    if (input.experienceId && !input.preservedCausalRelations) {
-      context.addIssue({
-        code: 'custom',
-        path: ['preservedCausalRelations'],
-        message: 'regeneration must preserve the active causal model',
-      });
-    }
-  });
-
-const generationInputSchema = z.union([firstGenerationInputSchema, regenerationInputSchema]);
-
 const revisionInputSchema = z.strictObject({
-  baseSpec: curiosityExperienceSpecSchema,
-  experienceSpec: curiosityExperienceSpecV2Schema,
-  sourceArtifacts: z.array(curiosityPipelineArtifactSchema).min(1).max(20),
+  baseVersionId: z.string().regex(/^ver_[a-zA-Z0-9_-]+$/),
   instruction: z.string().trim().min(2).max(240),
+});
+const regenerationInputSchema = z.strictObject({
+  baseVersionId: z.string().regex(/^ver_[a-zA-Z0-9_-]+$/),
+  targetAge: z.number().int().min(6).max(10),
+  directive: z.string().trim().min(4).max(120),
 });
 
 export class CuriosityModelUnavailableError extends Error {
   readonly code = 'MODEL_UNAVAILABLE';
-
   constructor(
     message: string,
     readonly cause?: unknown,
@@ -103,10 +67,9 @@ function errorResponse(error: unknown): NextResponse {
     );
   }
   if (error instanceof CuriosityDomainError) {
-    const status = error.code === 'UNSAFE_CONTENT' ? 400 : 422;
     return NextResponse.json(
       { success: false, errorCode: error.code, error: error.message },
-      { status },
+      { status: error.code === 'UNSAFE_CONTENT' ? 400 : 422 },
     );
   }
   if (error instanceof CuriosityRevisionPipelineError) {
@@ -127,65 +90,79 @@ function errorResponse(error: unknown): NextResponse {
   );
 }
 
+async function resolveGenerationModels<TBody>(
+  request: NextRequest,
+  body: TBody,
+  resolver: RoleModelResolver<TBody>,
+): Promise<CuriosityPipelineModels> {
+  const entries = await Promise.all(
+    INITIAL_GENERATION_ROLES.map(
+      async (role) => [role, await resolver(request, body, role)] as const,
+    ),
+  );
+  return Object.fromEntries(entries) as CuriosityPipelineModels;
+}
+
+async function enqueueGeneration(input: {
+  request: NextRequest;
+  body: CuriosityGenerationInput;
+  store: CuriosityJobStore;
+  resolveRoleModel: RoleModelResolver<CuriosityGenerationInput>;
+  schedule: (work: () => Promise<void>) => void;
+  identity: CuriosityPipelineIdentities & { jobId: string };
+}): Promise<NextResponse> {
+  const models = await resolveGenerationModels(input.request, input.body, input.resolveRoleModel);
+  await input.store.create({
+    id: input.identity.jobId,
+    status: 'queued',
+    step: 'queued',
+    progress: 0,
+    message: '生成任务已创建',
+    input: input.body,
+    runId: input.identity.runId,
+    completedStages: [],
+    artifacts: [],
+    agentRuns: [],
+    createdAt: input.identity.createdAt,
+    updatedAt: input.identity.createdAt,
+  });
+  input.schedule(() =>
+    runCuriosityGenerationJob(
+      input.identity.jobId,
+      input.body,
+      models,
+      input.store,
+      input.identity,
+    ),
+  );
+  return NextResponse.json(
+    {
+      success: true,
+      jobId: input.identity.jobId,
+      status: 'queued',
+      step: 'queued',
+      progress: 0,
+      pollUrl: `/api/curiosity/generations/${input.identity.jobId}`,
+      pollIntervalMs: 500,
+    },
+    { status: 202 },
+  );
+}
+
 export function createCuriosityGenerationPostHandler(deps: {
   store: CuriosityJobStore;
   resolveRoleModel: RoleModelResolver<CuriosityGenerationInput>;
   schedule: (work: () => Promise<void>) => void;
-  identityFactory: (body: CuriosityGenerationInput) => CuriosityPipelineIdentities & {
-    jobId: string;
-  };
+  identityFactory: (
+    body: CuriosityGenerationInput,
+  ) => CuriosityPipelineIdentities & { jobId: string };
 }) {
   return async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-      const requestBody = generationInputSchema.parse(await request.json());
-      classifyCuriosityRequest(requestBody);
-      const body: CuriosityGenerationInput =
-        'targetAge' in requestBody
-          ? { question: requestBody.question, targetAge: requestBody.targetAge }
-          : {
-              question: requestBody.question,
-              targetAge: requestBody.age,
-              experienceId: requestBody.experienceId,
-              revision: requestBody.revision,
-              perspectiveDirective: requestBody.perspectiveDirective,
-              preservedCausalRelations: requestBody.preservedCausalRelations,
-            };
-      const entries = await Promise.all(
-        INITIAL_GENERATION_ROLES.map(
-          async (role) => [role, await deps.resolveRoleModel(request, body, role)] as const,
-        ),
-      );
-      const models = Object.fromEntries(entries) as CuriosityPipelineModels;
+      const body = generationInputSchema.parse(await request.json());
+      classifyCuriosityRequest(body);
       const identity = deps.identityFactory(body);
-      await deps.store.create({
-        id: identity.jobId,
-        status: 'queued',
-        step: 'queued',
-        progress: 0,
-        message: '生成任务已创建',
-        input: body,
-        runId: identity.runId,
-        completedStages: [],
-        artifacts: [],
-        agentRuns: [],
-        createdAt: identity.createdAt,
-        updatedAt: identity.createdAt,
-      });
-      deps.schedule(() =>
-        runCuriosityGenerationJob(identity.jobId, body, models, deps.store, identity),
-      );
-      return NextResponse.json(
-        {
-          success: true,
-          jobId: identity.jobId,
-          status: 'queued',
-          step: 'queued',
-          progress: 0,
-          pollUrl: `/api/curiosity/generations/${identity.jobId}`,
-          pollIntervalMs: 500,
-        },
-        { status: 202 },
-      );
+      return enqueueGeneration({ request, body, identity, ...deps });
     } catch (error) {
       return errorResponse(error);
     }
@@ -223,9 +200,32 @@ export function createCuriosityGenerationGetHandler(deps: { store: CuriosityJobS
   };
 }
 
+function findBaseVersion(snapshot: CuriosityExperienceSnapshot | null, versionId: string) {
+  return snapshot?.versions.find((version) => version.id === versionId);
+}
+
+type RevisionCandidateInput = {
+  baseVersionId: string;
+  spec: CuriosityExperienceSnapshot['versions'][number]['spec'];
+  instruction: string;
+  experienceId: string;
+};
+
 export function createCuriosityRevisionPostHandler(deps: {
-  resolveRoleModel: RoleModelResolver<z.infer<typeof revisionInputSchema>>;
-  identityFactory: () => CuriosityRevisionIdentity;
+  loadExperience: (experienceId: string) => Promise<CuriosityExperienceSnapshot | null>;
+  createCandidate?: (
+    input: RevisionCandidateInput,
+    request: NextRequest,
+  ) => Promise<{
+    spec: RevisionCandidateInput['spec'];
+    specHash: string;
+    artifacts: Record<string, unknown>[];
+    agentRuns: Record<string, unknown>[];
+    patch?: Record<string, unknown>;
+    quality?: Record<string, unknown>;
+  }>;
+  resolveRoleModel?: RoleModelResolver<RevisionCandidateInput>;
+  identityFactory?: () => CuriosityRevisionIdentity;
 }) {
   return async function POST(
     request: NextRequest,
@@ -234,36 +234,91 @@ export function createCuriosityRevisionPostHandler(deps: {
     try {
       const body = revisionInputSchema.parse(await request.json());
       const { experienceId } = await context.params;
-      if (body.baseSpec.experienceId !== experienceId) {
+      const snapshot = await deps.loadExperience(experienceId);
+      const base = findBaseVersion(snapshot, body.baseVersionId);
+      if (!base) {
         return NextResponse.json(
-          { success: false, errorCode: 'INVALID_REQUEST', error: '体验编号与基础版本不匹配。' },
-          { status: 400 },
+          { success: false, errorCode: 'VERSION_NOT_FOUND', error: '基础版本不存在。' },
+          { status: 404 },
         );
       }
-      const [planner, quality] = await Promise.all([
-        deps.resolveRoleModel(request, body, 'curiosity.revision-planner'),
-        deps.resolveRoleModel(request, body, 'curiosity.quality-reviewer'),
-      ]);
-      const candidate = await createCuriosityRevisionCandidateV2(
-        {
-          runtimeSpec: body.baseSpec,
-          experienceSpec: body.experienceSpec,
-          sourceArtifacts: body.sourceArtifacts,
-          instruction: body.instruction,
-        },
-        { planner, quality },
-        deps.identityFactory(),
-      );
+      const input = { ...body, experienceId, spec: base.spec };
+      const identity = deps.identityFactory?.();
+      let candidate;
+      if (deps.createCandidate) {
+        candidate = await deps.createCandidate(input, request);
+      } else {
+        if (!deps.resolveRoleModel || !identity) throw new Error('REVISION_HANDLER_NOT_CONFIGURED');
+        const [planner, quality] = await Promise.all([
+          deps.resolveRoleModel(request, input, 'curiosity.revision-planner'),
+          deps.resolveRoleModel(request, input, 'curiosity.quality-reviewer'),
+        ]);
+        candidate = await createCuriosityRevisionCandidateV3(input, { planner, quality }, identity);
+      }
       return NextResponse.json({
         success: true,
         candidateReady: true,
-        impact: candidate.impact,
-        patch: candidate.patch,
-        spec: candidate.runtimeSpec,
-        experienceSpec: candidate.spec,
-        artifacts: candidate.artifacts,
-        agentRuns: candidate.agentRuns,
-        specHash: candidate.compiled.specHash,
+        experienceId,
+        baseVersionId: body.baseVersionId,
+        ...(identity
+          ? {
+              versionId: identity.versionId,
+              revision: base.revision + 1,
+              createdAt: identity.createdAt,
+            }
+          : {}),
+        ...candidate,
+      });
+    } catch (error) {
+      return errorResponse(error);
+    }
+  };
+}
+
+export function createCuriosityRegenerationPostHandler(deps: {
+  store: CuriosityJobStore;
+  loadExperience: (experienceId: string) => Promise<CuriosityExperienceSnapshot | null>;
+  resolveRoleModel: RoleModelResolver<CuriosityGenerationInput>;
+  schedule: (work: () => Promise<void>) => void;
+  identityFactory: (
+    experienceId: string,
+    revision: number,
+  ) => CuriosityPipelineIdentities & { jobId: string };
+}) {
+  return async function POST(
+    request: NextRequest,
+    context: { params: Promise<{ experienceId: string }> },
+  ): Promise<NextResponse> {
+    try {
+      const body = regenerationInputSchema.parse(await request.json());
+      const { experienceId } = await context.params;
+      const snapshot = await deps.loadExperience(experienceId);
+      const base = findBaseVersion(snapshot, body.baseVersionId);
+      if (!base) {
+        return NextResponse.json(
+          { success: false, errorCode: 'VERSION_NOT_FOUND', error: '基础版本不存在。' },
+          { status: 404 },
+        );
+      }
+      const generationInput: CuriosityGenerationInput = {
+        question: base.spec.question.original,
+        targetAge: body.targetAge,
+        experienceId,
+        revision: base.revision + 1,
+        perspectiveDirective: body.directive,
+        preservedKnowledge: base.spec.knowledge,
+      };
+      const identity = deps.identityFactory(experienceId, base.revision + 1);
+      if (identity.experienceId !== experienceId || identity.revision !== base.revision + 1) {
+        throw new Error('REGENERATION_IDENTITY_MISMATCH');
+      }
+      return enqueueGeneration({
+        request,
+        body: generationInput,
+        store: deps.store,
+        resolveRoleModel: deps.resolveRoleModel,
+        schedule: deps.schedule,
+        identity,
       });
     } catch (error) {
       return errorResponse(error);
