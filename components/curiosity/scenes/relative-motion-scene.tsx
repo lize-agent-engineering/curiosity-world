@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { CheckCircle2, Lightbulb } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 
 import type { CuriosityEventV1, CuriosityExperienceSpecV1 } from '@/lib/curiosity/contracts';
@@ -273,9 +274,10 @@ export function RelativeMotionScene({ spec, activeStageKind, onEvent }: Relative
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="rounded-full bg-[#fff2a8] px-5 py-2 text-sm font-black text-[#25334b] shadow-lg"
+                className="flex items-center gap-2 rounded-full border border-[#fff4bd] bg-[#fff7d8] px-5 py-2 text-sm font-black text-[#25334b] shadow-lg"
               >
-                ✨ 近处变化大，远处变化小
+                <Lightbulb className="size-4 text-[#b16e1e]" aria-hidden="true" />
+                近处变化大，远处变化小
               </motion.p>
             )}
           </AnimatePresence>
@@ -285,10 +287,8 @@ export function RelativeMotionScene({ spec, activeStageKind, onEvent }: Relative
               animate={{ opacity: 1, scale: 1 }}
               className="w-full rounded-[1.75rem] border-2 border-[#fff0a8] bg-[#fff8d6] p-6 text-center text-[#17324d] shadow-[0_10px_0_#c88928]"
             >
-              <p className="text-3xl" aria-hidden="true">
-                🌙✨
-              </p>
-              <p className="mt-2 text-xl font-black">发现完成！</p>
+              <CheckCircle2 className="mx-auto size-9 text-[#b16e1e]" aria-hidden="true" />
+              <p className="mt-3 text-xl font-black">发现完成！</p>
               <p className="mt-2 text-sm font-bold leading-6">{spec.presentation.completion}</p>
               <p className="mt-3 text-xs font-bold text-[#526b7e]">
                 可以去“家长复盘”回看，也可以换个角度再讲一遍。

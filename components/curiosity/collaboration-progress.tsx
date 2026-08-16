@@ -39,12 +39,12 @@ export function CollaborationProgress({ status }: CollaborationProgressProps) {
   const completed = new Set(status.completedStages ?? []);
   const artifacts = status.artifacts ?? [];
   return (
-    <section role="status" className="mt-5 rounded-2xl border border-[#bfd3e3] bg-[#eaf4fb] p-5">
+    <section role="status" className="mt-5 rounded-2xl border border-[#d8cda4] bg-[#f3ead2] p-5">
       <div className="flex items-baseline justify-between gap-4">
-        <p className="font-black text-[#123b61]">{status.message}</p>
-        <span className="font-mono text-xs font-bold text-[#48647d]">{status.progress}%</span>
+        <p className="font-black text-[#314657]">{status.message}</p>
+        <span className="font-mono text-xs font-bold text-[#6f603b]">{status.progress}%</span>
       </div>
-      <ol className="relative mt-5 space-y-4 before:absolute before:bottom-3 before:left-[11px] before:top-3 before:w-px before:bg-[#aac5d8]">
+      <ol className="relative mt-5 space-y-4 before:absolute before:bottom-3 before:left-[11px] before:top-3 before:w-px before:bg-[#c9ba84]">
         {stages.map((stage, index) => {
           const done = completed.has(stage.id);
           const active = status.step === stage.id;
@@ -52,7 +52,7 @@ export function CollaborationProgress({ status }: CollaborationProgressProps) {
           return (
             <li key={stage.id} className="relative grid grid-cols-[24px_1fr] gap-3">
               <span
-                className={`z-10 grid size-6 place-items-center rounded-full ${done ? 'bg-[#1b4d80] text-white' : active ? 'bg-[#ffd76a] text-[#07152f]' : 'bg-[#d4e4ef] text-[#66849b]'}`}
+                className={`z-10 grid size-6 place-items-center rounded-full ${done ? 'bg-[#234d69] text-white' : active ? 'bg-[#ffe08a] text-[#173047]' : 'bg-[#ddd6bd] text-[#7f7454]'}`}
               >
                 {done ? (
                   <Check className="size-3.5" />
@@ -61,8 +61,8 @@ export function CollaborationProgress({ status }: CollaborationProgressProps) {
                 )}
               </span>
               <div>
-                <p className="text-sm font-black text-[#173d5d]">{stage.label}</p>
-                <p className="mt-0.5 text-xs leading-5 text-[#567187]">
+                <p className="text-sm font-black text-[#314657]">{stage.label}</p>
+                <p className="mt-0.5 text-xs leading-5 text-[#657381]">
                   {conclusion ?? stage.conclusion}
                 </p>
               </div>

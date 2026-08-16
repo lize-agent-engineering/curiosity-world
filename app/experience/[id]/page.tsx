@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowLeft, Play, ScrollText } from 'lucide-react';
+import { ArrowLeft, Moon, Play, ScrollText } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { z } from 'zod';
 
@@ -454,16 +454,22 @@ export default function CuriosityExperiencePage() {
     );
 
   return (
-    <main className="min-h-screen bg-[#07152f] p-4 text-white sm:p-6">
+    <main className="min-h-dvh bg-[#08152d] p-4 text-white sm:p-6">
       <header className="mx-auto mb-5 flex max-w-[1450px] items-center justify-between gap-4">
-        <Button
-          variant="ghost"
-          onClick={() => router.push('/')}
-          className="text-white hover:bg-white/10 hover:text-white"
-        >
-          <ArrowLeft className="size-4" />
-          新的问题
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            onClick={() => router.push('/')}
+            className="text-white hover:bg-white/10 hover:text-white"
+          >
+            <ArrowLeft className="size-4" />
+            新的问题
+          </Button>
+          <span className="hidden items-center gap-2 text-sm font-black text-[#fff4c7] sm:flex">
+            <Moon className="size-4 fill-[#ffe08a] text-[#ffe08a]" aria-hidden="true" />
+            为什么世界
+          </span>
+        </div>
         <div className="flex rounded-xl border border-white/10 bg-white/[.06] p-1">
           <Button
             size="sm"

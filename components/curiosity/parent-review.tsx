@@ -51,9 +51,9 @@ export function CuriosityParentReview({
 }: CuriosityParentReviewProps) {
   return (
     <div className="grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
-      <section className="rounded-[1.75rem] bg-[#f5faff] p-6 text-[#07152f] sm:p-8">
-        <p className="text-xs font-black tracking-[.18em] text-[#1b4d80]">
-          PARENT RECAP · 版本 {spec.revision}
+      <section className="rounded-[1.75rem] border border-[#d8cda4]/40 bg-[#faf5e7] p-6 text-[#17283d] shadow-[0_18px_45px_rgba(0,0,0,.15)] sm:p-8">
+        <p className="text-xs font-black tracking-[.18em] text-[#856c31]">
+          观察回看 · 版本 {spec.revision}
         </p>
         <h2 className="mt-3 text-3xl font-black">孩子实际做了什么</h2>
         <p className="mt-2 text-sm text-[#48647d]">这里只归约行为事实，不推断孩子的能力或结论。</p>
@@ -121,16 +121,16 @@ export function CuriosityParentReview({
         )}
       </section>
       <div className="space-y-6">
-        <section className="rounded-[1.75rem] border border-[#80d8ff]/35 bg-[#1b4d80]/35 p-6">
+        <section className="rounded-[1.75rem] border border-[#ffe08a]/25 bg-[#133657] p-6 shadow-[0_18px_40px_rgba(0,0,0,.16)]">
           <h2 className="text-xl font-black">还没听懂？换一种讲法</h2>
           <p className="mt-2 text-sm leading-6 text-[#c8dbef]">
-            重新召集各个 Agent，从不同生活情境设计一套新的互动探索；当前版本会保留在历史中。
+            从另一个生活情境重新讲一遍；当前版本会保留在历史中，随时可以回看。
           </p>
           <Button
             type="button"
             disabled={regenerating || revising}
             onClick={onRegenerate}
-            className="mt-4 h-12 w-full rounded-xl bg-[#80d8ff] font-black text-[#07152f] hover:bg-[#a4e4ff]"
+            className="mt-4 h-12 w-full rounded-xl bg-[#fff0ae] font-black text-[#173047] shadow-[0_3px_0_#c99d38] hover:bg-[#fff5c9]"
           >
             <RefreshCw className={`size-4 ${regenerating ? 'animate-spin' : ''}`} />
             {regenerating ? '正在换一个角度' : '换个角度再讲一遍'}
@@ -175,7 +175,7 @@ export function CuriosityParentReview({
             required
             rows={4}
             placeholder="例如：改成适合 6 岁，并加入桌上远近实验"
-            className="mt-4 w-full resize-none rounded-2xl border border-white/15 bg-[#091d3b] p-4 text-white outline-none focus:border-[#ffd76a]"
+            className="mt-4 w-full resize-none rounded-2xl border border-white/15 bg-[#091d3b] p-4 text-white outline-none transition focus:border-[#ffe08a] focus:ring-4 focus:ring-[#ffe08a]/10"
           />
           {error && (
             <p role="alert" className="mt-3 text-sm font-bold text-[#ff9d89]">
@@ -184,7 +184,7 @@ export function CuriosityParentReview({
           )}
           <Button
             disabled={revising}
-            className="mt-4 h-12 w-full rounded-xl bg-[#ffd76a] font-black text-[#07152f] hover:bg-[#ffe397]"
+            className="mt-4 h-12 w-full rounded-xl bg-[#d87355] font-black text-white shadow-[0_3px_0_#9f4637] hover:bg-[#c96349]"
           >
             <RefreshCw className={`size-4 ${revising ? 'animate-spin' : ''}`} />
             {revising ? '正在校验候选版本' : '生成候选版本'}

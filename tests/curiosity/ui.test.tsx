@@ -1,6 +1,8 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { CuriosityHomeView } from '@/components/curiosity/home-view';
 import { CuriosityRuntimeFrame } from '@/components/curiosity/runtime-frame';
@@ -36,6 +38,28 @@ describe('Curiosity parent creation view', () => {
     expect(html).toContain('桥为什么不会倒？');
     expect(html).toContain('影子为什么会变长？');
     expect(html).not.toMatch(/课程大纲|教师|同学|幻灯片|白板|课堂 TTS|视频导出|PBL/);
+  });
+
+  it('frames the entry point as a real-world observation instead of an AI generation form', () => {
+    const html = renderToStaticMarkup(
+      createElement(CuriosityHomeView, {
+        values: {
+          question: '为什么月亮看起来会跟着我们？',
+          age: 8,
+          interests: '散步、星空',
+        },
+        status: null,
+        recent: [],
+        error: null,
+        onChange: vi.fn(),
+        onSubmit: vi.fn(),
+        onOpenExperience: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('今晚的观察');
+    expect(html).toContain('从一个真问题出发');
+    expect(html).not.toContain('把它编译成');
   });
 
   it('keeps a failed generation actionable without exposing pipeline diagnostics', () => {
@@ -133,6 +157,7 @@ describe('Curiosity child runtime frame', () => {
     );
     expect(html).toContain('开始探索');
     expect(html).toContain('先猜一猜，谁变化得更快？');
+    expect(html).toContain('先听，再做');
     expect(html).not.toMatch(/API Key|服务商|模型设置/);
   });
 
@@ -172,6 +197,15 @@ describe('Curiosity child runtime frame', () => {
     expect(html).toContain('data-scene-layer="moon"');
     expect(html).toContain('让小朋友往前走');
     expect(html).not.toContain('观察者位置');
+  });
+
+  it('uses labeled vector discovery states rather than decorative emoji', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/curiosity/scenes/relative-motion-scene.tsx'),
+      'utf8',
+    );
+
+    expect(source).not.toMatch(/[✨🌙]/);
   });
 
   it.each([
