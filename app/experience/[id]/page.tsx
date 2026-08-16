@@ -265,6 +265,9 @@ export default function CuriosityExperiencePage() {
       if (!selected || !guidanceState) {
         throw new Error('GUIDANCE_STAGE_CONFLICT: 引导状态尚未就绪。');
       }
+      if (aggregate?.experience.activeVersionId !== selected.id) {
+        throw new Error('VERSION_NOT_ACTIVE: 探索版本刚刚更新。');
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       recordingChunksRef.current = [];
@@ -281,6 +284,10 @@ export default function CuriosityExperiencePage() {
             setTranscript(answer.transcript);
             const eventId = `evt_voice_${Date.now()}`;
             await activationRef.current;
+            const latest = await getCuriosityRepository().getExperience(experienceId);
+            if (latest?.experience.activeVersionId !== selected.id) {
+              throw new Error('VERSION_NOT_ACTIVE: 探索版本刚刚更新。');
+            }
             const voiceEvent: ChildVoiceEventV1 = {
               schemaVersion: '1.0',
               eventId,
@@ -297,7 +304,7 @@ export default function CuriosityExperiencePage() {
             );
             await requestGuidance({ kind: 'voice', transcript: answer.transcript }, [eventId]);
           } catch (cause) {
-            setVoiceError(cause instanceof Error ? cause.message : String(cause));
+            setVoiceError(describeVoiceFailure(cause));
           } finally {
             stream.getTracks().forEach((track) => track.stop());
             mediaRecorderRef.current = null;
@@ -312,7 +319,7 @@ export default function CuriosityExperiencePage() {
       setVoiceError(describeVoiceFailure(cause));
       setListening(false);
     }
-  }, [experienceId, guidanceState, requestGuidance, selected]);
+  }, [aggregate, experienceId, guidanceState, requestGuidance, selected]);
 
   const handleRuntimeFailure = useCallback(
     async (message: string) => {
@@ -516,7 +523,9 @@ export default function CuriosityExperiencePage() {
         )}
         {mode === 'child' ? (
           <div className="min-h-[calc(100vh-110px)]">
-            {story && !pendingCandidateId && (
+            {story &&
+              !pendingCandidateId &&
+              selected.id === aggregate.experience.activeVersionId && (
               <VoiceGuide
                 narration={guideNarration}
                 started={guideStarted}

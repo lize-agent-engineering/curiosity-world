@@ -141,6 +141,20 @@ describe('iframe protocol boundary', () => {
 });
 
 describe('traceable parent summary', () => {
+  it('describes balance-support evidence as a bridge test instead of observer motion', () => {
+    const spec = createValidCuriositySpec();
+    spec.knowledge = { family: 'balance-support', packId: 'balance-support.bridge.v1' };
+    const summary = summarizeCuriosityEvents(spec, [
+      event('evt_1', 'variable_changed', 'exploration', 'scene_adjusted', {
+        variableId: 'support-position',
+        value: 1,
+      }),
+    ]);
+
+    expect(summary.facts[0]?.text).toBe('孩子移动桥墩并完成了 1 次承重观察。');
+    expect(summary.facts[0]?.text).not.toContain('观察者');
+  });
+
   it('records a submitted prediction as a parent-visible behavior fact', () => {
     const summary = summarizeCuriosityEvents(createValidCuriositySpec(), [
       event('evt_1', 'prediction_submitted', 'prediction', 'option_selected', {

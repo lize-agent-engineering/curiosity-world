@@ -44,6 +44,9 @@ interface ManagedGuidanceDependencies {
 
 export function describeVoiceFailure(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : String(cause);
+  if (/VERSION_NOT_ACTIVE|语音事件只能写入当前活动版本/i.test(message)) {
+    return '探索版本刚刚更新，请重新点击说话。';
+  }
   if (
     (cause instanceof DOMException && cause.name === 'NotAllowedError') ||
     /permission denied|permission dismissed|notallowederror/i.test(message)

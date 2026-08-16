@@ -9,6 +9,12 @@ import {
 } from '@/lib/curiosity/voice-client';
 
 describe('Curiosity browser voice client', () => {
+  it('does not expose an internal active-version write conflict to families', () => {
+    expect(
+      describeVoiceFailure(new Error('VERSION_NOT_ACTIVE: 语音事件只能写入当前活动版本。')),
+    ).toBe('探索版本刚刚更新，请重新点击说话。');
+  });
+
   it('turns microphone permission denial into an actionable Chinese message', () => {
     expect(describeVoiceFailure(new DOMException('Permission denied', 'NotAllowedError'))).toBe(
       '没有获得麦克风权限。请在浏览器设置中允许使用麦克风，然后重新说一次。',

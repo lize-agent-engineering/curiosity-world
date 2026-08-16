@@ -81,9 +81,15 @@ export function summarizeCuriosityEvents(
 
   const movement = events.filter((event) => event.type === 'variable_changed');
   if (movement.length > 0) {
+    const explorationText =
+      spec.knowledge.family === 'balance-support'
+        ? `孩子移动桥墩并完成了 ${movement.length} 次承重观察。`
+        : spec.knowledge.family === 'light-path'
+          ? `孩子移动光源并完成了 ${movement.length} 次影子观察。`
+          : `孩子移动观察者 ${movement.length} 次，比较了远近物体的视角变化。`;
     facts.push({
       kind: 'exploration',
-      text: `孩子移动观察者 ${movement.length} 次，比较了远近物体的视角变化。`,
+      text: explorationText,
       eventIds: movement.map((event) => event.eventId),
     });
   }
