@@ -1,11 +1,15 @@
 'use client';
 
-import { Mic, Play, RotateCcw, SkipForward, Volume2 } from 'lucide-react';
+import { Mic, Play, RotateCcw, SkipForward } from 'lucide-react';
 
 interface VoiceGuideProps {
   narration: string;
   started: boolean;
   listening: boolean;
+  requestingMicrophone?: boolean;
+  speakerName?: string;
+  speakerAvatar?: string;
+  status?: string | null;
   error: string | null;
   transcript?: string | null;
   onStart: () => void;
@@ -21,6 +25,10 @@ export function VoiceGuide({
   narration,
   started,
   listening,
+  requestingMicrophone = false,
+  speakerName = '探索伙伴',
+  speakerAvatar = '🌙',
+  status,
   error,
   transcript,
   onStart,
@@ -34,15 +42,23 @@ export function VoiceGuide({
       className="border-b border-[#d9eef0]/12 bg-[#0d2643] px-5 py-4 text-white"
     >
       <div className="mx-auto flex max-w-4xl items-center gap-4">
-        <span className="grid size-12 shrink-0 place-items-center rounded-full border border-[#fff2bd]/50 bg-[#fff0ae] text-[#183047] shadow-[0_0_0_6px_rgba(255,240,174,.07)]">
-          <Volume2 className="size-6" />
+        <span className="relative grid size-12 shrink-0 place-items-center rounded-full border border-[#fff2bd]/50 bg-[#fff0ae] text-xl text-[#183047] shadow-[0_0_0_6px_rgba(255,240,174,.07)]">
+          <span aria-hidden="true">{speakerAvatar}</span>
+          <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#0d2643] bg-[#6de3a4]" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-black tracking-[.15em] text-[#a9d9df]">先听，再做</p>
+          <p className="text-xs font-black tracking-[.12em] text-[#a9d9df]">
+            {speakerName}正在引导 · 先听，再做
+          </p>
           <p aria-live="polite" className="mt-1 text-base font-bold leading-7 text-[#fff9e7]">
             {narration}
           </p>
           {transcript && <p className="mt-2 text-sm text-[#b9d7ef]">我听到：{transcript}</p>}
+          {status && (
+            <p role="status" aria-live="polite" className="mt-2 text-sm font-bold text-[#ffe08a]">
+              {status}
+            </p>
+          )}
           {error && (
             <p role="alert" className="mt-2 text-sm font-bold text-[#ffb8a9]">
               {error}
@@ -71,9 +87,16 @@ export function VoiceGuide({
               type="button"
               className={`${controlClass} bg-[#d87355] text-white shadow-[0_3px_0_#9f4637] hover:bg-[#c96349]`}
               onClick={onListen}
+              disabled={requestingMicrophone}
             >
               <Mic className="size-4" />{' '}
-              {listening ? '点击结束' : error ? '重新说一次' : '点击说话'}
+              {listening
+                ? '点击结束'
+                : requestingMicrophone
+                  ? '等待授权…'
+                  : error
+                    ? '重新说一次'
+                    : '点击说话'}
             </button>
           </>
         )}

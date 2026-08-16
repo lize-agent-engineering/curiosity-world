@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   describeVoiceFailure,
+  requestMicrophoneStream,
   recognizeChildAnswer,
   speakGuidance,
   speakManagedGuidance,
@@ -22,6 +23,15 @@ describe('Curiosity browser voice client', () => {
     expect(describeVoiceFailure(new Error('Permission denied'))).toBe(
       '没有获得麦克风权限。请在浏览器设置中允许使用麦克风，然后重新说一次。',
     );
+  });
+
+  it('times out a microphone request when the browser never shows its permission UI', async () => {
+    await expect(
+      requestMicrophoneStream(() => new Promise<MediaStream>(() => undefined), 5),
+    ).rejects.toThrow(/MICROPHONE_PERMISSION_TIMEOUT/);
+    expect(
+      describeVoiceFailure(new Error('MICROPHONE_PERMISSION_TIMEOUT: browser prompt unavailable')),
+    ).toBe('浏览器没有显示授权窗口。请打开地址栏旁的网站权限，将麦克风设为允许，然后重新说一次。');
   });
 
   it('speaks Chinese guidance and cancels the previous utterance', async () => {

@@ -53,7 +53,41 @@ export function describeVoiceFailure(cause: unknown): string {
   ) {
     return '没有获得麦克风权限。请在浏览器设置中允许使用麦克风，然后重新说一次。';
   }
+  if (/MICROPHONE_PERMISSION_TIMEOUT/i.test(message)) {
+    return '浏览器没有显示授权窗口。请打开地址栏旁的网站权限，将麦克风设为允许，然后重新说一次。';
+  }
   return message;
+}
+
+export function requestMicrophoneStream(
+  getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>,
+  timeoutMs = 8_000,
+): Promise<MediaStream> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      settled = true;
+      reject(new Error('MICROPHONE_PERMISSION_TIMEOUT: browser prompt unavailable'));
+    }, timeoutMs);
+
+    getUserMedia({ audio: true }).then(
+      (stream) => {
+        if (settled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        settled = true;
+        clearTimeout(timeout);
+        resolve(stream);
+      },
+      (cause) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        reject(cause);
+      },
+    );
+  });
 }
 
 export async function transcribeChildRecording(

@@ -39,6 +39,7 @@ import {
 } from '@/lib/curiosity/guidance';
 import {
   describeVoiceFailure,
+  requestMicrophoneStream,
   speakManagedGuidance,
   transcribeChildRecording,
 } from '@/lib/curiosity/voice-client';
@@ -51,6 +52,8 @@ import {
   describeExperienceFailure,
   selectRegenerationBase,
 } from '@/lib/curiosity/experience-recovery';
+import { runGuidanceWithRetry } from '@/lib/curiosity/guidance-retry';
+import { selectActiveTeamMember } from '@/lib/curiosity/team-speaker';
 
 type Mode = 'child' | 'parent';
 
@@ -82,6 +85,9 @@ export default function CuriosityExperiencePage() {
   const [guideNarration, setGuideNarration] = useState('准备好后，我们一起开始探索。');
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [guideStatus, setGuideStatus] = useState<string | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  const [requestingMicrophone, setRequestingMicrophone] = useState(false);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [voiceEvents, setVoiceEvents] = useState<ChildVoiceEventV1[]>([]);
 
@@ -122,6 +128,14 @@ export default function CuriosityExperiencePage() {
     );
     return artifact ? teamAssemblyArtifactV1Schema.parse(artifact) : null;
   }, [selected]);
+  const activeStageKind = story?.stages.find((stage) => stage.id === guidanceState?.stageId)?.kind;
+  const activeTeamMember = useMemo(
+    () =>
+      explorationTeam
+        ? selectActiveTeamMember(explorationTeam, activeStageKind, guideNarration)
+        : null,
+    [activeStageKind, explorationTeam, guideNarration],
+  );
 
   useEffect(() => {
     if (!story || !selectedVersionId) return;
@@ -132,6 +146,9 @@ export default function CuriosityExperiencePage() {
       setGuideStarted(false);
       setTranscript(null);
       setVoiceError(null);
+      setGuideStatus(null);
+      setVoiceStatus(null);
+      setRequestingMicrophone(false);
     }
     let cancelled = false;
     getCuriosityRepository()
@@ -207,18 +224,26 @@ export default function CuriosityExperiencePage() {
           triggerEventIds,
           childInput,
         );
-        const body = await readApiJson(
-          await fetch('/api/curiosity/guidance', {
-            method: 'POST',
-            headers: getCuriosityApiHeaders('curiosity.exploration-guide'),
-            body: JSON.stringify({
-              request,
-              story,
-              knowledge: selected.artifacts.find(
-                (artifact) => artifact.agentRole === 'curiosity.knowledge-designer',
-              ),
-            }),
-          }),
+        setGuideStatus(null);
+        const body = await runGuidanceWithRetry(
+          async () =>
+            readApiJson(
+              await fetch('/api/curiosity/guidance', {
+                method: 'POST',
+                headers: getCuriosityApiHeaders('curiosity.exploration-guide'),
+                body: JSON.stringify({
+                  request,
+                  story,
+                  knowledge: selected.artifacts.find(
+                    (artifact) => artifact.agentRole === 'curiosity.knowledge-designer',
+                  ),
+                }),
+              }),
+            ),
+          {
+            attempts: 3,
+            onRetry: () => setGuideStatus('探索伙伴正在整理下一步，请稍等一下…'),
+          },
         );
         const response = body.response as GuidanceTurnResponseV1;
         const next = applyGuidanceTurn(current, response, story, {
@@ -229,6 +254,7 @@ export default function CuriosityExperiencePage() {
         setGuidanceState(next);
         await getCuriosityRepository().saveGuidanceState(experienceId, selected.id, next);
         setGuideNarration(response.narration);
+        setGuideStatus(null);
         await speakManagedGuidance(response.narration);
       });
       guidanceRequestQueueRef.current = operation.catch(() => undefined);
@@ -256,8 +282,8 @@ export default function CuriosityExperiencePage() {
           },
           [event.eventId],
         );
-      } catch (cause) {
-        setVoiceError(cause instanceof Error ? cause.message : String(cause));
+      } catch (_cause) {
+        setGuideStatus('探索伙伴还在想怎么说得更清楚，请再做一次刚才的观察。');
       }
     },
     [guidanceState, guideStarted, handleEvent, requestGuidance, story],
@@ -265,6 +291,7 @@ export default function CuriosityExperiencePage() {
 
   const playNarration = useCallback(async () => {
     setVoiceError(null);
+    setVoiceStatus(null);
     try {
       await speakManagedGuidance(guideNarration);
     } catch (cause) {
@@ -285,7 +312,13 @@ export default function CuriosityExperiencePage() {
       if (aggregate?.experience.activeVersionId !== selected.id) {
         throw new Error('VERSION_NOT_ACTIVE: 探索版本刚刚更新。');
       }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setRequestingMicrophone(true);
+      setVoiceStatus('正在等待麦克风授权，请在浏览器提示中选择允许。');
+      const stream = await requestMicrophoneStream(
+        navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices),
+      );
+      setRequestingMicrophone(false);
+      setVoiceStatus(null);
       const recorder = new MediaRecorder(stream);
       recordingChunksRef.current = [];
       recorder.ondataavailable = (event) => {
@@ -334,6 +367,8 @@ export default function CuriosityExperiencePage() {
       setListening(true);
     } catch (cause) {
       setVoiceError(describeVoiceFailure(cause));
+      setVoiceStatus(null);
+      setRequestingMicrophone(false);
       setListening(false);
     }
   }, [aggregate, experienceId, guidanceState, requestGuidance, selected]);
@@ -540,34 +575,38 @@ export default function CuriosityExperiencePage() {
         )}
         {mode === 'child' ? (
           <div className="min-h-[calc(100vh-110px)]">
-            {explorationTeam && <ExplorationTeamStrip team={explorationTeam} />}
+            {explorationTeam && (
+              <ExplorationTeamStrip team={explorationTeam} activeMemberId={activeTeamMember?.id} />
+            )}
             {story &&
               !pendingCandidateId &&
               selected.id === aggregate.experience.activeVersionId && (
-              <VoiceGuide
-                narration={guideNarration}
-                started={guideStarted}
-                listening={listening}
-                error={voiceError}
-                transcript={transcript}
-                onStart={() => {
-                  setGuideStarted(true);
-                  void playNarration();
-                }}
-                onReplay={() => void playNarration()}
-                onSkip={() => globalThis.speechSynthesis?.cancel()}
-                onListen={() => void handleVoiceAnswer()}
-              />
-            )}
+                <VoiceGuide
+                  narration={guideNarration}
+                  started={guideStarted}
+                  listening={listening}
+                  requestingMicrophone={requestingMicrophone}
+                  speakerName={activeTeamMember?.name}
+                  speakerAvatar={activeTeamMember?.avatar}
+                  status={voiceStatus ?? guideStatus}
+                  error={voiceError}
+                  transcript={transcript}
+                  onStart={() => {
+                    setGuideStarted(true);
+                    void playNarration();
+                  }}
+                  onReplay={() => void playNarration()}
+                  onSkip={() => globalThis.speechSynthesis?.cancel()}
+                  onListen={() => void handleVoiceAnswer()}
+                />
+              )}
             <CuriosityRuntimeFrame
               key={selected.id}
               spec={selected.spec}
               onReady={handleReady}
               onEvent={handleGuidedEvent}
               onRuntimeFailure={handleRuntimeFailure}
-              activeStageKind={
-                story?.stages.find((stage) => stage.id === guidanceState?.stageId)?.kind
-              }
+              activeStageKind={activeStageKind}
             />
           </div>
         ) : (

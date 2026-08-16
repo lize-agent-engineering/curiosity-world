@@ -12,6 +12,7 @@ import { ChildTaskShell } from '@/components/curiosity/child-task-shell';
 import { CuriosityArchiveView } from '@/components/curiosity/archive-view';
 import { VoiceGuide } from '@/components/curiosity/voice-guide';
 import { ExplorationTeamStrip } from '@/components/curiosity/exploration-team-strip';
+import { selectActiveTeamMember } from '@/lib/curiosity/team-speaker';
 import { createValidCuriositySpec } from './fixture';
 
 const generatedTeamArtifact = {
@@ -25,9 +26,36 @@ const generatedTeamArtifact = {
   teamName: '桥梁侦察队',
   rationale: '根据桥梁承重场景的科学边界与操作任务动态组队。',
   members: [
-    { id: 'member_lead', name: '稳稳队长', role: 'lead' as const, persona: '负责串起承重问题和每一步观察，不提前泄露答案。', avatar: '🌉', color: '#4F7DA1', priority: 10, voiceStyle: '温暖清楚，语速舒缓' },
-    { id: 'member_science', name: '支点博士', role: 'science' as const, persona: '专门核对支点与重心关系，守住桥梁实验的科学边界。', avatar: '⚖️', color: '#927236', priority: 8, voiceStyle: '沉稳准确，句子简短' },
-    { id: 'member_interaction', name: '桥墩阿搭', role: 'interaction' as const, persona: '把承重规律变成可以移动桥墩和比较结果的动作。', avatar: '🧱', color: '#3F8066', priority: 7, voiceStyle: '活泼鼓励，节奏明快' },
+    {
+      id: 'member_lead',
+      name: '稳稳队长',
+      role: 'lead' as const,
+      persona: '负责串起承重问题和每一步观察，不提前泄露答案。',
+      avatar: '🌉',
+      color: '#4F7DA1',
+      priority: 10,
+      voiceStyle: '温暖清楚，语速舒缓',
+    },
+    {
+      id: 'member_science',
+      name: '支点博士',
+      role: 'science' as const,
+      persona: '专门核对支点与重心关系，守住桥梁实验的科学边界。',
+      avatar: '⚖️',
+      color: '#927236',
+      priority: 8,
+      voiceStyle: '沉稳准确，句子简短',
+    },
+    {
+      id: 'member_interaction',
+      name: '桥墩阿搭',
+      role: 'interaction' as const,
+      persona: '把承重规律变成可以移动桥墩和比较结果的动作。',
+      avatar: '🧱',
+      color: '#3F8066',
+      priority: 7,
+      voiceStyle: '活泼鼓励，节奏明快',
+    },
   ],
 };
 
@@ -120,6 +148,21 @@ describe('Curiosity structured collaboration', () => {
     expect(html).toContain('负责串起承重问题和每一步观察');
   });
 
+  it('explains the team strip and marks the current speaker', () => {
+    const active = selectActiveTeamMember(generatedTeamArtifact, 'guided-discovery', '继续比较。');
+    const html = renderToStaticMarkup(
+      createElement(ExplorationTeamStrip, {
+        team: generatedTeamArtifact,
+        activeMemberId: active.id,
+      }),
+    );
+
+    expect(active.name).toBe('支点博士');
+    expect(html).toContain('高亮的是正在引导你的伙伴');
+    expect(html).toContain('正在说话');
+    expect(html).toContain('aria-current="true"');
+  });
+
   it('shows story guidance as a real generation stage', () => {
     const html = renderToStaticMarkup(
       createElement(CollaborationProgress, {
@@ -171,7 +214,12 @@ describe('Curiosity structured collaboration', () => {
   it('reveals only the team returned by the current generation artifact', () => {
     const html = renderToStaticMarkup(
       createElement(CollaborationProgress, {
-        status: { step: 'story_design', progress: 78, message: '小队已组建', artifacts: [generatedTeamArtifact] },
+        status: {
+          step: 'story_design',
+          progress: 78,
+          message: '小队已组建',
+          artifacts: [generatedTeamArtifact],
+        },
       }),
     );
 
@@ -250,6 +298,30 @@ describe('Curiosity child runtime frame', () => {
     );
     expect(html).toContain('点击结束');
     expect(html).not.toContain('disabled=""');
+  });
+
+  it('shows who is speaking and makes microphone permission waiting explicit', () => {
+    const html = renderToStaticMarkup(
+      createElement(VoiceGuide, {
+        narration: '再走一次，仔细比较。',
+        started: true,
+        listening: false,
+        requestingMicrophone: true,
+        speakerName: '观察小灵',
+        speakerAvatar: '👀',
+        status: '正在等待麦克风授权，请在浏览器提示中选择允许。',
+        error: null,
+        onStart: vi.fn(),
+        onReplay: vi.fn(),
+        onSkip: vi.fn(),
+        onListen: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('观察小灵正在引导');
+    expect(html).toContain('正在等待麦克风授权');
+    expect(html).toContain('等待授权…');
+    expect(html).toContain('disabled=""');
   });
 
   it('renders the deterministic child scene as React SVG instead of an iframe runtime', () => {
