@@ -21,11 +21,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: process.env.CI ? 'pnpm build && pnpm start' : 'pnpm dev',
+    command: 'tsx scripts/start-curiosity-e2e.ts',
     url: 'http://127.0.0.1:3002',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    // Use the bounded test model so browser tests remain deterministic.
-    env: { PORT: '3002', CURIOSITY_TEST_MODEL: 'true', PLAYWRIGHT_TEST: 'true' },
   },
 });

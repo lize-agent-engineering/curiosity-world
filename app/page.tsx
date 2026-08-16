@@ -11,7 +11,6 @@ import {
   type CuriosityHomeValues,
 } from '@/components/curiosity/home-view';
 import {
-  getCuriosityApiHeaders,
   getCuriosityRepository,
   readApiJson,
   syncCuriosityExperience,
@@ -81,7 +80,7 @@ export default function HomePage() {
       const created = await readApiJson(
         await fetch('/api/curiosity/generations', {
           method: 'POST',
-          headers: getCuriosityApiHeaders('curiosity.interaction-designer'),
+          headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ question: values.question, targetAge: values.targetAge }),
           signal: controller.signal,
         }),

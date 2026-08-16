@@ -1,18 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import type {
-  CuriosityPipelineIdentities,
-  CuriosityPipelineModel,
-  CuriosityPipelineModels,
-} from './agent-pipeline';
+import type { CuriosityPipelineIdentities, CuriosityPipelineModel } from './agent-pipeline';
 import type { CuriosityAgentRole } from './agent-contracts';
 import type { CuriosityExperienceSnapshot } from './repository';
-import {
-  type CuriosityGenerationInput,
-  type CuriosityJobStore,
-  runCuriosityGenerationJob,
-} from './jobs';
+import { type CuriosityGenerationInput, type CuriosityJobStore } from './jobs';
 import { classifyCuriosityRequest, CuriosityDomainError } from './knowledge';
 import {
   createCuriosityRevisionCandidateV3,
@@ -51,14 +43,6 @@ type RoleModelResolver<TBody> = (
   role: CuriosityAgentRole,
 ) => Promise<CuriosityPipelineModel>;
 
-const INITIAL_GENERATION_ROLES = [
-  'curiosity.question-modeler',
-  'curiosity.knowledge-designer',
-  'curiosity.interaction-designer',
-  'curiosity.presentation-designer',
-  'curiosity.quality-reviewer',
-] as const;
-
 function errorResponse(error: unknown): NextResponse {
   if (error instanceof CuriosityModelUnavailableError) {
     return NextResponse.json(
@@ -90,35 +74,20 @@ function errorResponse(error: unknown): NextResponse {
   );
 }
 
-async function resolveGenerationModels<TBody>(
-  request: NextRequest,
-  body: TBody,
-  resolver: RoleModelResolver<TBody>,
-): Promise<CuriosityPipelineModels> {
-  const entries = await Promise.all(
-    INITIAL_GENERATION_ROLES.map(
-      async (role) => [role, await resolver(request, body, role)] as const,
-    ),
-  );
-  return Object.fromEntries(entries) as CuriosityPipelineModels;
-}
-
 async function enqueueGeneration(input: {
-  request: NextRequest;
   body: CuriosityGenerationInput;
   store: CuriosityJobStore;
-  resolveRoleModel: RoleModelResolver<CuriosityGenerationInput>;
-  schedule: (work: () => Promise<void>) => void;
   identity: CuriosityPipelineIdentities & { jobId: string };
 }): Promise<NextResponse> {
-  const models = await resolveGenerationModels(input.request, input.body, input.resolveRoleModel);
   await input.store.create({
     id: input.identity.jobId,
+    storeVersion: 1,
     status: 'queued',
     step: 'queued',
     progress: 0,
     message: '生成任务已创建',
     input: input.body,
+    identity: input.identity,
     runId: input.identity.runId,
     completedStages: [],
     artifacts: [],
@@ -126,15 +95,6 @@ async function enqueueGeneration(input: {
     createdAt: input.identity.createdAt,
     updatedAt: input.identity.createdAt,
   });
-  input.schedule(() =>
-    runCuriosityGenerationJob(
-      input.identity.jobId,
-      input.body,
-      models,
-      input.store,
-      input.identity,
-    ),
-  );
   return NextResponse.json(
     {
       success: true,
@@ -151,8 +111,6 @@ async function enqueueGeneration(input: {
 
 export function createCuriosityGenerationPostHandler(deps: {
   store: CuriosityJobStore;
-  resolveRoleModel: RoleModelResolver<CuriosityGenerationInput>;
-  schedule: (work: () => Promise<void>) => void;
   identityFactory: (
     body: CuriosityGenerationInput,
   ) => CuriosityPipelineIdentities & { jobId: string };
@@ -162,7 +120,7 @@ export function createCuriosityGenerationPostHandler(deps: {
       const body = generationInputSchema.parse(await request.json());
       classifyCuriosityRequest(body);
       const identity = deps.identityFactory(body);
-      return enqueueGeneration({ request, body, identity, ...deps });
+      return enqueueGeneration({ body, identity, store: deps.store });
     } catch (error) {
       return errorResponse(error);
     }
@@ -278,8 +236,6 @@ export function createCuriosityRevisionPostHandler(deps: {
 export function createCuriosityRegenerationPostHandler(deps: {
   store: CuriosityJobStore;
   loadExperience: (experienceId: string) => Promise<CuriosityExperienceSnapshot | null>;
-  resolveRoleModel: RoleModelResolver<CuriosityGenerationInput>;
-  schedule: (work: () => Promise<void>) => void;
   identityFactory: (
     experienceId: string,
     revision: number,
@@ -313,11 +269,8 @@ export function createCuriosityRegenerationPostHandler(deps: {
         throw new Error('REGENERATION_IDENTITY_MISMATCH');
       }
       return enqueueGeneration({
-        request,
         body: generationInput,
         store: deps.store,
-        resolveRoleModel: deps.resolveRoleModel,
-        schedule: deps.schedule,
         identity,
       });
     } catch (error) {

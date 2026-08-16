@@ -1,17 +1,13 @@
-import { after } from 'next/server';
 import { nanoid } from 'nanoid';
 
 import { createCuriosityRegenerationPostHandler } from '@/lib/curiosity/api-handlers';
 import { curiosityExperienceStore, curiosityJobStore } from '@/lib/curiosity/server-store';
-import { resolveCuriosityRoleModel } from '@/lib/curiosity/server-model';
 
 export const maxDuration = 120;
 
 export const POST = createCuriosityRegenerationPostHandler({
   store: curiosityJobStore,
   loadExperience: (experienceId) => curiosityExperienceStore.read(experienceId),
-  resolveRoleModel: resolveCuriosityRoleModel,
-  schedule: (work) => after(work),
   identityFactory: (experienceId, revision) => ({
     jobId: `job_${nanoid(10)}`,
     runId: `run_${nanoid(12)}`,

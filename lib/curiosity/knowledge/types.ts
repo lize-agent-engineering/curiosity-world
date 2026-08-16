@@ -23,10 +23,7 @@ export interface CuriosityKnowledgePlugin {
   migrationQuestions(packId: string): readonly string[];
 }
 
-export type CuriosityKnowledgePluginErrorCode =
-  | 'UNSUPPORTED_QUESTION'
-  | 'AMBIGUOUS_KNOWLEDGE_FAMILY'
-  | 'KNOWLEDGE_VIOLATION';
+export type CuriosityKnowledgePluginErrorCode = 'KNOWLEDGE_VIOLATION';
 
 export class CuriosityKnowledgePluginError extends Error {
   constructor(

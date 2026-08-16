@@ -1,46 +1,35 @@
 # Curiosity World · 为什么世界
 
-Curiosity World 把孩子的“为什么”，变成有语音引导、可以亲手操作的探索小游戏。
+Curiosity World 把 6–10 岁孩子自由提出的“为什么”，变成经过知识与质量审查、可亲手操作的探索场景。除问题外，唯一用户参数是目标年龄。
 
-## 当前面试演示范围
+## 核心链路
 
-当前可运行范围严格限于三个预设问题：
-
-- 月亮为什么跟着我？
-- 恐龙为什么会消失？
-- 为什么会下雨？
-
-当前尚未支持自由问题；受本次笔试时间与 AI Coding 工具额度限制，它被列为后续的 P0 优先级方向。
-
-首版聚焦一个完整案例：**“月亮为什么像在跟着我？”** 专业 Agent 小队依次完成问题建模、科学知识设计、互动设计、故事旁白和质量审查，再由 React/SVG/Motion 确定性场景呈现。
-
-## 完整闭环
-
-1. 输入或选择一个问题。
-2. 看见 Agent 小队生成探索。
-3. 先预测，再操作场景观察现象。
-4. 用语音或触摸回答。
-5. 解释发现并回看探索证据。
-6. 从历史恢复，或换个角度重新讲解。
+1. 安全且信息充分的问题进入五段生成：问题、知识、场景、呈现、质量。
+2. 模型只选择受控场景并填写结构化配置，不生成 HTML、CSS、JavaScript、函数或表达式。
+3. 九类 React 场景由单一 `CuriosityExperienceSpecV3`、统一事件词表和确定性 reducer 驱动。
+4. 运行时旁白只能从生成期审核通过的旁白库选择。
+5. Web 只创建和查询任务；独立 `curiosity-worker` 通过租约、检查点和 CAS 推进任务。
 
 ## 本地运行
-
-需要 Node.js 20.9+、pnpm 和 OpenRouter API Key。
 
 ```bash
 pnpm install
 cp .env.example .env.local
 pnpm dev
+pnpm worker:curiosity
 ```
 
-核心验证：
+Docker Compose 会同时启动 Web 与 worker，并共享任务数据卷。
+
+## 准出
 
 ```bash
-pnpm vitest run tests/curiosity
-pnpm run check:curiosity-deploy
+pnpm check
+pnpm lint
+pnpm typecheck
+pnpm test
 pnpm build
+pnpm test:e2e
 ```
 
-## 部署
-
-首版使用 Docker 本地部署，并通过已配置的固定 ngrok 域名提供公网体验。设置 `CURIOSITY_PUBLIC_MODE=1` 后，只公开 Curiosity World 首页、体验页、健康检查和 Curiosity API。
+`pnpm check` 仅检查格式。真实模型门禁使用 12 类问题各 5 次，硬时限 120 秒；模型只能由 worker 的服务端 `MODEL_ROUTES`/`DEFAULT_MODEL` 配置。准备工程 evidence、Web 与 worker 后运行 `pnpm spike:curiosity:real`。

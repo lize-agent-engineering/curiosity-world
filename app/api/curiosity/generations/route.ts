@@ -1,16 +1,12 @@
-import { after } from 'next/server';
 import { nanoid } from 'nanoid';
 
 import { createCuriosityGenerationPostHandler } from '@/lib/curiosity/api-handlers';
-import { resolveCuriosityRoleModel } from '@/lib/curiosity/server-model';
-import { curiosityJobStore, ensureCuriosityJobStoreRecovered } from '@/lib/curiosity/server-store';
+import { curiosityJobStore } from '@/lib/curiosity/server-store';
 
 export const maxDuration = 120;
 
 const post = createCuriosityGenerationPostHandler({
   store: curiosityJobStore,
-  resolveRoleModel: (request, body, role) => resolveCuriosityRoleModel(request, body, role),
-  schedule: (work) => after(work),
   identityFactory: (_body) => {
     const createdAt = new Date().toISOString();
     return {
@@ -39,6 +35,5 @@ const post = createCuriosityGenerationPostHandler({
 });
 
 export async function POST(...args: Parameters<typeof post>) {
-  await ensureCuriosityJobStoreRecovered();
   return post(...args);
 }

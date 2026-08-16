@@ -12,11 +12,33 @@ function completedJob(): CuriosityGenerationJob {
   const spec = curiosityExperienceSpecV3Schema.parse(validV3Spec);
   return {
     id: 'job_public_1',
+    storeVersion: 1,
     status: 'candidate_ready',
     step: 'awaiting_runtime_check',
     progress: 95,
     message: '等待浏览器运行检查',
     input: { question: spec.question.original, targetAge: 8 },
+    identity: {
+      runId: 'run_generation_1',
+      experienceId: 'cur_moon_demo',
+      versionId: 'ver_moon_demo_1',
+      revision: 1,
+      createdAt: '2026-08-15T00:00:00.000Z',
+      artifactIds: {
+        question: 'art_question_1',
+        knowledge: 'art_knowledge_1',
+        scene: 'art_scene_1',
+        presentation: 'art_presentation_1',
+        quality: 'art_quality_1',
+      },
+      agentRunIds: {
+        question: 'agent_question_1',
+        knowledge: 'agent_knowledge_1',
+        scene: 'agent_scene_1',
+        presentation: 'agent_presentation_1',
+        quality: 'agent_quality_1',
+      },
+    },
     createdAt: '2026-08-15T00:00:00.000Z',
     updatedAt: '2026-08-15T00:01:00.000Z',
     runId: 'run_generation_1',

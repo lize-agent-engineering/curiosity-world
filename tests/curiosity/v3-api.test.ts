@@ -90,15 +90,9 @@ describe('V3 revision API', () => {
 describe('V3 regeneration API', () => {
   it('loads the base version and queues a full regeneration through its dedicated endpoint', async () => {
     const store = new MemoryCuriosityJobStore();
-    const scheduled: Array<() => Promise<void>> = [];
     const handler = createCuriosityRegenerationPostHandler({
       store,
       loadExperience: async () => snapshot,
-      resolveRoleModel: async () => ({
-        route: { providerId: 'test', modelId: 'test' },
-        complete: async () => '{}',
-      }),
-      schedule: (work) => scheduled.push(work),
       identityFactory: () => ({
         jobId: 'job_regeneration_v3',
         runId: 'run_regeneration_v3',
@@ -131,7 +125,7 @@ describe('V3 regeneration API', () => {
       { params: Promise.resolve({ experienceId: 'cur_moon_demo' }) },
     );
     expect(response.status).toBe(202);
-    expect(scheduled).toHaveLength(1);
+    expect((await store.read('job_regeneration_v3'))?.status).toBe('queued');
     await expect(store.read('job_regeneration_v3')).resolves.toMatchObject({
       input: {
         question: validV3Spec.question.original,

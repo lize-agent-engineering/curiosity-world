@@ -256,6 +256,45 @@ describe('first-release five-stage pipeline', () => {
     expect(result.qualityRetryCount).toBe(1);
   });
 
+  it('resumes from the last complete stage without invoking completed models again', async () => {
+    let checkpoint: CuriosityPipelineStageUpdate | undefined;
+    await expect(
+      runCuriosityAgentPipeline(
+        { question: '水洼里的水为什么慢慢不见了？', targetAge: 8 },
+        models(),
+        identities,
+        (update) => {
+          checkpoint = update;
+          if (update.stage === 'presentation') throw new Error('SIMULATED_WORKER_EXIT');
+        },
+      ),
+    ).rejects.toThrow(/SIMULATED_WORKER_EXIT/);
+
+    expect(checkpoint?.stage).toBe('presentation');
+    const completedModel = {
+      route: { providerId: 'test', modelId: 'must-not-run' },
+      complete: () => Promise.reject(new Error('COMPLETED_STAGE_RERAN')),
+    };
+    const qualityCalls: Array<{ prompt: string }> = [];
+    const resumed = await runCuriosityAgentPipeline(
+      { question: '水洼里的水为什么慢慢不见了？', targetAge: 8 },
+      models({
+        'curiosity.question-modeler': completedModel,
+        'curiosity.knowledge-designer': completedModel,
+        'curiosity.interaction-designer': completedModel,
+        'curiosity.presentation-designer': completedModel,
+        'curiosity.quality-reviewer': sequenceModel([qualityOutput('pass')], qualityCalls),
+      }),
+      identities,
+      undefined,
+      { artifacts: checkpoint!.artifacts, agentRuns: checkpoint!.agentRuns },
+    );
+
+    expect(qualityCalls).toHaveLength(1);
+    expect(resumed.artifacts).toHaveLength(5);
+    expect(resumed.specHash).toMatch(/^cw3-/);
+  });
+
   it('fast-fails after the second quality rejection', async () => {
     const sceneCalls: Array<{ prompt: string }> = [];
     const qualityCalls: Array<{ prompt: string }> = [];

@@ -2,11 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { buildSnapshotFromGenerationJobs } from '@/lib/curiosity/experience-store';
 import { parseCuriosityExperienceSnapshot } from '@/lib/curiosity/repository';
-import {
-  curiosityExperienceStore,
-  curiosityJobStore,
-  ensureCuriosityJobStoreRecovered,
-} from '@/lib/curiosity/server-store';
+import { curiosityExperienceStore, curiosityJobStore } from '@/lib/curiosity/server-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +11,6 @@ export async function GET(
   context: { params: Promise<{ experienceId: string }> },
 ) {
   const { experienceId } = await context.params;
-  await ensureCuriosityJobStoreRecovered();
   let snapshot = await curiosityExperienceStore.read(experienceId);
   if (!snapshot) {
     snapshot = buildSnapshotFromGenerationJobs(experienceId, await curiosityJobStore.list());

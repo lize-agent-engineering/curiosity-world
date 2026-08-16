@@ -60,6 +60,7 @@ const docker = run('docker', [
   '{{.State.Running}}',
   'curiosity-world-local',
 ]);
+const worker = run('docker', ['inspect', '--format', '{{.State.Running}}', 'curiosity-worker']);
 const publicUrl = environment.CURIOSITY_PUBLIC_URL?.replace(/\/$/, '');
 const publicHealthOk = publicUrl ? endpointHasStatus(`${publicUrl}/api/health`, 200) : false;
 const legacyRoutesBlocked = publicUrl
@@ -72,6 +73,7 @@ const result = assessCuriosityDeploymentReadiness({
   environment,
   gitClean: git.stdout.trim().length === 0,
   dockerRunning: docker.status === 0 && docker.stdout.trim() === 'true',
+  workerRunning: worker.status === 0 && worker.stdout.trim() === 'true',
   publicUrl,
   publicHealthOk,
   legacyRoutesBlocked,

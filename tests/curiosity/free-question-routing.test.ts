@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { createCuriosityGenerationPostHandler } from '@/lib/curiosity/api-handlers';
 import { MemoryCuriosityJobStore } from '@/lib/curiosity/jobs';
@@ -77,47 +77,27 @@ describe('first-release free-question routing', () => {
 });
 
 describe('first generation request contract', () => {
-  it('creates an initial job with only question and targetAge and resolves five generation roles', async () => {
+  it('creates an initial queued job with only question and targetAge', async () => {
     const store = new MemoryCuriosityJobStore();
-    const roles: string[] = [];
-    const schedule = vi.fn();
     const post = createCuriosityGenerationPostHandler({
       store,
-      resolveRoleModel: vi.fn(async (_request, _body, role) => {
-        roles.push(role);
-        return {
-          route: { providerId: 'test', modelId: 'unused' },
-          complete: async () => '{}',
-        };
-      }),
-      schedule,
       identityFactory,
     });
 
     const response = await post(request({ question: '毛毛虫为什么会变成蝴蝶？', targetAge: 8 }));
 
     expect(response.status).toBe(202);
-    expect(roles).toEqual([
-      'curiosity.question-modeler',
-      'curiosity.knowledge-designer',
-      'curiosity.interaction-designer',
-      'curiosity.presentation-designer',
-      'curiosity.quality-reviewer',
-    ]);
     expect((await store.read('job_free_question'))?.input).toEqual({
       question: '毛毛虫为什么会变成蝴蝶？',
       targetAge: 8,
     });
-    expect(schedule).toHaveBeenCalledOnce();
+    expect((await store.read('job_free_question'))?.status).toBe('queued');
   });
 
   it('accepts only question and targetAge', async () => {
     const store = new MemoryCuriosityJobStore();
-    const resolveRoleModel = vi.fn();
     const post = createCuriosityGenerationPostHandler({
       store,
-      resolveRoleModel,
-      schedule: vi.fn(),
       identityFactory,
     });
 
@@ -131,18 +111,13 @@ describe('first generation request contract', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ success: false, errorCode: 'INVALID_REQUEST' });
-    expect(resolveRoleModel).not.toHaveBeenCalled();
     expect(await store.list()).toHaveLength(0);
   });
 
   it('returns 422 NEEDS_CLARIFICATION without creating a job', async () => {
     const store = new MemoryCuriosityJobStore();
-    const resolveRoleModel = vi.fn();
-    const schedule = vi.fn();
     const post = createCuriosityGenerationPostHandler({
       store,
-      resolveRoleModel,
-      schedule,
       identityFactory,
     });
 
@@ -153,8 +128,6 @@ describe('first generation request contract', () => {
       success: false,
       errorCode: 'NEEDS_CLARIFICATION',
     });
-    expect(resolveRoleModel).not.toHaveBeenCalled();
-    expect(schedule).not.toHaveBeenCalled();
     expect(await store.list()).toHaveLength(0);
   });
 });

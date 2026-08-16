@@ -14,4 +14,6 @@
 2. 统一到 `CuriosityExperienceSpecV3`、单一事件词表与完整场景注册表，并迁移历史数据。
 3. 用带租约和 CAS 的独立 worker 替代 Web 进程后台任务，重建真实模型与浏览器准出。
 
+当前运行契约：Web 只创建和读取任务；`curiosity-worker` 是唯一可领取、续跑和回收过期任务的进程。任务更新必须携带 `expectedStoreVersion`，未过期租约不能被其他 worker 接管。
+
 每期必须独立通过格式、Lint、类型、单元测试、构建和端到端门禁。120 秒是硬产品目标，不能通过放宽指标准出。

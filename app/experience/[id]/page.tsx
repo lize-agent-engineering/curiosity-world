@@ -188,7 +188,7 @@ export default function CuriosityExperiencePage() {
       const created = await readApiJson(
         await fetch(`/api/curiosity/experiences/${experienceId}/regenerations`, {
           method: 'POST',
-          headers: getCuriosityApiHeaders('curiosity.interaction-designer'),
+          headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             baseVersionId: selected.id,
             targetAge: selected.spec.targetAge,

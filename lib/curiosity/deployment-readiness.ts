@@ -3,6 +3,7 @@ import { CURIOSITY_AGENT_ROLES } from './agent-contracts';
 export type CuriosityDeploymentIssue =
   | 'WORKTREE_DIRTY'
   | 'DOCKER_CONTAINER_NOT_RUNNING'
+  | 'WORKER_NOT_RUNNING'
   | 'PUBLIC_HTTPS_UNCONFIGURED'
   | 'PUBLIC_HEALTH_UNREACHABLE'
   | 'LEGACY_SURFACE_EXPOSED'
@@ -19,6 +20,7 @@ interface CuriosityDeploymentReadinessInput {
   environment: Readonly<Record<string, string | undefined>>;
   gitClean: boolean;
   dockerRunning: boolean;
+  workerRunning: boolean;
   publicUrl: string | undefined;
   publicHealthOk: boolean;
   legacyRoutesBlocked: boolean;
@@ -71,6 +73,7 @@ export function assessCuriosityDeploymentReadiness(input: CuriosityDeploymentRea
   const issues: CuriosityDeploymentIssue[] = [];
   if (!input.gitClean) issues.push('WORKTREE_DIRTY');
   if (!input.dockerRunning) issues.push('DOCKER_CONTAINER_NOT_RUNNING');
+  if (!input.workerRunning) issues.push('WORKER_NOT_RUNNING');
   if (!input.publicUrl?.startsWith('https://')) issues.push('PUBLIC_HTTPS_UNCONFIGURED');
   if (!input.publicHealthOk) issues.push('PUBLIC_HEALTH_UNREACHABLE');
   if (!input.legacyRoutesBlocked) issues.push('LEGACY_SURFACE_EXPOSED');

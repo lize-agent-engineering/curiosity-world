@@ -54,3 +54,18 @@ USER nextjs
 EXPOSE 3000
 
 CMD ["node", "server.js"]
+
+FROM base AS worker
+
+ENV NODE_ENV=production
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json tsconfig.json ./
+COPY lib ./lib
+COPY scripts ./scripts
+
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 --ingroup nodejs nextjs
+RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+USER nextjs
+
+CMD ["pnpm", "worker:curiosity"]

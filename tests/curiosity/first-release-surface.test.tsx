@@ -55,7 +55,7 @@ describe('first-release public surface', () => {
     expect(experiencePage).toContain('selectReviewedNarration');
   });
 
-  it('keeps the Next after scheduler and removes the V1/V2 compiler gate', () => {
+  it('keeps Web request handling queue-only and uses the V3 validator', () => {
     const route = readFileSync(
       resolve(process.cwd(), 'app/api/curiosity/generations/route.ts'),
       'utf8',
@@ -64,8 +64,10 @@ describe('first-release public surface', () => {
       resolve(process.cwd(), 'lib/curiosity/agent-pipeline.ts'),
       'utf8',
     );
-    expect(route).toContain("import { after } from 'next/server'");
-    expect(route).toContain('after(work)');
+    const worker = readFileSync(resolve(process.cwd(), 'scripts/curiosity-worker.ts'), 'utf8');
+    expect(route).not.toContain("from 'next/server'");
+    expect(route).not.toContain('after(');
+    expect(worker).toContain('runCuriosityWorkerOnce');
     expect(pipeline).toContain('validateCuriosityExperienceSpecV3');
     expect(pipeline).not.toContain('compileCuriosityExperience');
   });

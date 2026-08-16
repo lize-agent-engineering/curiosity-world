@@ -28,8 +28,6 @@ export type CuriosityDomainErrorCode =
   | 'AGE_OUT_OF_RANGE'
   | 'UNSAFE_CONTENT'
   | 'NEEDS_CLARIFICATION'
-  | 'UNSUPPORTED_QUESTION'
-  | 'AMBIGUOUS_KNOWLEDGE_FAMILY'
   | 'KNOWLEDGE_VIOLATION';
 
 export class CuriosityDomainError extends Error {

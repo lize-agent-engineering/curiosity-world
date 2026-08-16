@@ -11,6 +11,16 @@ services:
     volumes:
       - curiosity-world-data:/app/data
     restart: unless-stopped
+  curiosity-worker:
+    container_name: curiosity-worker
+    build:
+      context: .
+      target: worker
+    env_file:
+      - .env.local
+    volumes:
+      - curiosity-world-data:/app/data
+    restart: unless-stopped
 
 volumes:
   curiosity-world-data:

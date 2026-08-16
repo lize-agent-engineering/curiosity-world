@@ -168,6 +168,7 @@ export interface CuriosityAgentPipelineResult {
   spec: CuriosityExperienceSpecV3;
   specHash: string;
   qualityRetryCount: 0 | 1;
+  schemaRepairs: number;
 }
 
 export type CuriosityPipelineFailureCode =
@@ -213,6 +214,19 @@ function assertNoExecutableModelContent(value: unknown): void {
   if (Array.isArray(value)) return value.forEach(assertNoExecutableModelContent);
   if (value && typeof value === 'object')
     Object.values(value).forEach(assertNoExecutableModelContent);
+}
+
+function contentPolicy(question: string): string[] {
+  const policies = [
+    '危险、违法和成人内容必须拒绝，不得提供操作步骤。',
+    '时效性内容必须标注生成时间并说明信息可能变化。',
+    '争议问题必须区分可核查事实与观点。',
+    '不得伪造来源；家长视图必须说明内容未经联网核验。',
+  ];
+  if (/医疗|生病|疼|痛|药|心理|焦虑|抑郁|法律|违法|律师|法院/i.test(question)) {
+    policies.push('医疗、心理和法律问题只提供适龄通识，并明确建议向可信成人或专业人士求助。');
+  }
+  return policies;
 }
 
 const questionOutputBaseSchema = questionModelArtifactV1Schema.omit(envelopeKeys);
@@ -335,7 +349,13 @@ function buildExperienceSpec(input: {
     scene: input.scene.scene,
     narrationLibrary: input.presentation.narrationLibrary,
     discoveryPrompts: input.presentation.discoveryPrompts,
-    limitations: input.presentation.limitations,
+    limitations: [
+      ...input.presentation.limitations.slice(0, input.knowledge.timeSensitive ? 10 : 11),
+      '本内容由模型知识生成，未经联网核验。',
+      ...(input.knowledge.timeSensitive
+        ? [`生成时间：${input.question.createdAt.slice(0, 10)}；相关信息可能变化。`]
+        : []),
+    ],
     eventRequirements: [...CURIOSITY_EVENT_TYPES_V3],
   });
   getCuriositySceneEntry(spec.scene.type as CuriositySceneType).validate(
@@ -350,10 +370,13 @@ export async function runCuriosityAgentPipeline(
   models: CuriosityPipelineModels,
   identities: CuriosityPipelineIdentities,
   onStage?: (update: CuriosityPipelineStageUpdate) => void | Promise<void>,
+  resume?: { artifacts: CuriosityPipelineArtifact[]; agentRuns: CuriosityAgentRun[] },
 ): Promise<CuriosityAgentPipelineResult> {
   const route = classifyCuriosityRequest(input);
-  const artifacts: CuriosityPipelineArtifact[] = [];
-  const agentRuns: CuriosityAgentRun[] = [];
+  const safetyPolicy = contentPolicy(input.question);
+  const artifacts: CuriosityPipelineArtifact[] = structuredClone(resume?.artifacts ?? []);
+  const agentRuns: CuriosityAgentRun[] = structuredClone(resume?.agentRuns ?? []);
+  let schemaRepairs = 0;
   const notify = async (stage: CuriosityPipelineStage, artifactId: string) =>
     onStage?.({
       stage,
@@ -380,6 +403,7 @@ export async function runCuriosityAgentPipeline(
       let lastError: unknown;
       for (let attempt = 1; attempt <= MAX_MODEL_OUTPUT_ATTEMPTS; attempt += 1) {
         try {
+          if (attempt > 1) schemaRepairs += 1;
           const raw = await selectedModel.complete({
             system: `你是 ${parameters.role}。\n${renderCuriosityRoleSkill(parameters.role)}\n只返回严格 JSON，不得输出隐藏思维链。不得输出 HTML、CSS、JavaScript、函数或表达式。输出必须严格符合以下 JSON Schema：${JSON.stringify(z.toJSONSchema(parameters.schema))}`,
             prompt:
@@ -454,27 +478,33 @@ export async function runCuriosityAgentPipeline(
         ? z.array(z.literal(route.family)).length(1)
         : z.array(z.enum(['relative-motion', 'balance-support', 'light-path', 'open'])).max(3),
   });
-  const question = (await execute({
-    role: 'curiosity.question-modeler',
-    stage: 'question',
-    failureCode: 'QUESTION_MODEL_INVALID',
-    agentRunId: identities.agentRunIds.question,
-    artifactId: identities.artifactIds.question,
-    upstreamArtifactIds: [],
-    prompt: JSON.stringify({ input, route }),
-    schema: questionSchema,
-    build: (output) =>
-      questionModelArtifactV1Schema.parse({
-        ...output,
-        artifactId: identities.artifactIds.question,
-        runId: identities.runId,
-        agentRole: 'curiosity.question-modeler',
-        schemaVersion: '1.0',
-        createdAt: identities.createdAt,
-        upstreamArtifactIds: [],
-        knowledgePackVersion: route.kind === 'curated' ? '1.0.0' : 'generated-1',
-      }),
-  })) as QuestionModelArtifactV1;
+  const resumedQuestion = artifacts.find(
+    (artifact): artifact is QuestionModelArtifactV1 =>
+      artifact.agentRole === 'curiosity.question-modeler',
+  );
+  const question =
+    resumedQuestion ??
+    ((await execute({
+      role: 'curiosity.question-modeler',
+      stage: 'question',
+      failureCode: 'QUESTION_MODEL_INVALID',
+      agentRunId: identities.agentRunIds.question,
+      artifactId: identities.artifactIds.question,
+      upstreamArtifactIds: [],
+      prompt: JSON.stringify({ input, route, safetyPolicy }),
+      schema: questionSchema,
+      build: (output) =>
+        questionModelArtifactV1Schema.parse({
+          ...output,
+          artifactId: identities.artifactIds.question,
+          runId: identities.runId,
+          agentRole: 'curiosity.question-modeler',
+          schemaVersion: '1.0',
+          createdAt: identities.createdAt,
+          upstreamArtifactIds: [],
+          knowledgePackVersion: route.kind === 'curated' ? '1.0.0' : 'generated-1',
+        }),
+    })) as QuestionModelArtifactV1);
 
   const selectedPack =
     route.kind === 'curated'
@@ -489,46 +519,73 @@ export async function runCuriosityAgentPipeline(
       agentRuns,
     );
   }
-  const knowledge = (await execute({
-    role: 'curiosity.knowledge-designer',
-    stage: 'knowledge',
-    failureCode: 'KNOWLEDGE_DESIGN_INVALID',
-    agentRunId: identities.agentRunIds.knowledge,
-    artifactId: identities.artifactIds.knowledge,
-    upstreamArtifactIds: [question.artifactId],
-    prompt: JSON.stringify({
-      question,
-      route,
-      curatedKnowledgePack: selectedPack,
-      perspectiveDirective: input.perspectiveDirective,
-      preservedKnowledge: input.preservedKnowledge,
-    }),
-    schema: route.kind === 'open' ? openKnowledgeOutputSchema : commonKnowledgeOutputSchema,
-    build: (output) => {
-      const artifact = knowledgeDesignArtifactV1Schema.parse({
-        ...output,
-        ...(input.preservedCausalRelations
-          ? { causalRelations: input.preservedCausalRelations }
-          : {}),
-        artifactId: identities.artifactIds.knowledge,
-        runId: identities.runId,
-        agentRole: 'curiosity.knowledge-designer',
-        schemaVersion: '1.0',
-        createdAt: identities.createdAt,
-        upstreamArtifactIds: [question.artifactId],
-        knowledgePackVersion: selectedPack?.version ?? 'generated-1',
-        source: route.kind,
-        knowledgeFamily: route.kind === 'curated' ? route.family : 'open',
-        packId:
-          route.kind === 'curated' ? route.packId : `open.${identities.artifactIds.knowledge}`,
-      });
-      if (route.kind === 'curated') knowledgeRegistry.get(route.family).validateKnowledge(artifact);
-      return artifact;
-    },
-  })) as KnowledgeDesignArtifactV1;
+  const resumedKnowledge = artifacts.find(
+    (artifact): artifact is KnowledgeDesignArtifactV1 =>
+      artifact.agentRole === 'curiosity.knowledge-designer',
+  );
+  const knowledge =
+    resumedKnowledge ??
+    ((await execute({
+      role: 'curiosity.knowledge-designer',
+      stage: 'knowledge',
+      failureCode: 'KNOWLEDGE_DESIGN_INVALID',
+      agentRunId: identities.agentRunIds.knowledge,
+      artifactId: identities.artifactIds.knowledge,
+      upstreamArtifactIds: [question.artifactId],
+      prompt: JSON.stringify({
+        question,
+        route,
+        curatedKnowledgePack: selectedPack,
+        perspectiveDirective: input.perspectiveDirective,
+        preservedKnowledge: input.preservedKnowledge,
+        safetyPolicy,
+      }),
+      schema: route.kind === 'open' ? openKnowledgeOutputSchema : commonKnowledgeOutputSchema,
+      build: (output) => {
+        const artifact = knowledgeDesignArtifactV1Schema.parse({
+          ...output,
+          ...(input.preservedCausalRelations
+            ? { causalRelations: input.preservedCausalRelations }
+            : {}),
+          artifactId: identities.artifactIds.knowledge,
+          runId: identities.runId,
+          agentRole: 'curiosity.knowledge-designer',
+          schemaVersion: '1.0',
+          createdAt: identities.createdAt,
+          upstreamArtifactIds: [question.artifactId],
+          knowledgePackVersion: selectedPack?.version ?? 'generated-1',
+          source: route.kind,
+          knowledgeFamily: route.kind === 'curated' ? route.family : 'open',
+          packId:
+            route.kind === 'curated' ? route.packId : `open.${identities.artifactIds.knowledge}`,
+        });
+        if (route.kind === 'curated')
+          knowledgeRegistry.get(route.family).validateKnowledge(artifact);
+        return artifact;
+      },
+    })) as KnowledgeDesignArtifactV1);
 
   let rejectionFeedback: string[] = [];
-  for (let attempt = 0; attempt <= 1; attempt += 1) {
+  const priorQuality = artifacts.filter(
+    (artifact): artifact is QualityReviewArtifactV1 =>
+      artifact.agentRole === 'curiosity.quality-reviewer',
+  );
+  const lastQuality = priorQuality.at(-1);
+  if (lastQuality?.verdict === 'reject') {
+    rejectionFeedback = lastQuality.checks
+      .filter((check) => check.status === 'reject')
+      .flatMap((check) => check.findings);
+  }
+  if (priorQuality.length >= 2 && lastQuality?.verdict === 'reject') {
+    throw new CuriosityAgentPipelineError(
+      'QUALITY_REJECTED',
+      'curiosity.quality-reviewer',
+      `质量审查两次拒绝候选体验：${rejectionFeedback.join('；') || '未提供原因'}`,
+      artifacts,
+      agentRuns,
+    );
+  }
+  for (let attempt = Math.min(priorQuality.length, 1); attempt <= 1; attempt += 1) {
     const sceneArtifactId = suffix(identities.artifactIds.scene, attempt);
     const presentationArtifactId = suffix(identities.artifactIds.presentation, attempt);
     const qualityArtifactId = suffix(identities.artifactIds.quality, attempt);
@@ -536,79 +593,95 @@ export async function runCuriosityAgentPipeline(
       route.kind === 'curated'
         ? [route.family]
         : ['variable', 'relation', 'timeline', 'comparison', 'process', 'situation'];
-    const scene = (await execute({
-      role: 'curiosity.interaction-designer',
-      stage: 'scene',
-      failureCode: 'SCENE_DESIGN_INVALID',
-      agentRunId: suffix(identities.agentRunIds.scene, attempt),
-      artifactId: sceneArtifactId,
-      upstreamArtifactIds: [question.artifactId, knowledge.artifactId],
-      prompt: JSON.stringify({
-        question,
-        knowledge,
-        allowedSceneTypes,
-        modelCodePolicy: 'declarative-data-only',
-        rejectionFeedback,
-        perspectiveDirective: input.perspectiveDirective,
-      }),
-      schema: sceneOutputSchema,
-      build: (output) => {
-        if (!allowedSceneTypes.includes(output.scene.type)) {
-          throw new Error(`SCENE_TYPE_NOT_ALLOWED: ${output.scene.type}`);
-        }
-        getCuriositySceneEntry(output.scene.type as CuriositySceneType).validate(
-          output.scene,
-          input.targetAge,
-        );
-        return curiositySceneDesignArtifactSchema.parse({
-          ...output,
-          artifactId: sceneArtifactId,
-          runId: identities.runId,
-          agentRole: 'curiosity.interaction-designer',
-          schemaVersion: '3.0',
-          createdAt: identities.createdAt,
-          upstreamArtifactIds: [question.artifactId, knowledge.artifactId],
-          knowledgePackVersion: knowledge.knowledgePackVersion,
-        });
-      },
-    })) as CuriositySceneDesignArtifact;
-
-    const presentation = (await execute({
-      role: 'curiosity.presentation-designer',
-      stage: 'presentation',
-      failureCode: 'PRESENTATION_INVALID',
-      agentRunId: suffix(identities.agentRunIds.presentation, attempt),
-      artifactId: presentationArtifactId,
-      upstreamArtifactIds: [question.artifactId, knowledge.artifactId, scene.artifactId],
-      prompt: JSON.stringify({
-        question,
-        knowledge,
-        scene,
-        eventTypes: CURIOSITY_EVENT_TYPES_V3,
-        narrationPolicy: 'generate-complete-reviewed-library-now;runtime-generation-forbidden',
-        discoveryPromptLimit: 3,
-        everyDiscoveryPromptSkippable: true,
-        rejectionFeedback,
-        perspectiveDirective: input.perspectiveDirective,
-      }),
-      schema: presentationOutputSchema,
-      build: (output) =>
-        curiosityPresentationArtifactSchema.parse({
-          ...output,
-          artifactId: presentationArtifactId,
-          runId: identities.runId,
-          agentRole: 'curiosity.presentation-designer',
-          schemaVersion: '3.0',
-          createdAt: identities.createdAt,
-          upstreamArtifactIds: [question.artifactId, knowledge.artifactId, scene.artifactId],
-          knowledgePackVersion: knowledge.knowledgePackVersion,
-          sourceArtifactIds: {
-            questionModel: question.artifactId,
-            knowledgeDesign: knowledge.artifactId,
-            sceneDesign: scene.artifactId,
-          },
+    const resumedScene = artifacts.find(
+      (artifact): artifact is CuriositySceneDesignArtifact =>
+        artifact.agentRole === 'curiosity.interaction-designer' &&
+        artifact.artifactId === sceneArtifactId,
+    );
+    const scene =
+      resumedScene ??
+      ((await execute({
+        role: 'curiosity.interaction-designer',
+        stage: 'scene',
+        failureCode: 'SCENE_DESIGN_INVALID',
+        agentRunId: suffix(identities.agentRunIds.scene, attempt),
+        artifactId: sceneArtifactId,
+        upstreamArtifactIds: [question.artifactId, knowledge.artifactId],
+        prompt: JSON.stringify({
+          question,
+          knowledge,
+          allowedSceneTypes,
+          modelCodePolicy: 'declarative-data-only',
+          rejectionFeedback,
+          perspectiveDirective: input.perspectiveDirective,
+          safetyPolicy,
         }),
-    })) as CuriosityPresentationArtifact;
+        schema: sceneOutputSchema,
+        build: (output) => {
+          if (!allowedSceneTypes.includes(output.scene.type)) {
+            throw new Error(`SCENE_TYPE_NOT_ALLOWED: ${output.scene.type}`);
+          }
+          getCuriositySceneEntry(output.scene.type as CuriositySceneType).validate(
+            output.scene,
+            input.targetAge,
+          );
+          return curiositySceneDesignArtifactSchema.parse({
+            ...output,
+            artifactId: sceneArtifactId,
+            runId: identities.runId,
+            agentRole: 'curiosity.interaction-designer',
+            schemaVersion: '3.0',
+            createdAt: identities.createdAt,
+            upstreamArtifactIds: [question.artifactId, knowledge.artifactId],
+            knowledgePackVersion: knowledge.knowledgePackVersion,
+          });
+        },
+      })) as CuriositySceneDesignArtifact);
+
+    const resumedPresentation = artifacts.find(
+      (artifact): artifact is CuriosityPresentationArtifact =>
+        artifact.agentRole === 'curiosity.presentation-designer' &&
+        artifact.artifactId === presentationArtifactId,
+    );
+    const presentation =
+      resumedPresentation ??
+      ((await execute({
+        role: 'curiosity.presentation-designer',
+        stage: 'presentation',
+        failureCode: 'PRESENTATION_INVALID',
+        agentRunId: suffix(identities.agentRunIds.presentation, attempt),
+        artifactId: presentationArtifactId,
+        upstreamArtifactIds: [question.artifactId, knowledge.artifactId, scene.artifactId],
+        prompt: JSON.stringify({
+          question,
+          knowledge,
+          scene,
+          eventTypes: CURIOSITY_EVENT_TYPES_V3,
+          narrationPolicy: 'generate-complete-reviewed-library-now;runtime-generation-forbidden',
+          discoveryPromptLimit: 3,
+          everyDiscoveryPromptSkippable: true,
+          rejectionFeedback,
+          perspectiveDirective: input.perspectiveDirective,
+          safetyPolicy,
+        }),
+        schema: presentationOutputSchema,
+        build: (output) =>
+          curiosityPresentationArtifactSchema.parse({
+            ...output,
+            artifactId: presentationArtifactId,
+            runId: identities.runId,
+            agentRole: 'curiosity.presentation-designer',
+            schemaVersion: '3.0',
+            createdAt: identities.createdAt,
+            upstreamArtifactIds: [question.artifactId, knowledge.artifactId, scene.artifactId],
+            knowledgePackVersion: knowledge.knowledgePackVersion,
+            sourceArtifactIds: {
+              questionModel: question.artifactId,
+              knowledgeDesign: knowledge.artifactId,
+              sceneDesign: scene.artifactId,
+            },
+          }),
+      })) as CuriosityPresentationArtifact);
 
     let spec: CuriosityExperienceSpecV3;
     let specHash: string;
@@ -633,39 +706,47 @@ export async function runCuriosityAgentPipeline(
       );
     }
 
-    const quality = (await execute({
-      role: 'curiosity.quality-reviewer',
-      stage: 'quality',
-      failureCode: 'QUALITY_REVIEW_INVALID',
-      agentRunId: suffix(identities.agentRunIds.quality, attempt),
-      artifactId: qualityArtifactId,
-      upstreamArtifactIds: [knowledge.artifactId, scene.artifactId, presentation.artifactId],
-      prompt: JSON.stringify({
-        reviewContract: {
-          criteria: CURIOSITY_QUALITY_CRITERIA,
-          reviewAllKnowledge: true,
-          reviewCompleteScene: true,
-          reviewEveryNarration: true,
-          reviewEveryDiscoveryPrompt: true,
-        },
-        knowledge,
-        scene,
-        presentation,
-        spec,
-      }),
-      schema: qualityOutputSchema,
-      build: (output) =>
-        qualityReviewArtifactV1Schema.parse({
-          ...canonicalizeCuriosityQuality(output, 8),
-          artifactId: qualityArtifactId,
-          runId: identities.runId,
-          agentRole: 'curiosity.quality-reviewer',
-          schemaVersion: '1.0',
-          createdAt: identities.createdAt,
-          upstreamArtifactIds: [knowledge.artifactId, scene.artifactId, presentation.artifactId],
-          knowledgePackVersion: knowledge.knowledgePackVersion,
+    const resumedQuality = artifacts.find(
+      (artifact): artifact is QualityReviewArtifactV1 =>
+        artifact.agentRole === 'curiosity.quality-reviewer' &&
+        artifact.artifactId === qualityArtifactId,
+    );
+    const quality =
+      resumedQuality ??
+      ((await execute({
+        role: 'curiosity.quality-reviewer',
+        stage: 'quality',
+        failureCode: 'QUALITY_REVIEW_INVALID',
+        agentRunId: suffix(identities.agentRunIds.quality, attempt),
+        artifactId: qualityArtifactId,
+        upstreamArtifactIds: [knowledge.artifactId, scene.artifactId, presentation.artifactId],
+        prompt: JSON.stringify({
+          reviewContract: {
+            criteria: CURIOSITY_QUALITY_CRITERIA,
+            reviewAllKnowledge: true,
+            reviewCompleteScene: true,
+            reviewEveryNarration: true,
+            reviewEveryDiscoveryPrompt: true,
+          },
+          knowledge,
+          scene,
+          presentation,
+          spec,
+          safetyPolicy,
         }),
-    })) as QualityReviewArtifactV1;
+        schema: qualityOutputSchema,
+        build: (output) =>
+          qualityReviewArtifactV1Schema.parse({
+            ...canonicalizeCuriosityQuality(output, 8),
+            artifactId: qualityArtifactId,
+            runId: identities.runId,
+            agentRole: 'curiosity.quality-reviewer',
+            schemaVersion: '1.0',
+            createdAt: identities.createdAt,
+            upstreamArtifactIds: [knowledge.artifactId, scene.artifactId, presentation.artifactId],
+            knowledgePackVersion: knowledge.knowledgePackVersion,
+          }),
+      })) as QualityReviewArtifactV1);
 
     if (quality.verdict === 'pass') {
       return {
@@ -674,6 +755,7 @@ export async function runCuriosityAgentPipeline(
         spec,
         specHash,
         qualityRetryCount: attempt as 0 | 1,
+        schemaRepairs,
       };
     }
     rejectionFeedback = quality.checks
