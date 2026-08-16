@@ -14,6 +14,17 @@ function jsonModel(value: unknown): CuriosityTextModel {
 }
 
 function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextModel {
+  if (role === 'curiosity.team-assembler') {
+    return jsonModel({
+      teamName: '月光观察队',
+      rationale: '围绕远近比较和儿童动手观察，组建精简的科学探索团队。',
+      members: [
+        { id: 'member_lead', name: '小满队长', role: 'lead', persona: '温和地串起问题和任务，只给孩子下一步线索。', avatar: '🌙', color: '#4F7DA1', priority: 10, voiceStyle: '温暖清楚，语速舒缓' },
+        { id: 'member_science', name: '远近博士', role: 'science', persona: '专门核对远近物体与观察方向，守住科学解释边界。', avatar: '🔭', color: '#927236', priority: 8, voiceStyle: '沉稳准确，句子简短' },
+        { id: 'member_interaction', name: '动手阿桥', role: 'interaction', persona: '把抽象规律变成孩子可以移动、比较和验证的动作。', avatar: '🧩', color: '#3F8066', priority: 7, voiceStyle: '活泼鼓励，节奏明快' },
+      ],
+    });
+  }
   if (role === 'curiosity.question-modeler') {
     return jsonModel({
       coreQuestion: '为什么我们移动时，月亮看起来还在原来的方向？',
@@ -247,6 +258,7 @@ function curiosityModelTimeoutMs(): number {
 
 const CURIOSITY_ROLE_OUTPUT_TOKENS: Record<CuriosityAgentRole, number> = {
   'curiosity.question-modeler': 1536,
+  'curiosity.team-assembler': 3072,
   'curiosity.knowledge-designer': 3072,
   'curiosity.interaction-designer': 8192,
   'curiosity.story-designer': 8192,

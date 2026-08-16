@@ -11,7 +11,25 @@ import { CollaborationProgress } from '@/components/curiosity/collaboration-prog
 import { ChildTaskShell } from '@/components/curiosity/child-task-shell';
 import { CuriosityArchiveView } from '@/components/curiosity/archive-view';
 import { VoiceGuide } from '@/components/curiosity/voice-guide';
+import { ExplorationTeamStrip } from '@/components/curiosity/exploration-team-strip';
 import { createValidCuriositySpec } from './fixture';
+
+const generatedTeamArtifact = {
+  artifactId: 'art_team_ui',
+  runId: 'run_team_ui',
+  createdAt: '2026-08-16T00:00:00.000Z',
+  upstreamArtifactIds: ['art_question_ui', 'art_knowledge_ui', 'art_interaction_ui'],
+  knowledgePackVersion: '1.0.0',
+  agentRole: 'curiosity.team-assembler' as const,
+  schemaVersion: '1.0' as const,
+  teamName: '桥梁侦察队',
+  rationale: '根据桥梁承重场景的科学边界与操作任务动态组队。',
+  members: [
+    { id: 'member_lead', name: '稳稳队长', role: 'lead' as const, persona: '负责串起承重问题和每一步观察，不提前泄露答案。', avatar: '🌉', color: '#4F7DA1', priority: 10, voiceStyle: '温暖清楚，语速舒缓' },
+    { id: 'member_science', name: '支点博士', role: 'science' as const, persona: '专门核对支点与重心关系，守住桥梁实验的科学边界。', avatar: '⚖️', color: '#927236', priority: 8, voiceStyle: '沉稳准确，句子简短' },
+    { id: 'member_interaction', name: '桥墩阿搭', role: 'interaction' as const, persona: '把承重规律变成可以移动桥墩和比较结果的动作。', avatar: '🧱', color: '#3F8066', priority: 7, voiceStyle: '活泼鼓励，节奏明快' },
+  ],
+};
 
 describe('Curiosity parent creation view', () => {
   it('renders the question-first form and immediate generation state without legacy product language', () => {
@@ -87,6 +105,16 @@ describe('Curiosity parent creation view', () => {
 });
 
 describe('Curiosity structured collaboration', () => {
+  it('keeps the generated team visible during the child experience', () => {
+    const html = renderToStaticMarkup(
+      createElement(ExplorationTeamStrip, { team: generatedTeamArtifact }),
+    );
+    expect(html).toContain('本次专属探索小队');
+    expect(html).toContain('桥梁侦察队');
+    expect(html).toContain('稳稳队长');
+    expect(html).toContain('负责串起承重问题和每一步观察');
+  });
+
   it('shows story guidance as a real generation stage', () => {
     const html = renderToStaticMarkup(
       createElement(CollaborationProgress, {
@@ -104,7 +132,7 @@ describe('Curiosity structured collaboration', () => {
         },
       }),
     );
-    expect(html).toContain('故事引导');
+    expect(html).toContain('故事编排');
     expect(html).toContain('已完成故事阶段与引导设计');
     expect(html).not.toContain('agent-chat-bubble');
   });
@@ -122,40 +150,32 @@ describe('Curiosity structured collaboration', () => {
       }),
     );
 
-    expect(html).toContain('空间观察研究员');
+    expect(html).toContain('知识设计');
     expect(html).toContain('正在梳理科学原理、因果关系和常见误解');
     expect(html).toContain('仍在认真工作');
     expect(html).toContain('通常需要 2–4 分钟');
-    expect(html).toContain('已完成 1 / 6');
-    expect(html).toContain('问题侦探');
-    expect(html).toContain('移动实验设计师');
-    expect(html).toContain('故事引导员');
-    expect(html).toContain('运行工程师');
-    expect(html).toContain('体验质检员');
-    expect(html).toContain('把视差原理变成可以移动和比较的任务');
-    expect(html).toContain('前一位交付结果，下一位接着完成');
+    expect(html).toContain('已完成 1 / 7');
+    expect(html).toContain('问题建模');
+    expect(html).toContain('互动计划');
+    expect(html).toContain('动态组队');
+    expect(html).toContain('场景编译');
+    expect(html).toContain('质量审查');
+    expect(html).toContain('系统会为这个问题生成 3–5 位专属探索伙伴');
   });
 
-  it('assembles question-specific specialists instead of showing one fixed team', () => {
-    const bridge = renderToStaticMarkup(
+  it('reveals only the team returned by the current generation artifact', () => {
+    const html = renderToStaticMarkup(
       createElement(CollaborationProgress, {
-        question: '桥为什么不会倒？',
-        status: { step: 'knowledge_design', progress: 25, message: '正在组队', artifacts: [] },
-      }),
-    );
-    const shadow = renderToStaticMarkup(
-      createElement(CollaborationProgress, {
-        question: '影子为什么会变长？',
-        status: { step: 'knowledge_design', progress: 25, message: '正在组队', artifacts: [] },
+        status: { step: 'story_design', progress: 78, message: '小队已组建', artifacts: [generatedTeamArtifact] },
       }),
     );
 
-    expect(bridge).toContain('结构与承重研究员');
-    expect(bridge).toContain('桥梁实验设计师');
-    expect(bridge).not.toContain('光路观察研究员');
-    expect(shadow).toContain('光路观察研究员');
-    expect(shadow).toContain('影子实验设计师');
-    expect(shadow).not.toContain('结构与承重研究员');
+    expect(html).toContain('桥梁侦察队');
+    expect(html).toContain('稳稳队长');
+    expect(html).toContain('支点博士');
+    expect(html).toContain('桥墩阿搭');
+    expect(html).toContain('专门核对支点与重心关系');
+    expect(html).not.toContain('空间观察研究员');
   });
 
   it('renders verified stage conclusions instead of agent chat bubbles', () => {
@@ -171,7 +191,7 @@ describe('Curiosity structured collaboration', () => {
       }),
     );
     expect(html).toContain('核心问题');
-    expect(html).toContain('研究视差');
+    expect(html).toContain('知识边界');
     expect(html).not.toContain('agent-chat-bubble');
   });
 

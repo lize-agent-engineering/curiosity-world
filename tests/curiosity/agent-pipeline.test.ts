@@ -44,6 +44,18 @@ function knowledgeOutput() {
   };
 }
 
+function teamOutput() {
+  return {
+    teamName: '月光观察队',
+    rationale: '围绕本题的科学边界和互动任务动态组成探索团队。',
+    members: [
+      { id: 'member_lead', name: '小满队长', role: 'lead', persona: '温和地串起问题和任务，只给孩子下一步线索。', avatar: '🌙', color: '#4F7DA1', priority: 10, voiceStyle: '温暖清楚，语速舒缓' },
+      { id: 'member_science', name: '远近博士', role: 'science', persona: '专门核对远近物体与观察方向，守住科学解释边界。', avatar: '🔭', color: '#927236', priority: 8, voiceStyle: '沉稳准确，句子简短' },
+      { id: 'member_interaction', name: '动手阿桥', role: 'interaction', persona: '把抽象规律变成孩子可以移动、比较和验证的动作。', avatar: '🧩', color: '#3F8066', priority: 7, voiceStyle: '活泼鼓励，节奏明快' },
+    ],
+  };
+}
+
 function interactionOutput() {
   return {
     scenario: '夜晚散步时比较路灯、远山和月亮。',
@@ -161,6 +173,7 @@ function model(output: unknown, calls: string[] = []) {
 function models(overrides: Partial<CuriosityPipelineModels> = {}): CuriosityPipelineModels {
   return {
     'curiosity.question-modeler': model(questionOutput()),
+    'curiosity.team-assembler': model(teamOutput()),
     'curiosity.knowledge-designer': model(knowledgeOutput()),
     'curiosity.interaction-designer': model(interactionOutput()),
     'curiosity.story-designer': model(storyOutput()),
@@ -178,6 +191,7 @@ const identities = {
     question: 'art_question_1',
     knowledge: 'art_knowledge_1',
     interaction: 'art_interaction_1',
+    team: 'art_team_1',
     story: 'art_story_1',
     spec: 'art_spec_1',
     quality: 'art_quality_1',
@@ -186,6 +200,7 @@ const identities = {
     question: 'agent_run_question_1',
     knowledge: 'agent_run_knowledge_1',
     interaction: 'agent_run_interaction_1',
+    team: 'agent_run_team_1',
     story: 'agent_run_story_1',
     quality: 'agent_run_quality_1',
   },
@@ -500,6 +515,7 @@ describe('Curiosity five-ability generation pipeline', () => {
   it('passes only validated artifacts between roles and records every completed role', async () => {
     const knowledgeCalls: string[] = [];
     const interactionCalls: string[] = [];
+    const teamCalls: string[] = [];
     const storyCalls: string[] = [];
     const qualityCalls: string[] = [];
     const stages: string[] = [];
@@ -508,6 +524,7 @@ describe('Curiosity five-ability generation pipeline', () => {
       models({
         'curiosity.knowledge-designer': model(knowledgeOutput(), knowledgeCalls),
         'curiosity.interaction-designer': model(interactionOutput(), interactionCalls),
+        'curiosity.team-assembler': model(teamOutput(), teamCalls),
         'curiosity.story-designer': model(storyOutput(), storyCalls),
         'curiosity.quality-reviewer': model(qualityOutput(), qualityCalls),
       }),
@@ -521,6 +538,7 @@ describe('Curiosity five-ability generation pipeline', () => {
       'art_question_1',
       'art_knowledge_1',
       'art_interaction_1',
+      'art_team_1',
       'art_story_1',
       'art_spec_1',
       'art_quality_1',
@@ -529,6 +547,7 @@ describe('Curiosity five-ability generation pipeline', () => {
       'agent_run_question_1',
       'agent_run_knowledge_1',
       'agent_run_interaction_1',
+      'agent_run_team_1',
       'agent_run_story_1',
       'agent_run_quality_1',
     ]);
@@ -555,7 +574,11 @@ describe('Curiosity five-ability generation pipeline', () => {
     expect(interactionCalls[0]).toContain(
       '"requiredTaskKinds":["prediction","exploration","transfer","explanation"]',
     );
+    expect(teamCalls[0]).toContain('夜晚散步时比较路灯、远山和月亮');
+    expect(teamCalls[0]).toContain('"memberCount":"3-5"');
     expect(storyCalls[0]).toContain('art_interaction_1');
+    expect(storyCalls[0]).toContain('月光观察队');
+    expect(storyCalls[0]).toContain('远近博士');
     expect(qualityCalls[0]).toContain('"checksLength":7');
     expect(qualityCalls[0]).toContain('"exactlyOnePerCriterion":true');
     expect(qualityCalls[0]).toContain('"languagePolicy":"simplified-chinese-is-required"');
@@ -572,6 +595,7 @@ describe('Curiosity five-ability generation pipeline', () => {
       'question_modeling',
       'knowledge_design',
       'interaction_design',
+      'team_assembly',
       'story_design',
       'deterministic_compile',
       'quality_review',

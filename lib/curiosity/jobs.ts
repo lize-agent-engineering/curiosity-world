@@ -18,6 +18,7 @@ export type CuriosityGenerationStep =
   | 'question_modeling'
   | 'knowledge_design'
   | 'interaction_design'
+  | 'team_assembly'
   | 'story_design'
   | 'deterministic_compile'
   | 'quality_review'
@@ -172,8 +173,9 @@ export async function runCuriosityGenerationJob(
       question_modeling: { progress: 25, message: '已确认核心问题与安全范围' },
       knowledge_design: { progress: 45, message: '已完成知识目标与误解边界设计' },
       interaction_design: { progress: 65, message: '已完成变量、任务与反馈设计' },
-      story_design: { progress: 74, message: '已完成故事阶段与引导设计' },
-      deterministic_compile: { progress: 82, message: '确定性互动应用已编译' },
+      team_assembly: { progress: 72, message: '本次探索小队已经组建完成' },
+      story_design: { progress: 78, message: '已完成故事阶段与引导设计' },
+      deterministic_compile: { progress: 82, message: '场景已编译，正在进行最终质量检查' },
       quality_review: { progress: 92, message: '质量检查已完成' },
     };
     const candidate = await runCuriosityAgentPipeline(input, models, identity, async (update) => {

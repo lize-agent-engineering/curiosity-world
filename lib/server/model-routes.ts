@@ -101,6 +101,7 @@ function parseThinking(key: string, raw: unknown): ThinkingConfig | undefined {
  */
 export const LLM_STAGES = [
   'curiosity.question-modeler',
+  'curiosity.team-assembler',
   'curiosity.knowledge-designer',
   'curiosity.interaction-designer',
   'curiosity.story-designer',

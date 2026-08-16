@@ -10,6 +10,8 @@ import {
   knowledgeDesignArtifactV1Schema,
   qualityReviewArtifactV1Schema,
   questionModelArtifactV1Schema,
+  teamAssemblyArtifactV1Schema,
+  teamAssemblyOutputSchema,
   revisionImpactArtifactV1Schema,
   storyDesignArtifactV1Schema,
   storyStageSchema,
@@ -21,6 +23,7 @@ import {
   type KnowledgeDesignArtifactV1,
   type QualityReviewArtifactV1,
   type QuestionModelArtifactV1,
+  type TeamAssemblyArtifactV1,
   type RevisionImpactArtifactV1,
   type StoryDesignArtifactV1,
 } from './agent-contracts';
@@ -69,6 +72,7 @@ export interface CuriosityPipelineIdentities {
   createdAt: string;
   artifactIds: {
     question: string;
+    team: string;
     knowledge: string;
     interaction: string;
     story: string;
@@ -77,6 +81,7 @@ export interface CuriosityPipelineIdentities {
   };
   agentRunIds: {
     question: string;
+    team: string;
     knowledge: string;
     interaction: string;
     story: string;
@@ -86,6 +91,7 @@ export interface CuriosityPipelineIdentities {
 
 export type CuriosityPipelineArtifact =
   | QuestionModelArtifactV1
+  | TeamAssemblyArtifactV1
   | KnowledgeDesignArtifactV1
   | InteractionDesignArtifactV1
   | StoryDesignArtifactV1
@@ -96,6 +102,7 @@ export type CuriosityPipelineArtifact =
 
 export const curiosityPipelineArtifactSchema = z.union([
   questionModelArtifactV1Schema,
+  teamAssemblyArtifactV1Schema,
   knowledgeDesignArtifactV1Schema,
   interactionDesignArtifactV1Schema,
   storyDesignArtifactV1Schema,
@@ -109,6 +116,7 @@ export type CuriosityPipelineStage =
   | 'question_modeling'
   | 'knowledge_design'
   | 'interaction_design'
+  | 'team_assembly'
   | 'story_design'
   | 'deterministic_compile'
   | 'quality_review';
@@ -129,6 +137,7 @@ export interface CuriosityAgentPipelineResult {
 
 export type CuriosityPipelineFailureCode =
   | 'QUESTION_MODEL_INVALID'
+  | 'TEAM_ASSEMBLY_INVALID'
   | 'KNOWLEDGE_DESIGN_INVALID'
   | 'INTERACTION_DESIGN_INVALID'
   | 'STORY_DESIGN_INVALID'
@@ -161,6 +170,7 @@ const envelopeKeys = {
 } as const;
 
 const questionOutputSchema = questionModelArtifactV1Schema.omit(envelopeKeys);
+const teamOutputSchema = teamAssemblyOutputSchema;
 const questionOutputSchemaForMapping = (
   family: (typeof CURIOSITY_KNOWLEDGE_FAMILIES)[number],
   age: number,
@@ -823,17 +833,57 @@ export async function runCuriosityAgentPipeline(
       }),
   })) as InteractionDesignArtifactV1;
 
+  const team = (await execute({
+    role: 'curiosity.team-assembler',
+    stage: 'team_assembly',
+    failureCode: 'TEAM_ASSEMBLY_INVALID',
+    agentRunId: identities.agentRunIds.team,
+    artifactId: identities.artifactIds.team,
+    upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId],
+    prompt: JSON.stringify({
+      task: '根据本次问题、知识边界和场景计划组建专属探索团队，不得复用固定角色名单。',
+      questionArtifact: question,
+      knowledgeArtifact: knowledge,
+      sceneOutline: {
+        scenario: interaction.scenario,
+        variables: interaction.variables,
+        taskSequence: interaction.taskSequence,
+      },
+      constraints: {
+        memberCount: '3-5',
+        exactlyOneLead: true,
+        roles: ['lead', 'science', 'interaction', 'story', 'review'],
+        childFacingLanguage: '简体中文，角色姓名和 persona 必须与本题有关且适合儿童。',
+        distinctColors: true,
+        personaUsage: '后续故事与引导会读取 persona，必须描述具体职责、性格和表达方式。',
+      },
+    }),
+    schema: teamOutputSchema,
+    build: (output) =>
+      teamAssemblyArtifactV1Schema.parse({
+        ...output,
+        artifactId: identities.artifactIds.team,
+        runId: identities.runId,
+        agentRole: 'curiosity.team-assembler',
+        schemaVersion: '1.0',
+        createdAt: identities.createdAt,
+        upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId],
+        knowledgePackVersion: selectedPack.version,
+      }),
+  })) as TeamAssemblyArtifactV1;
+
   const story = (await execute({
     role: 'curiosity.story-designer',
     stage: 'story_design',
     failureCode: 'STORY_DESIGN_INVALID',
     agentRunId: identities.agentRunIds.story,
     artifactId: identities.artifactIds.story,
-    upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId],
+    upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId, team.artifactId],
     prompt: JSON.stringify({
       questionArtifact: question,
       knowledgeArtifact: knowledge,
       interactionArtifact: interaction,
+      explorationTeam: team,
       age: input.age,
       requiredStageKinds: interaction.taskSequence,
       perspectiveDirective: input.perspectiveDirective,
@@ -854,7 +904,7 @@ export async function runCuriosityAgentPipeline(
         agentRole: 'curiosity.story-designer',
         schemaVersion: '1.0',
         createdAt: identities.createdAt,
-        upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId],
+        upstreamArtifactIds: [question.artifactId, knowledge.artifactId, interaction.artifactId, team.artifactId],
         knowledgePackVersion: selectedPack.version,
         sourceArtifactIds: {
           questionModel: question.artifactId,
@@ -974,6 +1024,7 @@ export async function runCuriosityAgentPipeline(
       question,
       knowledge,
       interaction,
+      team,
       story,
       spec,
     }),

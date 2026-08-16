@@ -41,6 +41,20 @@ function validPipelineModel(
         }),
     };
   }
+  if (role === 'curiosity.team-assembler') {
+    return {
+      route,
+      complete: async () => JSON.stringify({
+        teamName: '月光观察队',
+        rationale: '围绕本题的科学边界和互动任务动态组成探索团队。',
+        members: [
+          { id: 'member_lead', name: '小满队长', role: 'lead', persona: '温和地串起问题和任务，只给孩子下一步线索。', avatar: '🌙', color: '#4F7DA1', priority: 10, voiceStyle: '温暖清楚，语速舒缓' },
+          { id: 'member_science', name: '远近博士', role: 'science', persona: '专门核对远近物体与观察方向，守住科学解释边界。', avatar: '🔭', color: '#927236', priority: 8, voiceStyle: '沉稳准确，句子简短' },
+          { id: 'member_interaction', name: '动手阿桥', role: 'interaction', persona: '把抽象规律变成孩子可以移动、比较和验证的动作。', avatar: '🧩', color: '#3F8066', priority: 7, voiceStyle: '活泼鼓励，节奏明快' },
+        ],
+      }),
+    };
+  }
   if (role === 'curiosity.knowledge-designer') {
     const output = {
       knowledgeFamily: 'relative-motion',
@@ -201,6 +215,7 @@ function generationIdentity(jobId: string) {
       question: `art_question_${jobId}`,
       knowledge: `art_knowledge_${jobId}`,
       interaction: `art_interaction_${jobId}`,
+      team: `art_team_${jobId}`,
       story: `art_story_${jobId}`,
       spec: `art_spec_${jobId}`,
       quality: `art_quality_${jobId}`,
@@ -209,6 +224,7 @@ function generationIdentity(jobId: string) {
       question: `agent_run_question_${jobId}`,
       knowledge: `agent_run_knowledge_${jobId}`,
       interaction: `agent_run_interaction_${jobId}`,
+      team: `agent_run_team_${jobId}`,
       story: `agent_run_story_${jobId}`,
       quality: `agent_run_quality_${jobId}`,
     },
@@ -296,6 +312,7 @@ describe('Curiosity generation API handlers', () => {
         'question_modeling',
         'knowledge_design',
         'interaction_design',
+        'team_assembly',
         'story_design',
         'deterministic_compile',
         'quality_review',
@@ -311,8 +328,8 @@ describe('Curiosity generation API handlers', () => {
         experienceSpec: { experienceId: 'cur_job_1', schemaVersion: '2.0' },
       },
     });
-    expect(completed.artifacts).toHaveLength(6);
-    expect(completed.agentRuns).toHaveLength(5);
+    expect(completed.artifacts).toHaveLength(7);
+    expect(completed.agentRuns).toHaveLength(6);
   });
 
   it('rejects unsupported input before resolving a model or creating a job', async () => {

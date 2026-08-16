@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { CuriosityParentReview } from '@/components/curiosity/parent-review';
 import { CuriosityRuntimeFrame } from '@/components/curiosity/runtime-frame';
 import { VoiceGuide } from '@/components/curiosity/voice-guide';
+import { ExplorationTeamStrip } from '@/components/curiosity/exploration-team-strip';
 import { Button } from '@/components/ui/button';
 import {
   getCuriosityApiHeaders,
@@ -21,6 +22,7 @@ import {
   knowledgeDesignArtifactV1Schema,
   revisionImpactArtifactV1Schema,
   storyDesignArtifactV1Schema,
+  teamAssemblyArtifactV1Schema,
   type ChildVoiceEventV1,
   type GuidanceTurnResponseV1,
   type RevisionImpactArtifactV1,
@@ -113,6 +115,12 @@ export default function CuriosityExperiencePage() {
       (candidate) => candidate.agentRole === 'curiosity.story-designer',
     );
     return artifact ? storyDesignArtifactV1Schema.parse(artifact) : null;
+  }, [selected]);
+  const explorationTeam = useMemo(() => {
+    const artifact = selected?.artifacts.find(
+      (candidate) => candidate.agentRole === 'curiosity.team-assembler',
+    );
+    return artifact ? teamAssemblyArtifactV1Schema.parse(artifact) : null;
   }, [selected]);
 
   useEffect(() => {
@@ -523,6 +531,7 @@ export default function CuriosityExperiencePage() {
         )}
         {mode === 'child' ? (
           <div className="min-h-[calc(100vh-110px)]">
+            {explorationTeam && <ExplorationTeamStrip team={explorationTeam} />}
             {story &&
               !pendingCandidateId &&
               selected.id === aggregate.experience.activeVersionId && (

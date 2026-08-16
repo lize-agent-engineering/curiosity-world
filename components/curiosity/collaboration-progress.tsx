@@ -8,7 +8,7 @@ import type {
   CuriosityPipelineStage,
 } from '@/lib/curiosity/agent-pipeline';
 
-const baseStages: Array<{
+const stages: Array<{
   id: CuriosityPipelineStage;
   role: string;
   label: string;
@@ -20,7 +20,7 @@ const baseStages: Array<{
 }> = [
   {
     id: 'question_modeling',
-    role: '问题侦探',
+    role: '问题建模',
     label: '核心问题',
     conclusion: '确认问题、安全范围和知识方向',
     doing: '正在理解孩子真正好奇的核心问题',
@@ -30,7 +30,7 @@ const baseStages: Array<{
   },
   {
     id: 'knowledge_design',
-    role: '知识研究员',
+    role: '知识设计',
     label: '知识边界',
     conclusion: '确定目标、因果关系和常见误解',
     doing: '正在梳理科学原理、因果关系和常见误解',
@@ -40,7 +40,7 @@ const baseStages: Array<{
   },
   {
     id: 'interaction_design',
-    role: '互动设计师',
+    role: '互动计划',
     label: '设计玩法',
     conclusion: '确定变量、任务和反馈',
     doing: '正在把知识变成孩子可以亲手尝试的任务',
@@ -49,8 +49,18 @@ const baseStages: Array<{
     color: '#3f8066',
   },
   {
+    id: 'team_assembly',
+    role: '动态组队',
+    label: '选择伙伴',
+    conclusion: '根据本题生成三至五名专属成员',
+    doing: '正在根据问题、知识边界和场景计划组建专属小队',
+    intro: '先分析本题需要哪些能力，再邀请适合的探索伙伴。',
+    initials: '组',
+    color: '#b46f3c',
+  },
+  {
     id: 'story_design',
-    role: '故事引导员',
+    role: '故事编排',
     label: '组织引导',
     conclusion: '组织连续阶段、旁白和提示层级',
     doing: '正在组织旁白、提问和连续探索阶段',
@@ -60,7 +70,7 @@ const baseStages: Array<{
   },
   {
     id: 'deterministic_compile',
-    role: '运行工程师',
+    role: '场景编译',
     label: '搭建场景',
     conclusion: '编译受限互动并检查事件协议',
     doing: '正在搭建互动场景并检查每个操作是否可运行',
@@ -70,7 +80,7 @@ const baseStages: Array<{
   },
   {
     id: 'quality_review',
-    role: '体验质检员',
+    role: '质量审查',
     label: '最后检查',
     conclusion: '逐项检查年龄、知识和迁移任务',
     doing: '正在检查年龄适配、知识准确性和探索完整性',
@@ -81,7 +91,6 @@ const baseStages: Array<{
 ];
 
 interface CollaborationProgressProps {
-  question?: string;
   status: {
     step: string;
     progress: number;
@@ -97,50 +106,16 @@ function artifactConclusion(artifact: CuriosityPipelineArtifact | undefined): st
   if ('objectives' in artifact) return `${artifact.packId} · ${artifact.objectives[0]}`;
   if ('taskSequence' in artifact)
     return `${artifact.variables.length} 个变量 · ${artifact.taskSequence.length} 个任务`;
+  if ('members' in artifact) return `${artifact.teamName} · ${artifact.members.length} 位成员`;
   if ('stages' in artifact) return `${artifact.stages.length} 个连续探索阶段`;
   if ('verdict' in artifact) return artifact.verdict === 'pass' ? '全部检查通过' : '检查拒绝';
   return undefined;
 }
 
-function assembleStages(question: string, artifacts: CuriosityPipelineArtifact[]) {
-  const serialized = JSON.stringify(artifacts);
-  const family = /balance-support|桥|承重|支点|重心/.test(`${serialized}${question}`)
-    ? 'balance-support'
-    : /light-path|影子|手电筒|光源/.test(`${serialized}${question}`)
-      ? 'light-path'
-      : 'relative-motion';
-  const specialist =
-    family === 'balance-support'
-      ? {
-          knowledge: ['结构与承重研究员', '研究支撑', '梳理重心、支点与承重之间可观察的关系。', '承'],
-          interaction: ['桥梁实验设计师', '设计承重实验', '把桥墩位置和载荷变成能亲手测试的变量。', '桥'],
-        }
-      : family === 'light-path'
-        ? {
-            knowledge: ['光路观察研究员', '研究光影', '梳理光源、遮挡物与影子变化的关系。', '光'],
-            interaction: ['影子实验设计师', '设计光影实验', '把光源位置和影子长度变成能亲手比较的任务。', '影'],
-          }
-        : {
-            knowledge: ['空间观察研究员', '研究视差', '梳理远近物体在移动观察中的视角变化。', '空'],
-            interaction: ['移动实验设计师', '设计观察', '把视差原理变成可以移动和比较的任务。', '移'],
-          };
-  return baseStages.map((stage) => {
-    const replacement =
-      stage.id === 'knowledge_design'
-        ? specialist.knowledge
-        : stage.id === 'interaction_design'
-          ? specialist.interaction
-          : null;
-    return replacement
-      ? { ...stage, role: replacement[0], label: replacement[1], intro: replacement[2], initials: replacement[3] }
-      : stage;
-  });
-}
-
-export function CollaborationProgress({ status, question = '' }: CollaborationProgressProps) {
-  const stages = assembleStages(question, status.artifacts ?? []);
+export function CollaborationProgress({ status }: CollaborationProgressProps) {
   const completed = new Set(status.completedStages ?? []);
   const artifacts = status.artifacts ?? [];
+  const team = artifacts.find((artifact) => artifact.agentRole === 'curiosity.team-assembler');
   const activeStage =
     stages.find((stage) => stage.id === status.step) ??
     stages.find((stage) => !completed.has(stage.id)) ??
@@ -154,7 +129,7 @@ export function CollaborationProgress({ status, question = '' }: CollaborationPr
       <div className="border-b border-[#d8cda4] bg-[#173d5a] px-5 py-5 text-white">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold tracking-[.14em] text-[#ffe08a]">探索小队正在协作</p>
+            <p className="text-xs font-bold tracking-[.14em] text-[#ffe08a]">正在准备这次探索</p>
             <div className="mt-2 flex items-center gap-2">
               <LoaderCircle className="size-5 shrink-0 animate-spin text-[#ffe08a] motion-reduce:animate-none" />
               <p className="text-lg font-black">{activeStage.role}</p>
@@ -182,10 +157,56 @@ export function CollaborationProgress({ status, question = '' }: CollaborationPr
           <span>通常需要 2–4 分钟，请保持页面开启</span>
         </div>
       </div>
+      {team && 'members' in team ? (
+        <div className="border-b border-[#d8cda4] px-5 pb-5 pt-4">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <p className="text-xs font-black tracking-[.14em] text-[#856c31]">本次专属探索小队</p>
+              <h3 className="mt-1 text-lg font-black text-[#253d50]">{team.teamName}</h3>
+            </div>
+            <p className="max-w-xl text-xs leading-5 text-[#657381]">{team.rationale}</p>
+          </div>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {team.members.map((member, index) => (
+              <motion.li
+                key={member.id}
+                className="relative overflow-hidden rounded-2xl border bg-white p-4 shadow-[0_8px_22px_rgba(52,48,34,.09)]"
+                style={{ borderColor: `${member.color}66` }}
+                initial={{ opacity: 0, rotateY: 90, y: 8 }}
+                animate={{ opacity: 1, rotateY: 0, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.22, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className="grid size-11 shrink-0 place-items-center rounded-full text-xl"
+                    style={{ backgroundColor: `${member.color}18`, color: member.color }}
+                    aria-hidden="true"
+                  >
+                    {member.avatar}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black" style={{ color: member.color }}>
+                      {member.name}
+                    </p>
+                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[.12em] text-[#73808a]">
+                      {member.role}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-[#536675]">{member.persona}</p>
+              </motion.li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="border-b border-[#d8cda4] px-5 py-4 text-sm font-semibold text-[#536675]">
+          场景计划确认后，系统会为这个问题生成 3–5 位专属探索伙伴。
+        </p>
+      )}
       <div className="flex flex-wrap items-end justify-between gap-2 px-5 pt-4">
         <div>
-          <p className="text-xs font-black tracking-[.14em] text-[#856c31]">今晚的探索小队</p>
-          <p className="mt-1 text-sm font-bold text-[#314657]">前一位交付结果，下一位接着完成</p>
+          <p className="text-xs font-black tracking-[.14em] text-[#856c31]">生成与验收进度</p>
+          <p className="mt-1 text-sm font-bold text-[#314657]">每一步都有结构化产物，最后还要通过运行检查</p>
         </div>
         <p className="text-xs text-[#657381]">{status.message}</p>
       </div>

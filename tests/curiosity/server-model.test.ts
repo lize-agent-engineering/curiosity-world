@@ -45,6 +45,7 @@ describe('explicit Curiosity test model', () => {
     vi.stubEnv('NODE_ENV', 'test');
     const roles = [
       'curiosity.question-modeler',
+      'curiosity.team-assembler',
       'curiosity.knowledge-designer',
       'curiosity.interaction-designer',
       'curiosity.story-designer',
@@ -68,6 +69,7 @@ describe('explicit Curiosity test model', () => {
           question: 'art_test_question',
           knowledge: 'art_test_knowledge',
           interaction: 'art_test_interaction',
+          team: 'art_test_team',
           story: 'art_test_story',
           spec: 'art_test_spec',
           quality: 'art_test_quality',
@@ -76,6 +78,7 @@ describe('explicit Curiosity test model', () => {
           question: 'agent_run_test_question',
           knowledge: 'agent_run_test_knowledge',
           interaction: 'agent_run_test_interaction',
+          team: 'agent_run_test_team',
           story: 'agent_run_test_story',
           quality: 'agent_run_test_quality',
         },
@@ -83,7 +86,7 @@ describe('explicit Curiosity test model', () => {
     );
 
     expect(result.spec.schemaVersion).toBe('2.0');
-    expect(result.artifacts).toHaveLength(6);
+    expect(result.artifacts).toHaveLength(7);
   });
 
   it('translates only recognized test revision intents into allow-listed operations', async () => {

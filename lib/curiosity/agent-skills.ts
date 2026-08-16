@@ -10,6 +10,14 @@ export interface CuriosityRoleSkill {
 }
 
 const SKILLS: Record<CuriosityAgentRole, CuriosityRoleSkill> = {
+  'curiosity.team-assembler': {
+    name: '动态探索组队',
+    version: '1.0.0',
+    workflow: ['读取本题场景计划', '决定三至五名互补成员', '生成可注入后续生成的角色人格'],
+    inputContract: '只读取结构化问题、知识边界与互动场景计划。',
+    outputContract: '只输出符合 Schema 的专属团队 JSON。',
+    refusalRules: ['不得复用固定角色名单。', '必须且只能有一名主引导者。'],
+  },
   'curiosity.question-modeler': {
     name: '儿童问题澄清',
     version: '1.0.0',

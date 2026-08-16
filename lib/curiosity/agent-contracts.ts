@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const CURIOSITY_AGENT_ROLES = [
   'curiosity.question-modeler',
+  'curiosity.team-assembler',
   'curiosity.knowledge-designer',
   'curiosity.interaction-designer',
   'curiosity.story-designer',
@@ -71,6 +72,51 @@ export const questionModelArtifactV1Schema = z.strictObject({
   knowledgeFamilyCandidates: z.array(curiosityKnowledgeFamilySchema).max(3),
   clarifications: z.array(shortTextSchema).max(3),
 });
+
+const generatedTeamMemberSchema = z.strictObject({
+  id: identifierSchema,
+  name: z.string().trim().min(2).max(24),
+  role: z.enum(['lead', 'science', 'interaction', 'story', 'review']),
+  persona: z.string().trim().min(12).max(180),
+  avatar: z.string().trim().min(1).max(16),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  priority: z.number().int().min(1).max(10),
+  voiceStyle: z.string().trim().min(4).max(80),
+});
+
+const teamAssemblyShape = {
+  teamName: z.string().trim().min(2).max(32),
+  rationale: z.string().trim().min(8).max(180),
+  members: z.array(generatedTeamMemberSchema).min(3).max(5),
+};
+
+function validateTeamAssembly(
+  team: { members: Array<{ id: string; role: string; color: string }> },
+  context: z.RefinementCtx,
+) {
+  if (team.members.filter((member) => member.role === 'lead').length !== 1) {
+    context.addIssue({ code: 'custom', path: ['members'], message: 'team must contain exactly one lead' });
+  }
+  if (new Set(team.members.map((member) => member.id)).size !== team.members.length) {
+    context.addIssue({ code: 'custom', path: ['members'], message: 'team member ids must be unique' });
+  }
+  if (new Set(team.members.map((member) => member.color)).size !== team.members.length) {
+    context.addIssue({ code: 'custom', path: ['members'], message: 'team member colors must be unique' });
+  }
+}
+
+export const teamAssemblyOutputSchema = z
+  .strictObject(teamAssemblyShape)
+  .superRefine(validateTeamAssembly);
+
+export const teamAssemblyArtifactV1Schema = z
+  .strictObject({
+    ...artifactEnvelopeShape,
+    agentRole: z.literal('curiosity.team-assembler'),
+    schemaVersion: z.literal('1.0'),
+    ...teamAssemblyShape,
+  })
+  .superRefine(validateTeamAssembly);
 
 const causalRelationSchema = z.strictObject({
   cause: shortTextSchema,
@@ -508,6 +554,7 @@ export type CuriosityAgentRole = z.infer<typeof curiosityAgentRoleSchema>;
 export type CuriosityKnowledgeFamily = z.infer<typeof curiosityKnowledgeFamilySchema>;
 export type CuriosityPrimitive = z.infer<typeof curiosityPrimitiveSchema>;
 export type QuestionModelArtifactV1 = z.infer<typeof questionModelArtifactV1Schema>;
+export type TeamAssemblyArtifactV1 = z.infer<typeof teamAssemblyArtifactV1Schema>;
 export type KnowledgeDesignArtifactV1 = z.infer<typeof knowledgeDesignArtifactV1Schema>;
 export type InteractionDesignArtifactV1 = z.infer<typeof interactionDesignArtifactV1Schema>;
 export type StoryDesignArtifactV1 = z.infer<typeof storyDesignArtifactV1Schema>;

@@ -83,6 +83,7 @@ type RoleModelResolver<TBody> = (
 
 const INITIAL_GENERATION_ROLES = [
   'curiosity.question-modeler',
+  'curiosity.team-assembler',
   'curiosity.knowledge-designer',
   'curiosity.interaction-designer',
   'curiosity.story-designer',
