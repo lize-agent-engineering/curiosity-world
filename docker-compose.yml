@@ -1,0 +1,16 @@
+services:
+  curiosity-world:
+    build:
+      context: .
+      args:
+        - ALLOWED_FRAME_ANCESTORS=${ALLOWED_FRAME_ANCESTORS:-}
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env.local
+    volumes:
+      - curiosity-world-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  curiosity-world-data:

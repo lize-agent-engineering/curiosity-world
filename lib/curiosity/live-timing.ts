@@ -1,0 +1,6 @@
+export const CURIOSITY_GENERATION_POLL_INTERVAL_MS = 500;
+export const CURIOSITY_GENERATION_TIMEOUT_MS = 360_000;
+
+export function curiosityGenerationPollLimit(): number {
+  return Math.ceil(CURIOSITY_GENERATION_TIMEOUT_MS / CURIOSITY_GENERATION_POLL_INTERVAL_MS);
+}

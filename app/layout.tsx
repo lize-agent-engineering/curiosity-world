@@ -1,0 +1,45 @@
+import type { Metadata } from 'next';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
+import './globals.css';
+import { Toaster } from '@/components/ui/sonner';
+import { AccessCodeGuard } from '@/components/access-code-guard';
+
+// The UI font is loaded from @fontsource's stylesheet rather than next/font,
+// because only the stylesheet carries the per-subset `unicode-range`
+// declarations. Pointing next/font at `inter-latin-wght-normal.woff2` loaded
+// exactly one subset, so every character outside Latin — Cyrillic for ru-RU,
+// tone-marked letters for vi-VN — fell back to an arbitrary OS font and
+// rendered in a different typeface mid-word.
+//
+// Declaring the other subset files as sibling faces of the same family does not
+// fix it either: faces with identical descriptors and no `unicode-range` do not
+// fall through per glyph, so the browser simply picks one.
+//
+// `--font-sans` moves to globals.css since the family no longer comes from
+// next/font's generated class.
+import '@fontsource-variable/inter';
+import '@fontsource/zcool-kuaile';
+
+export const metadata: Metadata = {
+  title: '为什么世界 · Curiosity World',
+  description: '把孩子真实的为什么，变成可以亲手探索的互动知识世界。',
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body
+        className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
+        suppressHydrationWarning
+      >
+        <AccessCodeGuard>{children}</AccessCodeGuard>
+        <Toaster position="top-center" />
+      </body>
+    </html>
+  );
+}

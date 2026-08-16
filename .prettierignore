@@ -1,0 +1,14 @@
+node_modules/
+
+# Build output
+.next/
+out/
+
+# Generated files
+*.min.js
+*.min.css
+
+# Markdown & YAML
+*.md
+*.yml
+*.yaml

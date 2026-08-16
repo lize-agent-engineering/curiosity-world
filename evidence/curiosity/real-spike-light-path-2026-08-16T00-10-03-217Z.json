@@ -1,0 +1,241 @@
+{
+  "generatedAt": "2026-08-16T00:10:03.216Z",
+  "baseUrl": "http://127.0.0.1:3101",
+  "modelRoute": "glm:glm-5.2",
+  "scenarios": [
+    {
+      "family": "relative-motion",
+      "questions": ["为什么月亮看起来会跟着我们？", "坐车时远山为什么像没动？"],
+      "revision": "减少文字，并加入桌上远近实验"
+    },
+    {
+      "family": "balance-support",
+      "questions": ["桥为什么不会倒？", "积木怎么搭才更稳？"],
+      "revision": "减少文字，并把现实观察改成桌上移动支点的小实验"
+    },
+    {
+      "family": "light-path",
+      "questions": ["影子为什么会变长？", "手电筒靠近时影子为什么变大？"],
+      "revision": "减少文字，并把现实观察改成手电筒移动实验"
+    }
+  ],
+  "engineering": [
+    {
+      "command": "pnpm check && pnpm vitest run tests/curiosity",
+      "exitCode": 0,
+      "timestamp": "2026-08-16T03:06:15+08:00",
+      "testCount": 134
+    },
+    {
+      "command": "pnpm lint && pnpm check:i18n-keys",
+      "exitCode": 0,
+      "timestamp": "2026-08-16T02:57:00+08:00"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "timestamp": "2026-08-16T03:21:15+08:00"
+    },
+    {
+      "command": "pnpm exec playwright test e2e/tests/curiosity-moon-spike.spec.ts",
+      "exitCode": 0,
+      "timestamp": "2026-08-16T03:19:31+08:00",
+      "testCount": 1
+    }
+  ],
+  "liveRuns": [
+    {
+      "family": "light-path",
+      "kind": "generation",
+      "run": 1,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 251019.068375,
+      "artifactHash": "cw1-4fb5e2e8",
+      "deterministicChecks": ["schema", "knowledge-family", "compile", "runtime-ready"],
+      "eventIds": [
+        "evt_ver_Uzb_dZh78YQG_1786837009010_1",
+        "evt_ver_Uzb_dZh78YQG_1786837009012_2",
+        "evt_ver_Uzb_dZh78YQG_1786837009056_3",
+        "evt_ver_Uzb_dZh78YQG_1786837009076_4",
+        "evt_ver_Uzb_dZh78YQG_1786837009076_5",
+        "evt_ver_Uzb_dZh78YQG_1786837009092_6",
+        "evt_ver_Uzb_dZh78YQG_1786837009108_7"
+      ]
+    },
+    {
+      "family": "light-path",
+      "kind": "generation",
+      "run": 2,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 258557.79962499999,
+      "artifactHash": "cw1-9a3b03ea",
+      "deterministicChecks": ["schema", "knowledge-family", "compile", "runtime-ready"],
+      "eventIds": [
+        "evt_ver_3kRvhECBZvM-_1786837267588_1",
+        "evt_ver_3kRvhECBZvM-_1786837267589_2",
+        "evt_ver_3kRvhECBZvM-_1786837267624_3",
+        "evt_ver_3kRvhECBZvM-_1786837267637_4",
+        "evt_ver_3kRvhECBZvM-_1786837267637_5",
+        "evt_ver_3kRvhECBZvM-_1786837267659_6",
+        "evt_ver_3kRvhECBZvM-_1786837267676_7"
+      ]
+    },
+    {
+      "family": "light-path",
+      "kind": "generation",
+      "run": 3,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 206708.163834,
+      "artifactHash": "cw1-07c76e1a",
+      "deterministicChecks": ["schema", "knowledge-family", "compile", "runtime-ready"],
+      "eventIds": [
+        "evt_ver_E_DGo_XsMz4d_1786837716164_1",
+        "evt_ver_E_DGo_XsMz4d_1786837716165_2",
+        "evt_ver_E_DGo_XsMz4d_1786837716200_3",
+        "evt_ver_E_DGo_XsMz4d_1786837716218_4",
+        "evt_ver_E_DGo_XsMz4d_1786837716218_5",
+        "evt_ver_E_DGo_XsMz4d_1786837716235_6",
+        "evt_ver_E_DGo_XsMz4d_1786837716253_7"
+      ]
+    },
+    {
+      "family": "light-path",
+      "kind": "generation",
+      "run": 4,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 242287.74195799988,
+      "artifactHash": "cw1-2fb2d3a2",
+      "deterministicChecks": ["schema", "knowledge-family", "compile", "runtime-ready"],
+      "eventIds": [
+        "evt_ver_DS9vbmY7hvhy_1786837958435_1",
+        "evt_ver_DS9vbmY7hvhy_1786837958436_2",
+        "evt_ver_DS9vbmY7hvhy_1786837958474_3",
+        "evt_ver_DS9vbmY7hvhy_1786837958487_4",
+        "evt_ver_DS9vbmY7hvhy_1786837958487_5",
+        "evt_ver_DS9vbmY7hvhy_1786837958502_6",
+        "evt_ver_DS9vbmY7hvhy_1786837958519_7"
+      ]
+    },
+    {
+      "family": "light-path",
+      "kind": "generation",
+      "run": 5,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 167205.77425000002,
+      "artifactHash": "cw1-f98651d2",
+      "deterministicChecks": ["schema", "knowledge-family", "compile", "runtime-ready"],
+      "eventIds": [
+        "evt_ver_s-2HoKV57-M6_1786838125640_1",
+        "evt_ver_s-2HoKV57-M6_1786838125641_2",
+        "evt_ver_s-2HoKV57-M6_1786838125676_3",
+        "evt_ver_s-2HoKV57-M6_1786838125688_4",
+        "evt_ver_s-2HoKV57-M6_1786838125688_5",
+        "evt_ver_s-2HoKV57-M6_1786838125703_6",
+        "evt_ver_s-2HoKV57-M6_1786838125720_7"
+      ]
+    },
+    {
+      "family": "light-path",
+      "kind": "revision",
+      "run": 1,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 111107.64741600002,
+      "artifactHash": "cw1-e5ff7b17",
+      "deterministicChecks": ["impact-first", "schema", "family-preserved", "compile"],
+      "eventIds": []
+    },
+    {
+      "family": "light-path",
+      "kind": "revision",
+      "run": 2,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 208210.31233300013,
+      "artifactHash": "cw1-17047d2f",
+      "deterministicChecks": ["impact-first", "schema", "family-preserved", "compile"],
+      "eventIds": []
+    },
+    {
+      "family": "light-path",
+      "kind": "revision",
+      "run": 3,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 125215.37433300004,
+      "artifactHash": "cw1-f0f7be7d",
+      "deterministicChecks": ["impact-first", "schema", "family-preserved", "compile"],
+      "eventIds": []
+    },
+    {
+      "family": "light-path",
+      "kind": "revision",
+      "run": 4,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 145527.2563750001,
+      "artifactHash": "cw1-53f0acb5",
+      "deterministicChecks": ["impact-first", "schema", "family-preserved", "compile"],
+      "eventIds": []
+    },
+    {
+      "family": "light-path",
+      "kind": "revision",
+      "run": 5,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 136585.448417,
+      "artifactHash": "cw1-0beb5e83",
+      "deterministicChecks": ["impact-first", "schema", "family-preserved", "compile"],
+      "eventIds": []
+    },
+    {
+      "family": "light-path",
+      "kind": "rejection",
+      "run": 1,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 15.45208299998194,
+      "deterministicChecks": ["explicit-error", "stable-failure-code"],
+      "eventIds": [],
+      "failureCode": "UNSUPPORTED_QUESTION"
+    },
+    {
+      "family": "light-path",
+      "kind": "rejection",
+      "run": 2,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 5.911541000008583,
+      "deterministicChecks": ["explicit-error", "stable-failure-code"],
+      "eventIds": [],
+      "failureCode": "UNSAFE_CONTENT"
+    },
+    {
+      "family": "light-path",
+      "kind": "rejection",
+      "run": 3,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 4.713540999684483,
+      "deterministicChecks": ["explicit-error", "stable-failure-code"],
+      "eventIds": [],
+      "failureCode": "AGE_OUT_OF_RANGE"
+    },
+    {
+      "family": "light-path",
+      "kind": "rejection",
+      "run": 4,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 4.924791999626905,
+      "deterministicChecks": ["explicit-error", "stable-failure-code"],
+      "eventIds": [],
+      "failureCode": "AGE_OUT_OF_RANGE"
+    },
+    {
+      "family": "light-path",
+      "kind": "rejection",
+      "run": 5,
+      "modelRoute": "glm:glm-5.2",
+      "durationMs": 5.424457999877632,
+      "deterministicChecks": ["explicit-error", "stable-failure-code"],
+      "eventIds": [],
+      "failureCode": "UNSUPPORTED_QUESTION"
+    }
+  ],
+  "requiredFamilies": ["light-path"],
+  "engineeringStatus": "PASS",
+  "liveModelStatus": "PASS"
+}
