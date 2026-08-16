@@ -133,6 +133,12 @@ export interface ThinkingConfig {
   budgetTokens?: number;
   /** Provider-specific option for APIs that can suppress reasoning text from responses. */
   excludeReasoningOutput?: boolean;
+  /**
+   * Internal routing constraint for OpenRouter schema calls. When set, the
+   * OpenRouter request requires a provider that supports every requested
+   * parameter instead of silently selecting an incompatible route.
+   */
+  requireStructuredOutputProvider?: boolean;
 }
 
 /**

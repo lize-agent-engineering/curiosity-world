@@ -322,7 +322,13 @@ export async function resolveCuriosityRoleModel(
     async complete(input) {
       const thinkingConfig =
         input.schema && !resolved.thinkingConfig
-          ? { mode: 'disabled' as const, enabled: false }
+          ? {
+              mode: 'disabled' as const,
+              enabled: false,
+              ...(resolved.providerId === 'openrouter'
+                ? { requireStructuredOutputProvider: true }
+                : {}),
+            }
           : resolved.thinkingConfig;
       const parameters = {
         model: resolved.model,

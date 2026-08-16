@@ -327,6 +327,22 @@ const qualityOutputSchema = z.strictObject({
   verdict: z.enum(['pass', 'reject']),
 });
 
+function qualityOutputSchemaForCandidate(age: number, instructions: Array<{ text: string }>) {
+  const instructionsMeetCopyLimit = instructions.every((instruction) =>
+    isPrimaryInstructionAllowed(age, instruction.text),
+  );
+  return qualityOutputSchema.superRefine((output, context) => {
+    const copyLoadCheck = output.checks.find((check) => check.criterion === 'copy-load');
+    if (instructionsMeetCopyLimit && copyLoadCheck?.status === 'reject') {
+      context.addIssue({
+        code: 'custom',
+        path: ['checks'],
+        message: 'copy-load rejection conflicts with deterministic instruction-length validation',
+      });
+    }
+  });
+}
+
 const MAX_MODEL_OUTPUT_ATTEMPTS = 3;
 
 function parseModelOutput<T>(raw: string, schema: z.ZodType<T>): T {
@@ -357,6 +373,16 @@ function modelValidationSummary(error: unknown, depth = 0): string {
       : `$:${error.name}`;
   }
   return '$:invalid_output';
+}
+
+function modelCorrectionDetails(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    return error.issues
+      .slice(0, 8)
+      .map((issue) => `${issue.path.join('.') || '$'}: ${issue.message}`)
+      .join('；');
+  }
+  return modelValidationSummary(error);
 }
 
 function modelRoute(model: CuriosityPipelineModel) {
@@ -610,7 +636,7 @@ export async function runCuriosityAgentPipeline(
             prompt:
               attempt === 1
                 ? parameters.prompt
-                : `${parameters.prompt}\n上一轮输出未通过 Schema 校验。请逐项自检后重新生成完整 JSON；不要省略字段、扩大允许范围或改写单位。`,
+                : `${parameters.prompt}\n上一轮输出未通过 Schema 校验。修正项：${modelCorrectionDetails(lastError)}。请逐项自检后重新生成完整 JSON；不要省略字段、扩大允许范围或改写单位。`,
             schema: parameters.schema,
           });
           output = parseModelOutput(raw, parameters.schema);
@@ -951,7 +977,7 @@ export async function runCuriosityAgentPipeline(
       story,
       spec,
     }),
-    schema: qualityOutputSchema,
+    schema: qualityOutputSchemaForCandidate(input.age, interaction.instructionCopy),
     build: (output) =>
       qualityReviewArtifactV1Schema.parse({
         ...canonicalizeCuriosityQuality(output, 8),

@@ -301,6 +301,35 @@ describe('explicit Curiosity test model', () => {
     expect(callModel).toHaveBeenCalledTimes(1);
   });
 
+  it('requires a structured-output-compatible OpenRouter provider for schema roles', async () => {
+    vi.stubEnv('CURIOSITY_TEST_MODEL', 'false');
+    const callModel = vi.fn(async () => ({ text: '{}', output: { answer: 'structured' } }));
+    const model = await resolveCuriosityRoleModel(request(), {}, 'curiosity.interaction-designer', {
+      resolveModel: vi.fn(async () => ({
+        model: {} as ResolvedModel['model'],
+        modelInfo: { id: 'glm-5.2', name: 'GLM 5.2', outputWindow: 16384 },
+        modelString: 'openrouter:z-ai/glm-5.2',
+        providerId: 'openrouter',
+        modelId: 'z-ai/glm-5.2',
+        apiKey: 'test-key',
+      })),
+      callModel,
+    });
+
+    await model.complete({
+      system: 'system',
+      prompt: 'prompt',
+      schema: z.strictObject({ answer: z.string() }),
+    });
+
+    const firstCall = callModel.mock.calls[0] as unknown as [unknown, unknown, unknown, unknown];
+    expect(firstCall[3]).toEqual({
+      mode: 'disabled',
+      enabled: false,
+      requireStructuredOutputProvider: true,
+    });
+  });
+
   it('does not retry unrelated model failures', async () => {
     vi.stubEnv('CURIOSITY_TEST_MODEL', 'false');
     const callModel = vi.fn().mockRejectedValue(new Error('authentication failed'));

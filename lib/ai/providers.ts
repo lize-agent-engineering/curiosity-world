@@ -69,6 +69,15 @@ export type { ProviderId, ProviderConfig, ModelInfo, ModelConfig };
 /** Provider IDs whose logos are monochrome-dark and need `dark:invert` in dark mode */
 export const MONO_LOGO_PROVIDERS: ReadonlySet<string> = new Set(['openai', 'openrouter', 'ollama']);
 
+/** Add OpenRouter's strict capability constraint without discarding an existing provider preference. */
+export function requireOpenRouterStructuredOutputProvider(body: Record<string, unknown>): void {
+  const provider = body.provider;
+  body.provider = {
+    ...(provider && typeof provider === 'object' && !Array.isArray(provider) ? provider : {}),
+    require_parameters: true,
+  };
+}
+
 /**
  * Provider registry
  */
@@ -2095,15 +2104,26 @@ export function getModel(config: ModelConfig): ModelWithInfo {
             (providerId === 'lemonade'
               ? getDefaultThinkingConfig(getCatalogThinkingCapability(providerId, config.modelId))
               : undefined);
-          if (thinking && init?.body && typeof init.body === 'string') {
-            const extra = getCompatThinkingBodyParams(providerId, config.modelId, thinking);
-            if (extra) {
+          const requiresStructuredOutputProvider =
+            providerId === 'openrouter' && thinking?.requireStructuredOutputProvider === true;
+          if (
+            (thinking || requiresStructuredOutputProvider) &&
+            init?.body &&
+            typeof init.body === 'string'
+          ) {
+            const extra = thinking
+              ? getCompatThinkingBodyParams(providerId, config.modelId, thinking)
+              : undefined;
+            if (extra || requiresStructuredOutputProvider) {
               try {
-                const body = JSON.parse(init.body);
+                const body = JSON.parse(init.body) as Record<string, unknown>;
                 if (providerId === 'lemonade' && 'stream_options' in body) {
                   delete body.stream_options;
                 }
-                Object.assign(body, extra);
+                if (extra) Object.assign(body, extra);
+                if (requiresStructuredOutputProvider) {
+                  requireOpenRouterStructuredOutputProvider(body);
+                }
                 init = { ...init, body: JSON.stringify(body) };
               } catch {
                 /* leave body as-is */

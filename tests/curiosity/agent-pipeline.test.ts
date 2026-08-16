@@ -763,6 +763,43 @@ describe('Curiosity five-ability generation pipeline', () => {
     await expect(candidate).rejects.toThrow('age-fit:主要指令超过年龄限制');
   });
 
+  it('retries an ungrounded copy-load rejection before publishing a valid candidate', async () => {
+    let attempts = 0;
+    const prompts: string[] = [];
+    const result = await runCuriosityAgentPipeline(
+      { question: '为什么月亮看起来会跟着我们？', age: 8, interests: [] },
+      models({
+        'curiosity.quality-reviewer': {
+          route: { providerId: 'test', modelId: 'strict-json' },
+          async complete({ prompt }: { prompt: string }) {
+            attempts += 1;
+            prompts.push(prompt);
+            const output = qualityOutput();
+            if (attempts === 1) {
+              output.checks[6] = {
+                criterion: 'copy-load',
+                status: 'reject',
+                findings: ['主要指令超过字数限制'],
+              };
+              output.verdict = 'reject';
+            }
+            return JSON.stringify(output);
+          },
+        },
+      }),
+      identities,
+    );
+
+    expect(attempts).toBe(2);
+    expect(prompts[1]).toContain(
+      'copy-load rejection conflicts with deterministic instruction-length validation',
+    );
+    expect(result.artifacts.at(-1)).toMatchObject({
+      agentRole: 'curiosity.quality-reviewer',
+      verdict: 'pass',
+    });
+  });
+
   it('canonicalizes duplicate quality criteria before publishing the artifact', async () => {
     const duplicated = qualityOutput();
     duplicated.checks.push({
