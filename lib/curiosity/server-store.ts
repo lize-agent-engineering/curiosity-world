@@ -1,6 +1,8 @@
 import { FileCuriosityJobStore, type CuriosityJobStore } from './jobs';
+import { FileCuriosityExperienceStore } from './experience-store';
 
 export const curiosityJobStore = new FileCuriosityJobStore();
+export const curiosityExperienceStore = new FileCuriosityExperienceStore();
 let recovery: Promise<void> | undefined;
 
 export function ensureCuriosityJobStoreRecovered(): Promise<void> {

@@ -13,6 +13,7 @@ import {
   getCuriosityApiHeaders,
   getCuriosityRepository,
   readApiJson,
+  syncCuriosityExperience,
 } from '@/lib/curiosity/client';
 import { curiosityExperienceSpecSchema } from '@/lib/curiosity/contracts';
 import {
@@ -117,6 +118,7 @@ export default function HomePage() {
               agentRuns: z.array(curiosityAgentRunSchema).parse(job.agentRuns),
             },
           );
+          await syncCuriosityExperience(spec.experienceId);
           router.push(`/experience/${spec.experienceId}?candidate=${spec.versionId}`);
           return;
         }

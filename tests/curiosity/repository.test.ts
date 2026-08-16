@@ -149,6 +149,41 @@ describe('IndexedDbCuriosityRepository', () => {
     expect(restored?.events.map((event) => event.eventId)).toEqual(['evt_1', 'evt_2']);
   });
 
+  it('exports and imports a complete experience snapshot for another browser', async () => {
+    const spec = createValidCuriositySpec();
+    await repository.createExperienceWithCandidate(spec, 'cw1-first', evidence());
+    await repository.activateVersion(spec.experienceId, spec.versionId);
+    await repository.appendEvent(curiosityEvent('evt_shared'));
+    const state = {
+      storyArtifactId: 'art_story_1',
+      stageId: 'explore',
+      hintLevel: 0 as const,
+      completedStageIds: ['predict'],
+      lastTriggerEventIds: ['evt_shared'],
+    };
+    await repository.saveGuidanceState(spec.experienceId, spec.versionId, state);
+
+    const snapshot = await repository.exportSnapshot(spec.experienceId);
+    const otherBrowser = new IndexedDbCuriosityRepository({
+      name: `Curiosity-Other-${crypto.randomUUID()}`,
+      indexedDB: new IDBFactory(),
+      IDBKeyRange,
+    });
+    await otherBrowser.importSnapshot(snapshot);
+
+    await expect(otherBrowser.getExperience(spec.experienceId)).resolves.toMatchObject({
+      experience: { activeVersionId: spec.versionId },
+      versions: [{ id: spec.versionId, status: 'active' }],
+    });
+    await expect(otherBrowser.listEvents(spec.experienceId, spec.versionId)).resolves.toEqual([
+      curiosityEvent('evt_shared'),
+    ]);
+    await expect(otherBrowser.getGuidanceState(spec.experienceId, spec.versionId)).resolves.toEqual(
+      state,
+    );
+    await otherBrowser.deleteDatabase();
+  });
+
   it('persists version-scoped guidance state and accepted voice evidence without audio', async () => {
     const spec = createValidCuriositySpec();
     await repository.createExperienceWithCandidate(spec, 'cw1-first', evidence());

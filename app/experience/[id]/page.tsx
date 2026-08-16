@@ -14,7 +14,9 @@ import { Button } from '@/components/ui/button';
 import {
   getCuriosityApiHeaders,
   getCuriosityRepository,
+  hydrateCuriosityExperience,
   readApiJson,
+  syncCuriosityExperience,
 } from '@/lib/curiosity/client';
 import { curiosityExperienceSpecSchema, type CuriosityEventV1 } from '@/lib/curiosity/contracts';
 import {
@@ -41,8 +43,8 @@ import {
 } from '@/lib/curiosity/guidance';
 import {
   describeVoiceFailure,
+  ManagedGuidancePlayer,
   requestMicrophoneStream,
-  speakManagedGuidance,
   transcribeChildRecording,
 } from '@/lib/curiosity/voice-client';
 import {
@@ -73,6 +75,7 @@ export default function CuriosityExperiencePage() {
   const guidanceRequestQueueRef = useRef<Promise<void>>(Promise.resolve());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
+  const guidancePlayerRef = useRef<ManagedGuidancePlayer | null>(null);
   const [aggregate, setAggregate] = useState<CuriosityExperienceAggregate | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(initialCandidateId);
   const [pendingCandidateId, setPendingCandidateId] = useState<string | null>(initialCandidateId);
@@ -96,7 +99,12 @@ export default function CuriosityExperiencePage() {
 
   const refresh = useCallback(
     async (preferredId?: string) => {
-      const next = await getCuriosityRepository().getExperience(experienceId);
+      let next = await getCuriosityRepository().getExperience(experienceId);
+      if (!next && (await hydrateCuriosityExperience(experienceId))) {
+        next = await getCuriosityRepository().getExperience(experienceId);
+      } else if (next) {
+        await syncCuriosityExperience(experienceId);
+      }
       if (!next) throw new Error('EXPERIENCE_NOT_FOUND: 这台设备上没有该体验。');
       setAggregate(next);
       const picked =
@@ -104,6 +112,9 @@ export default function CuriosityExperiencePage() {
         next.versions.find((version) => version.id === next.experience.activeVersionId) ??
         next.versions.at(-1);
       if (!picked) throw new Error('VERSION_NOT_FOUND: 体验没有可用版本。');
+      if (!next.experience.activeVersionId && picked.status === 'candidate') {
+        setPendingCandidateId(picked.id);
+      }
       setSelectedId(picked.id);
       setEvents(await getCuriosityRepository().listEvents(experienceId, picked.id));
       setVoiceEvents(await getCuriosityRepository().listVoiceEvents(experienceId, picked.id));
@@ -116,6 +127,13 @@ export default function CuriosityExperiencePage() {
       setError(cause instanceof Error ? cause.message : String(cause)),
     );
   }, [initialCandidateId, refresh]);
+
+  useEffect(
+    () => () => {
+      guidancePlayerRef.current?.stop();
+    },
+    [],
+  );
 
   const selected = aggregate?.versions.find((version) => version.id === selectedId) ?? null;
   const selectedVersionId = selected?.id;
@@ -201,6 +219,7 @@ export default function CuriosityExperiencePage() {
       .activateVersion(experienceId, candidateId)
       .then(async () => {
         setPendingCandidateId(null);
+        await syncCuriosityExperience(experienceId);
         await refresh(candidateId);
         router.replace(`/experience/${experienceId}`);
       })
@@ -212,6 +231,7 @@ export default function CuriosityExperiencePage() {
     await activationRef.current;
     try {
       await getCuriosityRepository().appendEvent(event);
+      await syncCuriosityExperience(event.experienceId);
       setEvents(await getCuriosityRepository().listEvents(event.experienceId, event.versionId));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -260,9 +280,11 @@ export default function CuriosityExperiencePage() {
         guidanceStateRef.current = next;
         setGuidanceState(next);
         await getCuriosityRepository().saveGuidanceState(experienceId, selected.id, next);
+        await syncCuriosityExperience(experienceId);
         setGuideNarration(response.narration);
         setGuideStatus(null);
-        await speakManagedGuidance(response.narration);
+        guidancePlayerRef.current ??= new ManagedGuidancePlayer();
+        await guidancePlayerRef.current.play(response.narration);
       });
       guidanceRequestQueueRef.current = operation.catch(() => undefined);
       return operation;
@@ -302,7 +324,8 @@ export default function CuriosityExperiencePage() {
     setVoiceError(null);
     setVoiceStatus(null);
     try {
-      await speakManagedGuidance(guideNarration);
+      guidancePlayerRef.current ??= new ManagedGuidancePlayer();
+      await guidancePlayerRef.current.play(guideNarration);
     } catch (cause) {
       setVoiceError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -358,6 +381,7 @@ export default function CuriosityExperiencePage() {
               occurredAt: new Date().toISOString(),
             };
             await getCuriosityRepository().appendVoiceEvent(voiceEvent);
+            await syncCuriosityExperience(experienceId);
             setVoiceEvents(
               await getCuriosityRepository().listVoiceEvents(experienceId, selected.id),
             );
@@ -391,6 +415,7 @@ export default function CuriosityExperiencePage() {
           pendingCandidateId,
           'RUNTIME_FAILED',
         );
+        await syncCuriosityExperience(experienceId);
         setPendingCandidateId(null);
         await refresh();
         setMode('parent');
@@ -523,7 +548,18 @@ export default function CuriosityExperiencePage() {
   if (!aggregate || !selected || !summary || !archive)
     return (
       <main className="grid min-h-screen place-items-center bg-[#07152f] p-6 text-white">
-        <p>{describeExperienceFailure(error) ?? '正在恢复探索…'}</p>
+        <div className="max-w-md text-center">
+          <p>{describeExperienceFailure(error) ?? '正在恢复探索…'}</p>
+          {error && (
+            <Button
+              type="button"
+              onClick={() => router.push('/')}
+              className="mt-5 min-h-12 bg-[#ffd76a] px-5 font-black text-[#173047] hover:bg-[#ffe393]"
+            >
+              返回新的问题
+            </Button>
+          )}
+        </div>
       </main>
     );
 
@@ -616,7 +652,7 @@ export default function CuriosityExperiencePage() {
                         void playNarration();
                       }}
                       onReplay={() => void playNarration()}
-                      onSkip={() => globalThis.speechSynthesis?.cancel()}
+                      onSkip={() => guidancePlayerRef.current?.stop()}
                       onListen={() => void handleVoiceAnswer()}
                     />
                   )}

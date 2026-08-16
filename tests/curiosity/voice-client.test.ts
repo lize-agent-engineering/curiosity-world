@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   describeVoiceFailure,
+  ManagedGuidancePlayer,
   requestMicrophoneStream,
   recognizeChildAnswer,
   speakGuidance,
@@ -111,6 +112,47 @@ describe('Curiosity browser voice client', () => {
     });
     expect(play).toHaveBeenCalledOnce();
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:curiosity-audio');
+  });
+
+  it('keeps exactly one managed narration active and stops it on demand', async () => {
+    const revokeObjectURL = vi.fn();
+    const audios: Array<{
+      pause: ReturnType<typeof vi.fn>;
+      currentTime: number;
+      onended: (() => void) | null;
+      onerror: (() => void) | null;
+      play: ReturnType<typeof vi.fn>;
+    }> = [];
+    const player = new ManagedGuidancePlayer({
+      fetch: async () => new Response(new Blob(['audio']), { status: 200 }),
+      createObjectURL: (_blob) => `blob:voice-${audios.length}`,
+      revokeObjectURL,
+      createAudio: () => {
+        const audio = {
+          pause: vi.fn(),
+          currentTime: 0,
+          onended: null,
+          onerror: null,
+          play: vi.fn(async () => undefined),
+        };
+        audios.push(audio);
+        return audio;
+      },
+    });
+
+    const first = player.play('第一段');
+    await vi.waitFor(() => expect(audios).toHaveLength(1));
+    const second = player.play('第二段');
+    await vi.waitFor(() => expect(audios).toHaveLength(2));
+
+    expect(audios[0]!.pause).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:voice-0');
+    audios[1]!.onended?.();
+    await expect(second).resolves.toBeUndefined();
+    await expect(first).resolves.toBeUndefined();
+
+    player.stop();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:voice-1');
   });
 
   it('does not pretend narration succeeded when the managed service fails', async () => {

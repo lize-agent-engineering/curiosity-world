@@ -35,11 +35,105 @@ interface ManagedAudioLike {
   play(): Promise<void>;
 }
 
+interface ControllableManagedAudioLike extends ManagedAudioLike {
+  pause(): void;
+  currentTime: number;
+  onended: (() => void) | null;
+  onerror: (() => void) | null;
+}
+
 interface ManagedGuidanceDependencies {
   fetch?: typeof fetch;
   createObjectURL?: (blob: Blob) => string;
   revokeObjectURL?: (url: string) => void;
   createAudio?: (src: string) => ManagedAudioLike;
+}
+
+interface ManagedGuidancePlayerDependencies {
+  fetch?: typeof fetch;
+  createObjectURL?: (blob: Blob) => string;
+  revokeObjectURL?: (url: string) => void;
+  createAudio?: (src: string) => ControllableManagedAudioLike;
+}
+
+export class ManagedGuidancePlayer {
+  private active:
+    | {
+        audio: ControllableManagedAudioLike;
+        objectUrl: string;
+        finish: () => void;
+      }
+    | undefined;
+  private request: AbortController | undefined;
+
+  constructor(private readonly dependencies: ManagedGuidancePlayerDependencies = {}) {}
+
+  stop(): void {
+    this.request?.abort();
+    this.request = undefined;
+    if (!this.active) return;
+    const { audio, objectUrl, finish } = this.active;
+    this.active = undefined;
+    audio.pause();
+    audio.currentTime = 0;
+    (this.dependencies.revokeObjectURL ?? URL.revokeObjectURL.bind(URL))(objectUrl);
+    finish();
+  }
+
+  async play(text: string): Promise<void> {
+    this.stop();
+    const request = new AbortController();
+    this.request = request;
+    const fetchNarration = this.dependencies.fetch ?? globalThis.fetch;
+    try {
+      const response = await fetchNarration('/api/curiosity/narration', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: request.signal,
+      });
+      if (!response.ok) throw new Error('TTS_FAILED: 语音旁白生成失败，请重试。');
+      if (request.signal.aborted) return;
+      const createObjectURL = this.dependencies.createObjectURL ?? URL.createObjectURL.bind(URL);
+      const objectUrl = createObjectURL(await response.blob());
+      if (request.signal.aborted) {
+        (this.dependencies.revokeObjectURL ?? URL.revokeObjectURL.bind(URL))(objectUrl);
+        return;
+      }
+      const createAudio =
+        this.dependencies.createAudio ??
+        ((src: string) => new Audio(src) as unknown as ControllableManagedAudioLike);
+      const audio = createAudio(objectUrl);
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          if (this.active?.audio === audio) this.active = undefined;
+          resolve();
+        };
+        const fail = () => {
+          if (settled) return;
+          settled = true;
+          if (this.active?.audio === audio) this.active = undefined;
+          (this.dependencies.revokeObjectURL ?? URL.revokeObjectURL.bind(URL))(objectUrl);
+          reject(new Error('TTS_FAILED: 语音旁白播放失败，请重试。'));
+        };
+        this.active = { audio, objectUrl, finish };
+        audio.onended = () => {
+          (this.dependencies.revokeObjectURL ?? URL.revokeObjectURL.bind(URL))(objectUrl);
+          finish();
+        };
+        audio.onerror = fail;
+        audio.play().catch(fail);
+      });
+    } catch (cause) {
+      if (request.signal.aborted) return;
+      throw cause;
+    } finally {
+      if (this.request === request) this.request = undefined;
+    }
+  }
 }
 
 export function describeVoiceFailure(cause: unknown): string {

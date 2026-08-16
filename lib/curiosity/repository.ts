@@ -84,6 +84,68 @@ export interface CuriosityExperienceAggregate {
   versions: CuriosityVersionRecord[];
 }
 
+export interface CuriosityExperienceSnapshot {
+  experience: CuriosityExperienceRecord;
+  versions: CuriosityVersionRecord[];
+  events: CuriosityEventV1[];
+  guidanceStates: Array<{ versionId: string; state: GuidanceState }>;
+  voiceEvents: ChildVoiceEventV1[];
+}
+
+const curiosityExperienceRecordSchema = z.strictObject({
+  id: z.string().regex(/^cur_[a-zA-Z0-9_-]+$/),
+  question: z.string().min(1).max(240),
+  age: z.number().int().min(6).max(10),
+  interests: z.array(z.string().min(1).max(30)).max(5),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+  activeVersionId: z
+    .string()
+    .regex(/^ver_[a-zA-Z0-9_-]+$/)
+    .optional(),
+});
+
+const curiosityVersionRecordSchema = z.strictObject({
+  id: z.string().regex(/^ver_[a-zA-Z0-9_-]+$/),
+  experienceId: z.string().regex(/^cur_[a-zA-Z0-9_-]+$/),
+  revision: z.number().int().positive(),
+  createdAt: z.iso.datetime(),
+  status: z.enum(['candidate', 'active', 'superseded', 'failed']),
+  spec: curiosityExperienceSpecSchema,
+  experienceSpec: curiosityExperienceSpecV2Schema,
+  artifacts: z.array(curiosityPipelineArtifactSchema).min(1).max(32),
+  agentRuns: z.array(curiosityAgentRunSchema).min(1).max(32),
+  specHash: z.string().min(1).max(256),
+  failureCode: z.string().min(1).max(128).optional(),
+});
+
+const guidanceStateSchema = z.strictObject({
+  storyArtifactId: z.string().min(1).max(128),
+  stageId: z.string().min(1).max(128),
+  hintLevel: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  completedStageIds: z.array(z.string().min(1).max(128)).max(32),
+  lastTriggerEventIds: z.array(z.string().min(1).max(128)).max(128),
+});
+
+const curiosityExperienceSnapshotSchema = z.strictObject({
+  experience: curiosityExperienceRecordSchema,
+  versions: z.array(curiosityVersionRecordSchema).min(1).max(24),
+  events: z.array(curiosityEventSchema).max(2_000),
+  guidanceStates: z
+    .array(
+      z.strictObject({
+        versionId: z.string().regex(/^ver_[a-zA-Z0-9_-]+$/),
+        state: guidanceStateSchema,
+      }),
+    )
+    .max(24),
+  voiceEvents: z.array(childVoiceEventV1Schema).max(500),
+});
+
+export function parseCuriosityExperienceSnapshot(input: unknown): CuriosityExperienceSnapshot {
+  return curiosityExperienceSnapshotSchema.parse(input);
+}
+
 export interface ActiveCuriosityExperience {
   experience: CuriosityExperienceRecord;
   version: CuriosityVersionRecord;
@@ -112,6 +174,8 @@ export interface CuriosityRepository {
   getExperience(experienceId: string): Promise<CuriosityExperienceAggregate | null>;
   getActiveExperience(experienceId: string): Promise<ActiveCuriosityExperience | null>;
   listExperiences(): Promise<CuriosityExperienceRecord[]>;
+  exportSnapshot(experienceId: string): Promise<CuriosityExperienceSnapshot>;
+  importSnapshot(snapshot: CuriosityExperienceSnapshot): Promise<void>;
 }
 
 export type CuriosityRepositoryErrorCode =
@@ -479,6 +543,112 @@ export class IndexedDbCuriosityRepository implements CuriosityRepository {
 
   async listExperiences(): Promise<CuriosityExperienceRecord[]> {
     return this.database.experiences.orderBy('updatedAt').reverse().toArray();
+  }
+
+  async exportSnapshot(experienceId: string): Promise<CuriosityExperienceSnapshot> {
+    const aggregate = await this.getExperience(experienceId);
+    if (!aggregate) {
+      throw new CuriosityRepositoryError('EXPERIENCE_NOT_FOUND', '体验不存在。');
+    }
+    const versionIds = new Set(aggregate.versions.map((version) => version.id));
+    const eventRows = (await this.database.events.toArray()).filter(
+      (row) => row.experienceId === experienceId && versionIds.has(row.versionId),
+    );
+    const guidanceRows = (await this.database.guidanceStates.toArray()).filter(
+      (row) => row.experienceId === experienceId && versionIds.has(row.versionId),
+    );
+    const voiceRows = (await this.database.voiceEvents.toArray()).filter(
+      (row) => row.experienceId === experienceId && versionIds.has(row.versionId),
+    );
+    return {
+      ...aggregate,
+      events: eventRows.map((row) => curiosityEventSchema.parse(row.event)),
+      guidanceStates: guidanceRows.map(({ versionId, experienceId: _experienceId, ...state }) => ({
+        versionId,
+        state,
+      })),
+      voiceEvents: voiceRows.map((row) => childVoiceEventV1Schema.parse(row.event)),
+    };
+  }
+
+  async importSnapshot(snapshot: CuriosityExperienceSnapshot): Promise<void> {
+    snapshot = parseCuriosityExperienceSnapshot(snapshot);
+    const experienceId = snapshot.experience.id;
+    const versions = snapshot.versions.map((version) => {
+      const spec = curiosityExperienceSpecSchema.parse(version.spec);
+      if (version.experienceId !== experienceId || spec.experienceId !== experienceId) {
+        throw new CuriosityRepositoryError('INVALID_VERSION_EVIDENCE', '快照体验绑定不一致。');
+      }
+      const evidence = parseEvidence(spec, {
+        experienceSpec: version.experienceSpec,
+        artifacts: version.artifacts,
+        agentRuns: version.agentRuns,
+      });
+      return { ...version, spec, ...evidence };
+    });
+    const versionIds = new Set(versions.map((version) => version.id));
+    const events = snapshot.events.map((event) => curiosityEventSchema.parse(event));
+    const voiceEvents = snapshot.voiceEvents.map((event) => childVoiceEventV1Schema.parse(event));
+    if (
+      events.some(
+        (event) => event.experienceId !== experienceId || !versionIds.has(event.versionId),
+      ) ||
+      voiceEvents.some(
+        (event) => event.experienceId !== experienceId || !versionIds.has(event.versionId),
+      )
+    ) {
+      throw new CuriosityRepositoryError('INVALID_VERSION_EVIDENCE', '快照事件绑定不一致。');
+    }
+    await this.database.transaction(
+      'rw',
+      [
+        this.database.experiences,
+        this.database.versions,
+        this.database.events,
+        this.database.artifacts,
+        this.database.agentRuns,
+        this.database.guidanceStates,
+        this.database.voiceEvents,
+      ],
+      async () => {
+        await this.database.experiences.put({ ...snapshot.experience });
+        await this.database.versions.where('experienceId').equals(experienceId).delete();
+        await this.database.events.filter((row) => row.experienceId === experienceId).delete();
+        await this.database.guidanceStates
+          .filter((row) => row.experienceId === experienceId)
+          .delete();
+        await this.database.voiceEvents.filter((row) => row.experienceId === experienceId).delete();
+        await this.database.versions.bulkPut(versions);
+        await this.database.artifacts.bulkPut(versions.flatMap((version) => version.artifacts));
+        await this.database.agentRuns.bulkPut(versions.flatMap((version) => version.agentRuns));
+        await this.database.events.bulkPut(
+          events.map((event) => ({
+            eventId: event.eventId,
+            experienceId: event.experienceId,
+            versionId: event.versionId,
+            occurredAt: event.occurredAt,
+            event,
+          })),
+        );
+        await this.database.guidanceStates.bulkPut(
+          snapshot.guidanceStates.map(({ versionId, state }) => ({
+            experienceId,
+            versionId,
+            ...state,
+          })),
+        );
+        await this.database.voiceEvents.bulkPut(
+          voiceEvents.map((event) => ({
+            eventId: event.eventId,
+            experienceId: event.experienceId,
+            versionId: event.versionId,
+            stageId: event.stageId,
+            occurredAt: event.occurredAt,
+            event,
+          })),
+        );
+      },
+    );
   }
 
   async deleteDatabase(): Promise<void> {

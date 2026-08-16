@@ -1,16 +1,11 @@
-import type {
-  CuriosityExperienceAggregate,
-  CuriosityVersionRecord,
-} from './repository';
+import type { CuriosityExperienceAggregate, CuriosityVersionRecord } from './repository';
 
 export function selectRegenerationBase(
   aggregate: CuriosityExperienceAggregate,
   selectedVersionId?: string | null,
 ): CuriosityVersionRecord | undefined {
   return (
-    aggregate.versions.find(
-      (version) => version.id === aggregate.experience.activeVersionId,
-    ) ??
+    aggregate.versions.find((version) => version.id === aggregate.experience.activeVersionId) ??
     aggregate.versions.find((version) => version.id === selectedVersionId) ??
     aggregate.versions.at(-1)
   );
@@ -23,6 +18,9 @@ export function describeExperienceFailure(message: string | null): string | null
   }
   if (/VERSION_NOT_ACTIVE/i.test(message)) {
     return '当前版本还不能修改，请先重新生成一版可运行的探索。';
+  }
+  if (/EXPERIENCE_NOT_FOUND/i.test(message)) {
+    return '没有找到这次探索。请检查链接，或返回首页重新开始。';
   }
   return message;
 }
