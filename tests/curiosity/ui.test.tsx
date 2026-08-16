@@ -32,6 +32,11 @@ const generatedTeamArtifact = {
 };
 
 describe('Curiosity parent creation view', () => {
+  it('accepts the dynamic team stage while polling a real generation job', () => {
+    const source = readFileSync(resolve(process.cwd(), 'app/page.tsx'), 'utf8');
+    expect(source).toContain("'team_assembly'");
+  });
+
   it('renders the question-first form and immediate generation state without legacy product language', () => {
     const html = renderToStaticMarkup(
       createElement(CuriosityHomeView, {

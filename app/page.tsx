@@ -89,6 +89,7 @@ export default function HomePage() {
                 'question_modeling',
                 'knowledge_design',
                 'interaction_design',
+                'team_assembly',
                 'story_design',
                 'deterministic_compile',
                 'quality_review',
