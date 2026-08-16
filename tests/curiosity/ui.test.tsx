@@ -12,6 +12,7 @@ import { ChildTaskShell } from '@/components/curiosity/child-task-shell';
 import { CuriosityArchiveView } from '@/components/curiosity/archive-view';
 import { VoiceGuide } from '@/components/curiosity/voice-guide';
 import { ExplorationTeamStrip } from '@/components/curiosity/exploration-team-strip';
+import { ExplorationCompletion } from '@/components/curiosity/exploration-completion';
 import { selectActiveTeamMember } from '@/lib/curiosity/team-speaker';
 import { createValidCuriositySpec } from './fixture';
 
@@ -264,6 +265,48 @@ describe('Curiosity structured collaboration', () => {
 });
 
 describe('Curiosity child runtime frame', () => {
+  it('closes a completed exploration with real evidence and two clear next actions', () => {
+    const spec = createValidCuriositySpec();
+    const html = renderToStaticMarkup(
+      createElement(ExplorationCompletion, {
+        spec,
+        team: generatedTeamArtifact,
+        speaker: generatedTeamArtifact.members[1],
+        summary: {
+          experienceId: spec.experienceId,
+          versionId: spec.versionId,
+          eventCount: 4,
+          facts: [
+            { kind: 'prediction', text: '孩子最初猜的是：“月亮会跟着走”。', eventIds: ['evt_1'] },
+            {
+              kind: 'exploration',
+              text: '孩子移动观察者 2 次，比较了远近物体的视角变化。',
+              eventIds: ['evt_2'],
+            },
+            {
+              kind: 'explanation',
+              text: '孩子最后选择的解释是：“距离越远，观察方向变化越小”。',
+              eventIds: ['evt_3'],
+            },
+            { kind: 'completion', text: '孩子完成了本次探索。', eventIds: ['evt_4'] },
+          ],
+          recommendation: '散步时继续比较路灯和月亮。',
+        },
+        onNewQuestion: vi.fn(),
+        onParentReview: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('你把一个“为什么”变成了自己的发现');
+    expect(html).toContain('你的发现轨迹');
+    expect(html).toContain('你一开始猜的是：“月亮会跟着走”');
+    expect(html).toContain('你移动观察者 2 次');
+    expect(html).toContain('支点博士');
+    expect(html).toContain('和家长一起回顾');
+    expect(html).toContain('再探索一个问题');
+    expect(html).not.toContain('evt_1');
+  });
+
   it('requires an explicit start gesture and exposes child-sized voice controls', () => {
     const html = renderToStaticMarkup(
       createElement(VoiceGuide, {

@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
 import type { CuriosityEventV1, CuriosityExperienceSpecV1 } from '@/lib/curiosity/contracts';
@@ -63,7 +62,8 @@ export function FamilyExperimentScene({
   const sequence = useRef(0);
   const [experimentCount, setExperimentCount] = useState(0);
   const [pending, setPending] = useState(false);
-  const [completed, setCompleted] = useState(false);
+  const [challengeCompleted, setChallengeCompleted] = useState(false);
+  const [challengeFeedback, setChallengeFeedback] = useState<string | null>(null);
   const prediction = spec.tasks.find((task) => task.kind === 'prediction');
   const challenge = spec.tasks.find((task) => task.kind === 'challenge');
   const explanation = spec.tasks.find((task) => task.kind === 'explanation');
@@ -97,15 +97,20 @@ export function FamilyExperimentScene({
           ...eventPayload,
         });
         if (optionId === expectedOptionId) {
-          await emit('challenge_completed', challenge?.id ?? 'challenge', 'completed', { optionId });
+          setChallengeFeedback(null);
+          await emit('challenge_completed', challenge?.id ?? 'challenge', 'completed', {
+            optionId,
+          });
+          setChallengeCompleted(true);
+        } else {
+          setChallengeFeedback('这个选择还不能解释刚才的现象，再比较一次。');
         }
       } else {
         await emit('explanation_selected', explanation?.id ?? 'explanation', 'option_selected', {
           ...eventPayload,
         });
-        if (optionId === expectedOptionId) {
+        if (optionId === expectedOptionId && challengeCompleted) {
           await emit('experience_completed', 'completion', 'finished', { optionId });
-          setCompleted(true);
         }
       }
     } finally {
@@ -176,7 +181,9 @@ export function FamilyExperimentScene({
             <path d="M495 324 L535 390 L455 390 Z" fill="#6fa2bd" />
             <rect x="325" y="238" width="70" height="60" rx="8" fill="#dc7158" />
             <line x1="360" y1="238" x2="360" y2="332" stroke="#fff3c4" strokeDasharray="7 7" />
-            <text x="360" y="220" textAnchor="middle" fill="#fff3c4" fontSize="18">重物</text>
+            <text x="360" y="220" textAnchor="middle" fill="#fff3c4" fontSize="18">
+              重物
+            </text>
           </>
         ) : (
           <>
@@ -199,22 +206,22 @@ export function FamilyExperimentScene({
               animate={{ rx: experimentCount % 2 ? 68 : 120 }}
               transition={{ duration: 0.65, ease: 'easeInOut' }}
             />
-            <text x="416" y="202" textAnchor="middle" fill="#fff3c4" fontSize="18">遮挡物</text>
+            <text x="416" y="202" textAnchor="middle" fill="#fff3c4" fontSize="18">
+              遮挡物
+            </text>
           </>
         )}
       </motion.svg>
 
       <div className="flex min-h-64 flex-col justify-center rounded-2xl border border-white/10 bg-white/[.06] p-5 text-white">
-        {completed ? (
-          <div>
-            <CheckCircle2 className="size-9 text-[#9fd8b8]" />
-            <p className="mt-3 text-xl font-black">发现完成</p>
-            <p className="mt-2 text-sm leading-6 text-[#c7dbe7]">{spec.presentation.completion}</p>
-          </div>
-        ) : options?.length ? (
+        {options?.length ? (
           <div>
             <p className="text-xs font-black tracking-[.14em] text-[#ffe08a]">
-              {activeStageKind === 'prediction' ? '先猜一猜' : activeStageKind === 'transfer' ? '换个情况试试' : '说出你的发现'}
+              {activeStageKind === 'prediction'
+                ? '先猜一猜'
+                : activeStageKind === 'transfer'
+                  ? '换个情况试试'
+                  : '说出你的发现'}
             </p>
             <p className="mt-2 text-sm leading-6 text-[#dbe8ef]">
               {activeStageKind === 'prediction'
@@ -229,13 +236,24 @@ export function FamilyExperimentScene({
                   key={option.id}
                   type="button"
                   disabled={pending}
-                  onClick={() => void choose(activeStageKind as 'prediction' | 'transfer' | 'explanation', option.id, expected ?? '')}
+                  onClick={() =>
+                    void choose(
+                      activeStageKind as 'prediction' | 'transfer' | 'explanation',
+                      option.id,
+                      expected ?? '',
+                    )
+                  }
                   className="min-h-12 rounded-xl border border-white/15 bg-white/10 px-4 text-left text-sm font-bold transition hover:bg-white/15 disabled:opacity-60"
                 >
                   {option.label}
                 </button>
               ))}
             </div>
+            {activeStageKind === 'transfer' && challengeFeedback && (
+              <p role="status" aria-live="polite" className="mt-3 text-sm font-bold text-[#ffe08a]">
+                {challengeFeedback}
+              </p>
+            )}
           </div>
         ) : (
           <div>

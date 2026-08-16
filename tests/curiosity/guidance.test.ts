@@ -5,6 +5,7 @@ import {
   createGuidanceState,
   deriveGuidanceRequest,
   restoreGuidanceState,
+  mapGuidanceTriggerEvent,
 } from '@/lib/curiosity/guidance';
 import type {
   GuidanceTurnResponseV1,
@@ -88,6 +89,14 @@ function response(overrides: Partial<GuidanceTurnResponseV1> = {}): GuidanceTurn
 }
 
 describe('deterministic curiosity guidance state', () => {
+  it('advances transfer guidance only after the challenge is actually completed', () => {
+    expect(mapGuidanceTriggerEvent('transfer', 'challenge_attempted')).toBeNull();
+    expect(mapGuidanceTriggerEvent('transfer', 'challenge_completed')).toBe('transfer_attempted');
+    expect(mapGuidanceTriggerEvent('explanation', 'explanation_selected')).toBe(
+      'explanation_selected',
+    );
+  });
+
   it('starts at the first story stage and derives a version-bound request', () => {
     const state = createGuidanceState(story);
     expect(state).toEqual({

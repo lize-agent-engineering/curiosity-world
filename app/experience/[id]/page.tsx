@@ -9,6 +9,7 @@ import { CuriosityParentReview } from '@/components/curiosity/parent-review';
 import { CuriosityRuntimeFrame } from '@/components/curiosity/runtime-frame';
 import { VoiceGuide } from '@/components/curiosity/voice-guide';
 import { ExplorationTeamStrip } from '@/components/curiosity/exploration-team-strip';
+import { ExplorationCompletion } from '@/components/curiosity/exploration-completion';
 import { Button } from '@/components/ui/button';
 import {
   getCuriosityApiHeaders,
@@ -35,6 +36,7 @@ import {
   applyGuidanceTurn,
   createGuidanceState,
   deriveGuidanceRequest,
+  mapGuidanceTriggerEvent,
   type GuidanceState,
 } from '@/lib/curiosity/guidance';
 import {
@@ -54,6 +56,7 @@ import {
 } from '@/lib/curiosity/experience-recovery';
 import { runGuidanceWithRetry } from '@/lib/curiosity/guidance-retry';
 import { selectActiveTeamMember } from '@/lib/curiosity/team-speaker';
+import { isExperienceComplete } from '@/lib/curiosity/completion';
 
 type Mode = 'child' | 'parent';
 
@@ -128,13 +131,18 @@ export default function CuriosityExperiencePage() {
     );
     return artifact ? teamAssemblyArtifactV1Schema.parse(artifact) : null;
   }, [selected]);
+  const experienceCompleted = selected ? isExperienceComplete(selected.spec, events) : false;
   const activeStageKind = story?.stages.find((stage) => stage.id === guidanceState?.stageId)?.kind;
   const activeTeamMember = useMemo(
     () =>
       explorationTeam
-        ? selectActiveTeamMember(explorationTeam, activeStageKind, guideNarration)
+        ? selectActiveTeamMember(
+            explorationTeam,
+            experienceCompleted ? 'explanation' : activeStageKind,
+            experienceCompleted ? '' : guideNarration,
+          )
         : null,
-    [activeStageKind, explorationTeam, guideNarration],
+    [activeStageKind, experienceCompleted, explorationTeam, guideNarration],
   );
 
   useEffect(() => {
@@ -184,7 +192,6 @@ export default function CuriosityExperiencePage() {
     );
     return artifact ? revisionImpactArtifactV1Schema.parse(artifact) : undefined;
   }, [revisionImpact, selected]);
-
   const handleReady = useCallback(() => {
     if (!pendingCandidateId) return;
     const candidateId = pendingCandidateId;
@@ -269,8 +276,10 @@ export default function CuriosityExperiencePage() {
       if (!story || !guidanceState) return;
       if (!guideStarted) setGuideStarted(true);
       const stage = story.stages.find((candidate) => candidate.id === guidanceState.stageId);
-      const mappedType = event.type === 'challenge_attempted' ? 'transfer_attempted' : event.type;
-      if (!stage?.allowedEventTypes.includes(mappedType as never)) return;
+      if (!stage) return;
+      const mappedType = mapGuidanceTriggerEvent(stage.kind, event.type);
+      if (!mappedType) return;
+      if (!stage.allowedEventTypes.includes(mappedType as never)) return;
       try {
         await requestGuidance(
           {
@@ -578,36 +587,49 @@ export default function CuriosityExperiencePage() {
             {explorationTeam && (
               <ExplorationTeamStrip team={explorationTeam} activeMemberId={activeTeamMember?.id} />
             )}
-            {story &&
-              !pendingCandidateId &&
-              selected.id === aggregate.experience.activeVersionId && (
-                <VoiceGuide
-                  narration={guideNarration}
-                  started={guideStarted}
-                  listening={listening}
-                  requestingMicrophone={requestingMicrophone}
-                  speakerName={activeTeamMember?.name}
-                  speakerAvatar={activeTeamMember?.avatar}
-                  status={voiceStatus ?? guideStatus}
-                  error={voiceError}
-                  transcript={transcript}
-                  onStart={() => {
-                    setGuideStarted(true);
-                    void playNarration();
-                  }}
-                  onReplay={() => void playNarration()}
-                  onSkip={() => globalThis.speechSynthesis?.cancel()}
-                  onListen={() => void handleVoiceAnswer()}
+            {experienceCompleted && explorationTeam && activeTeamMember && summary ? (
+              <ExplorationCompletion
+                spec={selected.spec}
+                team={explorationTeam}
+                speaker={activeTeamMember}
+                summary={summary}
+                onParentReview={() => setMode('parent')}
+                onNewQuestion={() => router.push('/')}
+              />
+            ) : (
+              <>
+                {story &&
+                  !pendingCandidateId &&
+                  selected.id === aggregate.experience.activeVersionId && (
+                    <VoiceGuide
+                      narration={guideNarration}
+                      started={guideStarted}
+                      listening={listening}
+                      requestingMicrophone={requestingMicrophone}
+                      speakerName={activeTeamMember?.name}
+                      speakerAvatar={activeTeamMember?.avatar}
+                      status={voiceStatus ?? guideStatus}
+                      error={voiceError}
+                      transcript={transcript}
+                      onStart={() => {
+                        setGuideStarted(true);
+                        void playNarration();
+                      }}
+                      onReplay={() => void playNarration()}
+                      onSkip={() => globalThis.speechSynthesis?.cancel()}
+                      onListen={() => void handleVoiceAnswer()}
+                    />
+                  )}
+                <CuriosityRuntimeFrame
+                  key={selected.id}
+                  spec={selected.spec}
+                  onReady={handleReady}
+                  onEvent={handleGuidedEvent}
+                  onRuntimeFailure={handleRuntimeFailure}
+                  activeStageKind={activeStageKind}
                 />
-              )}
-            <CuriosityRuntimeFrame
-              key={selected.id}
-              spec={selected.spec}
-              onReady={handleReady}
-              onEvent={handleGuidedEvent}
-              onRuntimeFailure={handleRuntimeFailure}
-              activeStageKind={activeStageKind}
-            />
+              </>
+            )}
           </div>
         ) : (
           <CuriosityParentReview

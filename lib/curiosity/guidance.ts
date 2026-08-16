@@ -6,6 +6,7 @@ import {
   type GuidanceTurnResponseV1,
   type StoryDesignArtifactV1,
 } from './agent-contracts';
+import type { CuriosityEventV1 } from './contracts';
 
 export interface GuidanceState {
   storyArtifactId: string;
@@ -27,6 +28,17 @@ export class GuidanceStageConflictError extends Error {
     super(`GUIDANCE_STAGE_CONFLICT: ${message}`);
     this.name = 'GuidanceStageConflictError';
   }
+}
+
+export function mapGuidanceTriggerEvent(
+  stageKind: StoryDesignArtifactV1['stages'][number]['kind'],
+  eventType: CuriosityEventV1['type'],
+): string | null {
+  if (stageKind === 'transfer' && eventType === 'challenge_attempted') return null;
+  if (stageKind === 'transfer' && eventType === 'challenge_completed') {
+    return 'transfer_attempted';
+  }
+  return eventType;
 }
 
 function parsedStory(input: StoryDesignArtifactV1): StoryDesignArtifactV1 {
