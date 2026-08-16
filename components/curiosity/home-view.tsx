@@ -212,7 +212,7 @@ export function CuriosityHomeView({
                 />
               </label>
             </div>
-            {status && <CollaborationProgress status={status} />}
+            {status && <CollaborationProgress status={status} question={values.question} />}
             {error && (
               <p
                 role="alert"

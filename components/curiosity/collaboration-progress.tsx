@@ -8,7 +8,7 @@ import type {
   CuriosityPipelineStage,
 } from '@/lib/curiosity/agent-pipeline';
 
-const stages: Array<{
+const baseStages: Array<{
   id: CuriosityPipelineStage;
   role: string;
   label: string;
@@ -81,6 +81,7 @@ const stages: Array<{
 ];
 
 interface CollaborationProgressProps {
+  question?: string;
   status: {
     step: string;
     progress: number;
@@ -101,7 +102,43 @@ function artifactConclusion(artifact: CuriosityPipelineArtifact | undefined): st
   return undefined;
 }
 
-export function CollaborationProgress({ status }: CollaborationProgressProps) {
+function assembleStages(question: string, artifacts: CuriosityPipelineArtifact[]) {
+  const serialized = JSON.stringify(artifacts);
+  const family = /balance-support|桥|承重|支点|重心/.test(`${serialized}${question}`)
+    ? 'balance-support'
+    : /light-path|影子|手电筒|光源/.test(`${serialized}${question}`)
+      ? 'light-path'
+      : 'relative-motion';
+  const specialist =
+    family === 'balance-support'
+      ? {
+          knowledge: ['结构与承重研究员', '研究支撑', '梳理重心、支点与承重之间可观察的关系。', '承'],
+          interaction: ['桥梁实验设计师', '设计承重实验', '把桥墩位置和载荷变成能亲手测试的变量。', '桥'],
+        }
+      : family === 'light-path'
+        ? {
+            knowledge: ['光路观察研究员', '研究光影', '梳理光源、遮挡物与影子变化的关系。', '光'],
+            interaction: ['影子实验设计师', '设计光影实验', '把光源位置和影子长度变成能亲手比较的任务。', '影'],
+          }
+        : {
+            knowledge: ['空间观察研究员', '研究视差', '梳理远近物体在移动观察中的视角变化。', '空'],
+            interaction: ['移动实验设计师', '设计观察', '把视差原理变成可以移动和比较的任务。', '移'],
+          };
+  return baseStages.map((stage) => {
+    const replacement =
+      stage.id === 'knowledge_design'
+        ? specialist.knowledge
+        : stage.id === 'interaction_design'
+          ? specialist.interaction
+          : null;
+    return replacement
+      ? { ...stage, role: replacement[0], label: replacement[1], intro: replacement[2], initials: replacement[3] }
+      : stage;
+  });
+}
+
+export function CollaborationProgress({ status, question = '' }: CollaborationProgressProps) {
+  const stages = assembleStages(question, status.artifacts ?? []);
   const completed = new Set(status.completedStages ?? []);
   const artifacts = status.artifacts ?? [];
   const activeStage =

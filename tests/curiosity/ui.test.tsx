@@ -122,18 +122,40 @@ describe('Curiosity structured collaboration', () => {
       }),
     );
 
-    expect(html).toContain('知识研究员');
+    expect(html).toContain('空间观察研究员');
     expect(html).toContain('正在梳理科学原理、因果关系和常见误解');
     expect(html).toContain('仍在认真工作');
     expect(html).toContain('通常需要 2–4 分钟');
     expect(html).toContain('已完成 1 / 6');
     expect(html).toContain('问题侦探');
-    expect(html).toContain('互动设计师');
+    expect(html).toContain('移动实验设计师');
     expect(html).toContain('故事引导员');
     expect(html).toContain('运行工程师');
     expect(html).toContain('体验质检员');
-    expect(html).toContain('把抽象知识变成孩子可以操作的探索');
+    expect(html).toContain('把视差原理变成可以移动和比较的任务');
     expect(html).toContain('前一位交付结果，下一位接着完成');
+  });
+
+  it('assembles question-specific specialists instead of showing one fixed team', () => {
+    const bridge = renderToStaticMarkup(
+      createElement(CollaborationProgress, {
+        question: '桥为什么不会倒？',
+        status: { step: 'knowledge_design', progress: 25, message: '正在组队', artifacts: [] },
+      }),
+    );
+    const shadow = renderToStaticMarkup(
+      createElement(CollaborationProgress, {
+        question: '影子为什么会变长？',
+        status: { step: 'knowledge_design', progress: 25, message: '正在组队', artifacts: [] },
+      }),
+    );
+
+    expect(bridge).toContain('结构与承重研究员');
+    expect(bridge).toContain('桥梁实验设计师');
+    expect(bridge).not.toContain('光路观察研究员');
+    expect(shadow).toContain('光路观察研究员');
+    expect(shadow).toContain('影子实验设计师');
+    expect(shadow).not.toContain('结构与承重研究员');
   });
 
   it('renders verified stage conclusions instead of agent chat bubbles', () => {
@@ -149,7 +171,7 @@ describe('Curiosity structured collaboration', () => {
       }),
     );
     expect(html).toContain('核心问题');
-    expect(html).toContain('知识边界');
+    expect(html).toContain('研究视差');
     expect(html).not.toContain('agent-chat-bubble');
   });
 
