@@ -210,6 +210,7 @@ const REQUIRED_RUNTIME_TASK_KINDS = [
   'transfer',
   'explanation',
 ] as const;
+const SCIENTIFIC_ABSOLUTE_LANGUAGE = /纹丝不动|绝对(?:不会|不可能)|永远(?:不会|不倒|不变)|一定(?:不会|不倒|不变)/;
 const interactionOutputSchemaForAge = (
   age: number,
   allowedVariables?: Readonly<Record<string, { min: number; max: number }>>,
@@ -236,6 +237,15 @@ const interactionOutputSchemaForAge = (
           code: 'custom',
           path: ['instructionCopy', index, 'text'],
           message: `primary instruction exceeds the age ${age} limit`,
+        });
+      }
+    });
+    output.feedback.forEach((feedback, index) => {
+      if (SCIENTIFIC_ABSOLUTE_LANGUAGE.test(feedback.message)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['feedback', index, 'message'],
+          message: 'feedback must describe the observed result without absolute scientific claims',
         });
       }
     });
@@ -811,6 +821,12 @@ export async function runCuriosityAgentPipeline(
       transferRule: 'only-use-declared-variables-and-primitives',
       forbiddenInteractionCopy:
         '不得要求孩子执行未由 allowedVariables 与 allowedPrimitives 支持的换物体、换场景或新增机制操作。',
+      scientificCopyPolicy: {
+        forbiddenExplanations: knowledge.forbiddenExplanations,
+        misconceptions: knowledge.misconceptions,
+        absoluteLanguage:
+          '反馈只能描述这一次观察到的结果；禁止纹丝不动、绝对不会、永远不倒、一定不变等绝对化科学表述。',
+      },
       primaryInstructionLimit: input.age <= 7 ? 16 : 28,
       instructionCopyRule: `instructionCopy 中每条 text 去掉标点和空格后不得超过 ${input.age <= 7 ? 16 : 28} 个汉字；必须逐条自行计数并缩短`,
       requiredTaskKinds: [...REQUIRED_RUNTIME_TASK_KINDS],

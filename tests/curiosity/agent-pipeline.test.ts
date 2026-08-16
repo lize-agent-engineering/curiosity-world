@@ -344,6 +344,31 @@ describe('Curiosity five-ability generation pipeline', () => {
     });
   });
 
+  it('retries absolute scientific feedback before downstream quality review', async () => {
+    let attempts = 0;
+    const result = await runCuriosityAgentPipeline(
+      { question: '为什么月亮看起来会跟着我们？', age: 8, interests: [] },
+      models({
+        'curiosity.interaction-designer': {
+          route: { providerId: 'test', modelId: 'strict-json' },
+          async complete() {
+            attempts += 1;
+            const valid = interactionOutput();
+            return JSON.stringify(
+              attempts === 1
+                ? { ...valid, feedback: [{ ...valid.feedback[0], message: '远处物体纹丝不动。' }] }
+                : valid,
+            );
+          },
+        },
+      }),
+      identities,
+    );
+
+    expect(attempts).toBe(2);
+    expect(result.artifacts.some((artifact) => artifact.agentRole === 'curiosity.quality-reviewer')).toBe(true);
+  });
+
   it('rejects adult idioms and belittling language from child narration', async () => {
     const unsafeStory = storyOutput();
     unsafeStory.stages[0]!.openingNarration = '月亮好像在溜须拍马地跟着你，这么简单你肯定懂吧？';
