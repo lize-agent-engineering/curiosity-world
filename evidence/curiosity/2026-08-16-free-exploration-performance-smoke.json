@@ -31,6 +31,14 @@
       "note": "Model returned no structured output."
     },
     {
+      "kind": "kimi-k2.5-route",
+      "terminal": "stopped_after_question_stage",
+      "stageDurationsMs": {
+        "question": 91901
+      },
+      "note": "Question modeling alone consumed 91.9 seconds, so the five-stage serial route cannot meet the 120-second hard limit."
+    },
+    {
       "kind": "glm-5.2-with-duplicate-schema-prompt-removed",
       "terminal": "quality_retry_started",
       "stageDurationsMs": {
