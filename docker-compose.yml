@@ -1,11 +1,18 @@
 services:
   curiosity-world:
+    container_name: curiosity-world-local
     build:
       context: .
+      # `worker` is the last stage in the Dockerfile, so an untargeted build
+      # produces the worker image and this service would run the worker instead
+      # of the web server. Always pin the stage explicitly.
+      target: runner
       args:
         - ALLOWED_FRAME_ANCESTORS=${ALLOWED_FRAME_ANCESTORS:-}
     ports:
-      - '3000:3000'
+      # Host 3100 is what the fixed ngrok address forwards to; host 3000 is
+      # taken by another local project. Override with CURIOSITY_HOST_PORT.
+      - '${CURIOSITY_HOST_PORT:-3100}:3000'
     env_file:
       - .env.local
     volumes:
