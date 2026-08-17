@@ -16,4 +16,4 @@
 
 当前运行契约：Web 只创建和读取任务；`curiosity-worker` 是唯一可领取、续跑和回收过期任务的进程。任务更新必须携带 `expectedStoreVersion`，未过期租约不能被其他 worker 接管。
 
-每期必须独立通过格式、Lint、类型、单元测试、构建和端到端门禁。120 秒是硬产品目标，不能通过放宽指标准出。
+每期必须独立通过格式、Lint、类型、单元测试、构建和端到端门禁。生成时长硬产品目标为 10 分钟（2026-08-17 由 120 秒放宽，决策见 `evidence/curiosity/2026-08-16-free-exploration-performance-smoke.json` 的 `limitChange`）。除该条已记录的产品决策外，不能通过放宽指标准出。

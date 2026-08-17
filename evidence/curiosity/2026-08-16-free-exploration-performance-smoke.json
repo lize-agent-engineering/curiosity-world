@@ -1,7 +1,17 @@
 {
-  "status": "VERIFICATION_FAILED",
+  "status": "REEVALUATION_PENDING",
   "scope": "Curiosity V3 free-exploration real-model performance smoke",
-  "hardLimitMs": 120000,
+  "hardLimitMs": 600000,
+  "attemptsMeasuredUnderHardLimitMs": 120000,
+  "limitChange": {
+    "date": "2026-08-17",
+    "previousHardLimitMs": 120000,
+    "newHardLimitMs": 600000,
+    "decidedBy": "product owner",
+    "rationale": "The 120-second target was a product goal, not a technical constraint: generation already runs in the out-of-band curiosity-worker, so no request timeout enforced it. Rather than change the five-stage serial topology or keep searching OpenRouter for a faster strict-structured-output model, the owner chose to relax the total-duration goal to 10 minutes.",
+    "enforcedAt": "lib/curiosity/spike.ts CURIOSITY_LIVE_TIMEOUT_MS",
+    "perCallTimeout": "CURIOSITY_MODEL_TIMEOUT_MS was raised from 120000 to 300000 ms in the same decision — the maximum the validator in lib/curiosity/server-model.ts accepts. A single stage may now run up to 5 minutes; two such stages would still leave the 600000 ms total gate satisfiable. The in-code default for environments that do not set the variable is unchanged at 120000."
+  },
   "modelRoute": "openrouter:z-ai/glm-5.2",
   "question": "飞机为什么能飞起来？",
   "targetAge": 8,
@@ -78,5 +88,12 @@
       "note": "The first quality review rejected and correctly triggered the allowed scene/presentation/quality retry. The hard limit was already exceeded before that retry."
     }
   ],
-  "conclusion": "The implementation is functional, but the current five-model serial route cannot satisfy the 120-second release gate. Do not run the 60-run final gate until a faster compatible model route or a product-approved pipeline-topology change is validated."
+  "reevaluationAgainstNewLimit": {
+    "note": "The attempts above are unchanged raw measurements taken under the 120000 ms limit; their individual notes still argue against that old limit. Nothing below has been re-measured — this is a re-reading of existing samples against 600000 ms.",
+    "glm-5.2": "Both samples now fit: 139200 ms end-to-end, and 190581 ms before an allowed quality retry that would add roughly the observed scene+presentation+quality cost. GLM-5.2 produced valid strict-schema output at every stage in every sample, so the limit was its only blocker. It is the leading candidate.",
+    "deepseek-v4-flash": "Latency is no longer disqualifying, but the QUALITY_REJECTED sample is a quality failure independent of the limit and remains unresolved.",
+    "kimi-k2.5": "Only the question stage was ever measured (91901 ms); no full five-stage sample exists, so it stays unverified.",
+    "qwen-flash / glm-5.1": "Still disqualified for lack of real strict structured-output support; unaffected by the limit change."
+  },
+  "conclusion": "The 120-second release gate was retired by product decision on 2026-08-17 in favour of a 600-second gate, so the failure recorded in this file no longer stands. No run has yet been measured under the new limit. The next step is the 60-run final gate on the openrouter:z-ai/glm-5.2 route; a pass there, not this re-reading, is what unblocks release."
 }

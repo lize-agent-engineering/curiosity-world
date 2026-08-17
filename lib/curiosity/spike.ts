@@ -20,7 +20,7 @@ export const CURIOSITY_BOUNDARY_CASES = [
 ] as const;
 
 export const CURIOSITY_LIVE_RUNS_PER_CASE = 5;
-export const CURIOSITY_LIVE_TIMEOUT_MS = 120_000;
+export const CURIOSITY_LIVE_TIMEOUT_MS = 600_000;
 
 export interface CuriosityLiveRun {
   caseId: (typeof CURIOSITY_LIVE_CASES)[number]['id'];

@@ -32,4 +32,4 @@ pnpm build
 pnpm test:e2e
 ```
 
-`pnpm check` 仅检查格式。真实模型门禁使用 12 类问题各 5 次，硬时限 120 秒；模型只能由 worker 的服务端 `MODEL_ROUTES`/`DEFAULT_MODEL` 配置。准备工程 evidence、Web 与 worker 后运行 `pnpm spike:curiosity:real`。
+`pnpm check` 仅检查格式。真实模型门禁使用 12 类问题各 5 次，硬时限 10 分钟；模型只能由 worker 的服务端 `MODEL_ROUTES`/`DEFAULT_MODEL` 配置。准备工程 evidence、Web 与 worker 后运行 `pnpm spike:curiosity:real`。

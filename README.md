@@ -26,4 +26,4 @@ pnpm build
 pnpm test:e2e
 ```
 
-`pnpm check` is formatting only. The real-model gate executes 12 question classes five times each with a hard 120-second limit through `pnpm spike:curiosity:real`. Models are configured only through the worker's server-side `MODEL_ROUTES`/`DEFAULT_MODEL`.
+`pnpm check` is formatting only. The real-model gate executes 12 question classes five times each with a hard 10-minute limit through `pnpm spike:curiosity:real`. Models are configured only through the worker's server-side `MODEL_ROUTES`/`DEFAULT_MODEL`.
