@@ -31,3 +31,8 @@ services:
 
 volumes:
   curiosity-world-data:
+    # Pin the real volume name. Without this, compose prefixes it with the
+    # project name and the stack silently comes up on an empty volume instead
+    # of the data the manual `docker run -v curiosity-world-data:/app/data`
+    # deployment has been writing to.
+    name: curiosity-world-data
