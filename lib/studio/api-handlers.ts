@@ -152,6 +152,11 @@ export function createStudioProjectsGetHandler(deps: { projectStore: StudioStore
           return {
             id: project.id,
             title: project.title,
+            // The project title is the question, truncated to fit; the full text
+            // is on the first message and is what the home page lists.
+            question: snapshot?.messages.find((message) => message.role === 'user')?.text ?? null,
+            /** The name the planner gave the app this question produced. */
+            appName: version?.plan?.appName ?? null,
             mode: project.mode,
             targetAge: project.targetAge ?? null,
             updatedAt: project.updatedAt,

@@ -71,7 +71,8 @@ async function seeded(): Promise<{ jobStore: StudioJobStore; projectStore: Studi
   await projectStore.create(
     createStudioSnapshot({
       projectId: 'prj_one',
-      title: '番茄钟',
+      // What the user typed, which is the project's identity.
+      title: '做个番茄钟',
       createdAt: at,
       firstMessage: { id: 'msg_one', text: '做个番茄钟', createdAt: at },
     }),
@@ -119,7 +120,7 @@ describe('runStudioWorkerOnce', () => {
     expect(finished.result).toMatchObject({ versionId: 'ver_new', revision: 1 });
   });
 
-  it('renames the project to the planned app name on the first version only', async () => {
+  it('keeps the question as the project title rather than renaming it to the app', async () => {
     const { jobStore, projectStore } = await seeded();
     await jobStore.create(job());
     await runStudioWorkerOnce({
@@ -129,19 +130,10 @@ describe('runStudioWorkerOnce', () => {
       resolveModels: async () => models(),
       newIds: ids,
     });
-    expect((await projectStore.read('prj_one'))!.project.title).toBe('番茄钟');
-    await jobStore.create(
-      job({ id: 'job_two', input: { request: '改标题', parentVersionId: null } }),
-    );
-    await runStudioWorkerOnce({
-      jobStore,
-      projectStore,
-      workerId: 'w1',
-      resolveModels: async () =>
-        models(['<<<<<<< SEARCH\n<h1>番茄钟</h1>\n=======\n<h1>专注钟</h1>\n>>>>>>> REPLACE']),
-      newIds: () => ({ versionId: 'ver_two', messageId: 'msg_two' }),
-    });
-    expect((await projectStore.read('prj_one'))!.project.title).toBe('番茄钟');
+    // The planner named the app 番茄钟; the project stays what was asked for.
+    const snapshot = (await projectStore.read('prj_one'))!;
+    expect(snapshot.project.title).toBe('做个番茄钟');
+    expect(snapshot.versions[0]!.plan!.appName).toBe('番茄钟');
   });
 
   it('streams the code into the job as it is written', async () => {

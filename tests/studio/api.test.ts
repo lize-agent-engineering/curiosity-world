@@ -158,6 +158,7 @@ describe('GET /api/studio/projects', () => {
     const projects = body.projects as Array<Record<string, unknown>>;
     expect(projects).toHaveLength(1);
     expect(projects[0]).toMatchObject({ id: 'prj_test1', appKind: 'tool', revision: 1 });
+    expect(projects[0]!.question).toBe('做一个番茄钟');
   });
 
   it('lists a project that has no version yet', async () => {

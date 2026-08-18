@@ -60,6 +60,8 @@ export type StudioJobView = z.infer<typeof studioJobViewSchema>;
 export const studioProjectSummarySchema = z.object({
   id: z.string(),
   title: z.string(),
+  question: z.string().nullable(),
+  appName: z.string().nullable(),
   mode: studioModeSchema,
   targetAge: z.number().nullable(),
   createdAt: z.string(),

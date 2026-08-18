@@ -17,6 +17,19 @@ import type { StudioProjectSummary } from '@/lib/studio/client';
 
 const MAX_STARS = 8;
 
+/** What the question produced: the app's name, who it was for, how many rounds. */
+function metaOf(project: StudioProjectSummary): string {
+  if (project.revision === 0) return '未完成';
+  const who = project.mode === 'education' ? `${project.targetAge ?? '—'} 岁` : '通用';
+  return [project.appName, who, `第 ${project.revision} 版`].filter(Boolean).join(' · ');
+}
+
+/** What was asked. Falls back to the project name for records made before it was kept. */
+function questionOf(project: StudioProjectSummary, limit?: number): string {
+  const asked = (project.question ?? project.title).trim();
+  return limit && asked.length > limit ? `${asked.slice(0, limit)}…` : asked;
+}
+
 function hash(value: string): number {
   let out = 0;
   for (let index = 0; index < value.length; index += 1) {
@@ -98,7 +111,7 @@ export function StudioSkyChart({ projects, onOpenProject }: StudioSkyChartProps)
             key={star.project.id}
             role="listitem"
             tabIndex={0}
-            aria-label={`${star.project.title}，${
+            aria-label={`${star.project.question ?? star.project.title}，${
               star.project.revision === 0 ? '未完成' : `第 ${star.project.revision} 版`
             }`}
             className="cursor-pointer outline-none [&:focus-visible_.sky-halo]:opacity-40 [&:hover_.sky-label]:fill-[var(--star)] [&:hover_.sky-star]:opacity-100"
@@ -133,9 +146,7 @@ export function StudioSkyChart({ projects, onOpenProject }: StudioSkyChartProps)
               fill="var(--star-soft)"
               style={{ font: '600 14px var(--font-sans)' }}
             >
-              {star.project.title.length > 16
-                ? `${star.project.title.slice(0, 16)}…`
-                : star.project.title}
+              {questionOf(star.project, 17)}
             </text>
             <text
               x={star.x + star.r + 12}
@@ -143,8 +154,7 @@ export function StudioSkyChart({ projects, onOpenProject }: StudioSkyChartProps)
               fill="var(--star-faint)"
               style={{ font: '10px var(--font-geist-mono)', letterSpacing: '0.08em' }}
             >
-              {star.project.mode === 'education' ? `${star.project.targetAge ?? '—'} 岁` : '通用'}
-              {star.project.revision === 0 ? ' · 未完成' : ` · 第 ${star.project.revision} 版`}
+              {metaOf(star.project)}
             </text>
           </g>
         ))}
@@ -166,13 +176,10 @@ export function StudioSkyChart({ projects, onOpenProject }: StudioSkyChartProps)
               />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold text-star">
-                  {star.project.title}
+                  {questionOf(star.project)}
                 </span>
-                <span className="label-machine mt-1 block text-star-faint">
-                  {star.project.mode === 'education'
-                    ? `${star.project.targetAge ?? '—'} 岁`
-                    : 'GENERAL'}
-                  {star.project.revision === 0 ? ' · 未完成' : ` · 第 ${star.project.revision} 版`}
+                <span className="mt-1 block truncate text-[11px] text-star-faint">
+                  {metaOf(star.project)}
                 </span>
               </span>
             </button>

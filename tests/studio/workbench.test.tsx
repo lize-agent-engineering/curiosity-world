@@ -350,27 +350,41 @@ describe('the studio home', () => {
     expect(html).not.toContain('孩子年龄');
   });
 
-  it('labels an education project by the child age it was made for', () => {
-    const html = renderToStaticMarkup(
-      <StudioHomeView
-        {...homeProps}
-        projects={[
-          {
-            id: 'prj_one',
-            title: '月亮为什么跟着我',
-            mode: 'education',
-            targetAge: 8,
-            revision: 2,
-            appKind: 'creative',
-            summary: '比较远近物体的视角变化。',
-            createdAt: at,
-            updatedAt: at,
-          },
-        ]}
-      />,
-    );
+  const askedProject = {
+    id: 'prj_one',
+    title: '为什么月亮看起来会跟着我…',
+    question: '为什么月亮看起来会跟着我们？',
+    appName: '月亮跟跑实验室',
+    mode: 'education' as const,
+    targetAge: 8,
+    revision: 2,
+    appKind: 'creative' as const,
+    summary: '比较远近物体的视角变化。',
+    createdAt: at,
+    updatedAt: at,
+  };
+
+  it('lists the question the child asked, not the name the planner invented', () => {
+    const html = renderToStaticMarkup(<StudioHomeView {...homeProps} projects={[askedProject]} />);
+    // The section is a list of questions, so the question leads.
+    expect(html).toContain('为什么月亮看起来会跟着我们？');
+    // The app it produced stays as supporting detail.
+    expect(html).toContain('月亮跟跑实验室');
     expect(html).toContain('8 岁');
-    expect(html).toContain('月亮为什么跟着我');
+  });
+
+  it('falls back to the project title for records kept before the question was', () => {
+    const html = renderToStaticMarkup(
+      <StudioHomeView {...homeProps} projects={[{ ...askedProject, question: null }]} />,
+    );
+    expect(html).toContain('为什么月亮看起来会跟着我…');
+  });
+
+  it('says so when an exploration never finished', () => {
+    const html = renderToStaticMarkup(
+      <StudioHomeView {...homeProps} projects={[{ ...askedProject, revision: 0 }]} />,
+    );
+    expect(html).toContain('未完成');
   });
 });
 

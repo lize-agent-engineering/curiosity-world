@@ -245,13 +245,12 @@ export async function runStudioWorkerOnce(input: StudioWorkerInput): Promise<boo
       jobId: job.id,
       createdAt,
     };
-    const committed = await withStudioProject(input.projectStore, job.projectId, (current) => {
-      const next = appendStudioMessage(appendStudioVersion(current, version), message);
-      // The project was named from the raw request; once the planner has named
-      // the app, that name is better in the project list.
-      if (current.versions.length > 0) return next;
-      return { ...next, project: { ...next.project, title: result.plan.appName } };
-    });
+    // The project is the question that was asked, so its title stays what the
+    // parent typed. The name the planner gave the app belongs to the version it
+    // named, and is shown alongside it.
+    const committed = await withStudioProject(input.projectStore, job.projectId, (current) =>
+      appendStudioMessage(appendStudioVersion(current, version), message),
+    );
     const stored = committed.versions.find((entry) => entry.id === version.id)!;
     await write({
       status: 'succeeded',
