@@ -101,6 +101,16 @@ describe('narration in education mode', () => {
     expect(report.warnings.map((issue) => issue.code)).not.toContain('HTML_NO_NARRATION');
   });
 
+  it('accepts a page that wraps the contract in its own helper', () => {
+    const report = validateStudioHtml(
+      page(
+        '<h1>毛毛虫</h1><script>function say(t){window.curiositySay(t);} say("好好吃呀");</script>',
+      ),
+      { education: true },
+    );
+    expect(report.warnings.map((issue) => issue.code)).not.toContain('HTML_NO_NARRATION');
+  });
+
   it('does not ask a general app to talk', () => {
     const report = validateStudioHtml(page('<h1>番茄钟</h1>'));
     expect(report.warnings.map((issue) => issue.code)).not.toContain('HTML_NO_NARRATION');

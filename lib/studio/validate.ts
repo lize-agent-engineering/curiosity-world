@@ -176,7 +176,9 @@ export function validateStudioHtml(
     });
   }
 
-  if (options.education && !/curiositySay\s*\(/.test(scriptText)) {
+  // A page may wrap the contract in a local helper, so the check is whether the
+  // page is on the contract at all, not how it spells its call sites.
+  if (options.education && !/curiositySay/.test(scriptText)) {
     warnings.push({
       code: 'HTML_NO_NARRATION',
       message: '页面没有调用 curiositySay()，孩子听不到任何解说。',

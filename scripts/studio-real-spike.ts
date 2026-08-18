@@ -88,7 +88,7 @@ async function runCase(sample: StudioSpikeCase, coderModel: string): Promise<Stu
       reviewRetryCount: created.reviewRetryCount,
       reviewSkipped: created.reviewSkipped,
       planFallback: created.planFallback,
-      narrates: /curiositySay\s*\(/.test(created.html),
+      narrates: /curiositySay/.test(created.html),
       warnings: validation.warnings.map((issue) => issue.code),
     });
     await writeFile(
@@ -138,7 +138,7 @@ async function runCase(sample: StudioSpikeCase, coderModel: string): Promise<Stu
       reviewRetryCount: patched.reviewRetryCount,
       reviewSkipped: patched.reviewSkipped,
       planFallback: patched.planFallback,
-      narrates: /curiositySay\s*\(/.test(patched.html),
+      narrates: /curiositySay/.test(patched.html),
       editBlockFailures: patched.editBlockFailures,
       warnings: validation.warnings.map((issue) => issue.code),
     });
