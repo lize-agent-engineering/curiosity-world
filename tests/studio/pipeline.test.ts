@@ -382,3 +382,46 @@ describe('the aimed patch retry', () => {
     expect(result.editBlockFailures).toEqual(['EDIT_BLOCK_NOT_FOUND', 'EDIT_BLOCK_NOT_FOUND']);
   });
 });
+
+describe('a coder call that produces nothing', () => {
+  it('retries once rather than losing the turn', async () => {
+    const bundle = models({ planner: [planJson()], coder: ['', good] });
+    const result = await runStudioPipeline({ request: '做个番茄钟' }, bundle);
+    expect(result.html).toContain('<h1>番茄钟</h1>');
+    expect((bundle['studio.coder'] as ReturnType<typeof scripted>).calls).toHaveLength(2);
+  });
+
+  it('retries once when the call throws, as a stalled provider does', async () => {
+    let calls = 0;
+    const coder = {
+      route: { providerId: 'test', modelId: 'stalling' },
+      async complete(input: { prompt: string }) {
+        calls += 1;
+        if (calls === 1) throw new Error('The operation was aborted due to timeout');
+        void input;
+        return good;
+      },
+    };
+    const result = await runStudioPipeline({ request: '做个番茄钟' }, {
+      'studio.planner': scripted([planJson()]),
+      'studio.coder': coder,
+      'studio.reviewer': scripted([reviewPass]),
+    } as never);
+    expect(calls).toBe(2);
+    expect(result.html).toContain('<h1>番茄钟</h1>');
+  });
+
+  it('gives up with the provider error when both attempts produce nothing', async () => {
+    const bundle = models({ planner: [planJson()], coder: [''] });
+    await expect(runStudioPipeline({ request: '做个番茄钟' }, bundle)).rejects.toThrow(
+      'CODER_RETURNED_NOTHING',
+    );
+  });
+
+  it('does not retry a call that produced real but unusable output', async () => {
+    const bundle = models({ planner: [planJson()], coder: ['这是一段说明，不是网页。'] });
+    await expect(runStudioPipeline({ request: '做个番茄钟' }, bundle)).rejects.toMatchObject({
+      failureCode: 'CODE_INVALID',
+    });
+  });
+});

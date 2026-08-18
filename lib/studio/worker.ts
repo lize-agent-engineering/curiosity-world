@@ -81,7 +81,11 @@ async function recoverExpiredStudioJobs(store: StudioJobStore, now: number): Pro
 
 export async function runStudioWorkerOnce(input: StudioWorkerInput): Promise<boolean> {
   const now = input.now ?? Date.now();
-  const leaseMs = input.leaseMs ?? 900_000;
+  // A coding round legitimately runs for minutes and can be retried once, and
+  // the lease is only refreshed when something is written back — a stalled call
+  // writes nothing. The lease has to outlast that, or a job still in flight gets
+  // recovered and restarted underneath itself.
+  const leaseMs = input.leaseMs ?? 1_800_000;
   await recoverExpiredStudioJobs(input.jobStore, now);
   const queued = (await input.jobStore.list()).find(
     (job) =>

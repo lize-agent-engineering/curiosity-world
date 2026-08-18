@@ -244,14 +244,34 @@ export async function runStudioPipeline(
   let patchResponseExcerpt: string | undefined;
   let codeAttempts = 0;
 
+  /**
+   * One coding round, with a single retry when the call produces nothing.
+   *
+   * The observed failure is a provider that accepts the request and then never
+   * emits — the call burns its whole timeout and returns empty. Retrying costs
+   * another round, but the alternative is losing the turn outright, and the
+   * failure is intermittent rather than a property of the prompt. A call that
+   * produced partial output is not retried: that is a real answer, and the
+   * validation path already handles a bad one.
+   */
   const writeCode = async (prompt: string): Promise<string> => {
-    codeAttempts += 1;
-    await emit({ type: 'stage', stage: 'coding', attempt: codeAttempts });
-    return coder.complete({
-      system,
-      prompt,
-      onDelta: (text) => emit({ type: 'code-delta', text }),
-    });
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      codeAttempts += 1;
+      await emit({ type: 'stage', stage: 'coding', attempt: codeAttempts });
+      try {
+        const text = await coder.complete({
+          system,
+          prompt,
+          onDelta: (chunk) => emit({ type: 'code-delta', text: chunk }),
+        });
+        if (text.trim() !== '') return text;
+        lastError = new Error('CODER_RETURNED_NOTHING');
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
   };
 
   interface CodeRound {
