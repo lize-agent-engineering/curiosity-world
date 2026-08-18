@@ -227,7 +227,15 @@ export function renderStudioPatchPrompt(input: {
   html: string;
   findings?: StudioReview['findings'];
   runtimeErrors?: StudioRuntimeError[];
+  /**
+   * Set on the second attempt, carrying the applier's own explanation of why
+   * the first set of blocks could not be applied.
+   */
+  retryGuidance?: string;
 }): string {
+  const retry = input.retryGuidance
+    ? `\n【上一次的编辑块没能对上原文，这一轮必须改正】\n${input.retryGuidance}\n`
+    : '';
   return `用户要修改一个已经在运行的应用。
 
 【用户这次的要求】
@@ -235,7 +243,7 @@ ${input.request}
 
 【修改后应达到的方案】
 ${renderPlan(input.plan)}
-${renderFindings(input.findings)}${renderRuntimeErrors(input.runtimeErrors)}
+${renderFindings(input.findings)}${renderRuntimeErrors(input.runtimeErrors)}${retry}
 【当前 HTML 全文】
 ${input.html}
 

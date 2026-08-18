@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>月亮为什么跟着我</title>
+<style>
+:root{
+  --bg:#0a1525;
+  --surface:#15233d;
+  --text:#eaf1fc;
+  --muted:#90a6c4;
+  --accent:#ffd368;
+  --border:#28405f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  padding:16px;
+  -webkit-tap-highlight-color:transparent;
+}
+.wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+
+.title{font-size:clamp(20px,5vw,26px);font-weight:700;text-align:center;margin:4px 0 0}
+.subtitle{color:var(--muted);text-align:center;font-size:14px;margin:0}
+
+#scene{
+  position:relative;
+  height:clamp(280px,46vh,400px);
+  border-radius:16px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  touch-action:none;
+  cursor:grab;
+  background:linear-gradient(180deg,#0a1830 0%,#142a4d 55%,#1a3a5a 100%);
+  user-select:none;
+}
+#scene:active{cursor:grabbing}
+.layer{position:absolute;top:0;left:0;width:100%;height:100%;will-change:transform}
+.stars{height:60%}
+.stars svg{width:120%;height:100%}
+.mountains{top:auto;bottom:30%;height:28%}
+.mountains svg{width:150%;height:100%}
+.moon-layer{top:6%;left:0;width:100%;height:52%;pointer-events:none}
+.moon-layer svg{position:absolute;left:50%;top:0;margin-left:-60px}
+.tree-layer{top:auto;bottom:22%;height:42%}
+.tree-layer svg{width:240%;height:100%}
+.ground{top:auto;bottom:0;height:22%;background:linear-gradient(180deg,#1d2740 0%,#0c1426 100%);z-index:2}
+.grass-layer{top:auto;bottom:0;height:22%;z-index:3}
+.grass-layer svg{width:240%;height:100%}
+
+.person{
+  position:absolute;
+  bottom:19%;
+  left:50%;
+  width:54px;height:88px;
+  transform:translateX(-50%);
+  z-index:6;
+  pointer-events:none;
+}
+.person.walking{animation:bob .42s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-5px)}}
+@media (prefers-reduced-motion:reduce){.person.walking{animation:none}}
+
+.draghint{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.35);
+  padding:6px 12px;border-radius:999px;font-size:13px;color:var(--text);
+  border:1px solid var(--border);
+  pointer-events:none;
+  transition:opacity .3s;
+  z-index:7;
+}
+.draghint.hide{opacity:0}
+
+.controls{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.stepbar{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.stepbar .dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:.2s;flex:0 0 auto}
+.stepbar .dot.active{background:var(--accent)}
+.stepbar .dot.done{background:var(--muted)}
+.stepbar .item{display:flex;align-items:center;gap:4px}
+
+.lead{font-size:15px;line-height:1.5;margin:0;color:var(--text)}
+
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.btn{
+  font:inherit;font-size:15px;
+  background:transparent;color:var(--text);
+  border:1px solid var(--border);
+  border-radius:10px;padding:12px 16px;
+  cursor:pointer;min-height:44px;
+  transition:150ms;
+  flex:1;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);color:#2a2300;border-color:var(--accent);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08);color:#2a2300}
+
+.slider-row{display:flex;flex-direction:column;gap:6px}
+.slider-row label{font-size:14px;color:var(--text);display:flex;justify-content:space-between;align-items:center}
+.slider-row .val{color:var(--accent)}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:36px;background:transparent;cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{height:6px;background:var(--border);border-radius:6px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--accent);margin-top:-9px;border:none;box-shadow:0 0 0 4px rgba(255,211,104,.2)}
+input[type=range]::-moz-range-track{height:6px;background:var(--border);border-radius:6px}
+input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--accent);border:none}
+
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;padding:16px;
+}
+.card h3{margin:0 0 10px;font-size:16px}
+.card p{margin:0 0 12px;color:var(--muted);font-size:14px;line-height:1.5}
+.card p.dark{color:var(--text)}
+.opt{
+  display:block;width:100%;text-align:left;
+  background:transparent;color:var(--text);
+  border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;margin:6px 0;font:inherit;font-size:15px;
+  cursor:pointer;min-height:44px;transition:150ms;
+}
+.opt:hover{border-color:var(--accent);color:var(--accent)}
+.opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.opt.chosen{border-color:var(--accent);background:rgba(255,211,104,.1);color:var(--accent)}
+.opt.correct{border-color:#7ad88f;background:rgba(122,216,143,.12);color:#a8e9b3}
+.opt.wrong{border-color:#e0867a;background:rgba(224,134,122,.12);color:#f0a59a}
+
+.feedback{font-size:14px;color:var(--text);line-height:1.5;margin-top:4px;min-height:1.2em}
+.feedback.muted{color:var(--muted)}
+
+.parents{
+  margin-top:4px;
+  background:#0d1c33;border:1px solid var(--border);
+  border-radius:16px;padding:16px;
+}
+.parents h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.06em}
+.parents p{margin:0;font-size:13px;line-height:1.6;color:var(--muted)}
+.parents ul{margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--muted)}
+.parents li{margin:3px 0}
+
+.hidden{display:none !important}
+
+.endcard{text-align:center;padding:22px 16px}
+.endcard .big{font-size:22px;font-weight:700;margin:0 0 8px}
+.endcard .sub{color:var(--muted);font-size:14px;margin:0 0 16px;line-height:1.6}
+
+@media (max-width:380px){
+  .row{flex-direction:column}
+  .btn{flex:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="title">月亮为什么跟着我</h1>
+  <p class="subtitle">走走看，它真的在追你吗？</p>
+
+  <div id="scene" aria-label="夜路场景，可拖动">
+    <div class="layer stars" id="starsLayer"></div>
+    <div class="layer mountains" id="mountainsLayer"></div>
+    <div class="layer moon-layer" id="moonLayer"></div>
+    <div class="layer tree-layer" id="treeLayer"></div>
+    <div class="layer ground"></div>
+    <div class="layer grass-layer" id="grassLayer"></div>
+    <div class="person" id="person"></div>
+    <div class="draghint" id="draghint">← 拖动画面，带小人走 →</div>
+  </div>
+
+  <div class="controls">
+    <div class="stepbar" id="stepbar">
+      <span class="item"><span class="dot active"></span>走一走</span>
+      <span class="item"><span class="dot"></span>猜一猜</span>
+      <span class="item"><span class="dot"></span>试一试</span>
+      <span class="item"><span class="dot"></span>新问题</span>
+    </div>
+    <p class="lead" id="lead">用手指拖动画面，让小人左右走走。看看近处的树和远处的月亮，谁先跑出画面？</p>
+    <div class="slider-row">
+      <label>把月亮拉到 <span class="val" id="distVal">很远（像真的月亮）</span></label>
+      <input type="range" id="distSlider" min="0" max="100" value="5" aria-label="月亮远近">
+    </div>
+    <div class="row">
+      <button class="btn" id="swapBtn">把月亮换成气球</button>
+      <button class="btn primary" id="predictBtn">猜一猜</button>
+    </div>
+    <p class="feedback muted" id="feedback">随便拖，多走几次也没关系。</p>
+  </div>
+
+  <div class="card hidden" id="predictCard">
+    <h3>你觉得，月亮会怎样？</h3>
+    <p>先别动手，先在心里选一个答案。</p>
+    <button class="opt" data-opt="0">月亮会像树一样，飞快往后跑</button>
+    <button class="opt" data-opt="1">月亮几乎不动，一直在我前面</button>
+    <button class="opt" data-opt="2">月亮会跟着我，跑到我前面去</button>
+    <p class="feedback muted" id="predictFb"></p>
+    <button class="btn primary hidden" id="verifyBtn">好，再走一次验证</button>
+  </div>
+
+  <div class="card hidden" id="revealCard">
+    <h3 id="revealTitle">再走一次，然后点这里</h3>
+    <p class="hidden" id="revealText"></p>
+    <button class="btn primary" id="revealBtn">我看到了</button>
+    <button class="btn primary hidden" id="migrateBtn">来一个新问题</button>
+  </div>
+
+  <div class="card hidden" id="migrateCard">
+    <h3>新场景：山和路灯</h3>
+    <p class="dark">远处有一座山，近处有一盏路灯。你往前走，哪一个更像月亮，好像"跟着你"？</p>
+    <button class="opt" data-mopt="0">近处的路灯</button>
+    <button class="opt" data-mopt="1">远处的山</button>
+    <p class="feedback muted" id="migrateFb"></p>
+    <button class="btn primary hidden" id="finishBtn">看看我发现了什么</button>
+  </div>
+
+  <div class="card endcard hidden" id="endCard">
+    <p class="big">你发现啦 🌙</p>
+    <p class="sub">东西越远，你走的时候它看起来方向变化越小。<br>月亮特别特别远，所以像一直待在同一个地方，就像在跟着你。<br>其实它没有动，是你动了。</p>
+    <button class="btn" id="againBtn">再玩一次</button>
+  </div>
+
+  <div class="parents">
+    <h4>给家长看</h4>
+    <p>这次孩子做的事：</p>
+    <ul>
+      <li>在夜路场景里拖动画面模拟行走，观察近处的树和远处的月亮谁先"跑出画面"。</li>
+      <li>用滑块把月亮拉近或拉远，再走一遍，对比方向变化。</li>
+      <li>把月亮换成近处的气球，验证"越近越会跑"。</li>
+      <li>做了两次预测：先猜后验，再迁移到"远山 vs 近路灯"的新情境。</li>
+    </ul>
+    <p style="margin-top:10px">生活里可以继续观察：</p>
+    <ul>
+      <li>坐车时看窗外：近处电线杆飞快后退，远处小山好像跟着车走。</li>
+      <li>晚上散步，让孩子边走边看月亮，再看看路边路灯，比较谁"更会跟"。</li>
+      <li>提醒孩子：月亮没有真的追我们，是它太远，方向几乎不变。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+window.curiositySay = window.curiositySay || function (t) { try { var u = new SpeechSynthesisUtterance(String(t)); u.lang = 'zh-CN'; u.rate = 0.95; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} };
+
+const $=id=>document.getElementById(id);
+const scene=$('scene'),person=$('person');
+const starsLayer=$('starsLayer'),mountainsLayer=$('mountainsLayer');
+const moonLayer=$('moonLayer'),treeLayer=$('treeLayer'),grassLayer=$('grassLayer');
+const draghint=$('draghint'),lead=$('lead'),feedback=$('feedback');
+const distSlider=$('distSlider'),distVal=$('distVal'),swapBtn=$('swapBtn');
+const predictBtn=$('predictBtn'),predictCard=$('predictCard'),predictFb=$('predictFb'),verifyBtn=$('verifyBtn');
+const revealCard=$('revealCard'),revealTitle=$('revealTitle'),revealText=$('revealText');
+const revealBtn=$('revealBtn'),migrateBtn=$('migrateBtn');
+const migrateCard=$('migrateCard'),migrateFb=$('migrateFb'),finishBtn=$('finishBtn');
+const endCard=$('endCard'),againBtn=$('againBtn');
+const stepbar=$('stepbar');
+
+// 星空
+  let s='<svg viewBox="0 0 600 200" preserveAspectRatio="none" width="100%" height="100%">';
+  for(let i=0;i<46;i++){
+    const x=Math.random()*600,y=Math.random()*180,r=Math.random()*1.2+0.3;
+    s+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#d6e4ff" opacity="${(0.4+Math.random()*0.5).toFixed(2)}"/>`;
+  }
+  s+='</svg>';
+  starsLayer.innerHTML=s;
+})();
+
+// 远山
+mountainsLayer.innerHTML=`<svg viewBox="0 0 700 100" preserveAspectRatio="none" width="100%" height="100%">
+  <path d="M0,100 L0,60 L80,38 L160,68 L240,28 L320,55 L420,22 L520,58 L620,32 L700,52 L700,100 Z" fill="#1a3050" opacity="0.85"/>
+  <path d="M0,100 L0,76 L100,60 L200,80 L300,55 L400,75 L500,48 L600,72 L700,60 L700,100 Z" fill="#142440" opacity="0.95"/>
+</svg>`;
+
+// 月亮 / 气球
+function makeMoon(){
+  return `<svg viewBox="0 0 120 120" width="120" height="120">
+    <defs><radialGradient id="mg" cx="40%" cy="38%"><stop offset="0%" stop-color="#fff4d0"/><stop offset="100%" stop-color="#ffd278"/></radialGradient></defs>
+    <circle cx="60" cy="60" r="42" fill="url(#mg)"/>
+    <circle cx="48" cy="50" r="6" fill="#e8c47a" opacity="0.55"/>
+    <circle cx="72" cy="55" r="4" fill="#e8c47a" opacity="0.5"/>
+    <circle cx="60" cy="74" r="5" fill="#e8c47a" opacity="0.5"/>
+    <circle cx="80" cy="70" r="3" fill="#e8c47a" opacity="0.4"/>
+    <circle cx="42" cy="68" r="3" fill="#e8c47a" opacity="0.4"/>
+  </svg>`;
+}
+function makeBalloon(){
+  return `<svg viewBox="0 0 120 168" width="120" height="168">
+    <ellipse cx="60" cy="56" rx="34" ry="42" fill="#ff7a7a"/>
+    <ellipse cx="50" cy="42" rx="10" ry="14" fill="#ffb0b0" opacity="0.7"/>
+    <path d="M58,98 L56,108 L64,108 L62,98 Z" fill="#e85555"/>
+    <path d="M60,108 Q54,120 64,132 Q56,144 60,160" stroke="#cfcfcf" stroke-width="1.5" fill="none"/>
+  </svg>`;
+}
+
+// 树
+  const positions=[-180,-90,0,90,180,270,360,450,540,630,720,810,900,990,1080,1170,1260,1350,1440];
+  let s='<svg viewBox="0 0 1500 200" preserveAspectRatio="none" width="100%" height="100%">';
+  positions.forEach((x,i)=>{
+    const h=110+(i%3)*22;
+    const w=38+(i%2)*10;
+    s+=`<rect x="${x+23}" y="${200-h+44}" width="6" height="${h-44}" fill="#3a2a1a" opacity="0.9"/>`;
+    s+=`<ellipse cx="${x+26}" cy="${200-h+30}" rx="${w}" ry="${h*0.55}" fill="#1f4a2a"/>`;
+    s+=`<ellipse cx="${x+18}" cy="${200-h+44}" rx="${w*0.7}" ry="${h*0.4}" fill="#28583a"/>`;
+  });
+  s+='</svg>';
+  treeLayer.innerHTML=s;
+})();
+
+// 草丛
+  let s='<svg viewBox="0 0 1500 60" preserveAspectRatio="none" width="100%" height="100%">';
+  for(let x=0;x<1500;x+=22){
+    const h=8+Math.random()*14;
+    s+=`<path d="M${x},60 Q${x+2},${60-h} ${x+4},60" stroke="#2e5a3a" stroke-width="2" fill="none"/>`;
+    s+=`<path d="M${x+9},60 Q${x+11},${60-h*0.7} ${x+13},60" stroke="#365e42" stroke-width="2" fill="none"/>`;
+  }
+  s+='</svg>';
+  grassLayer.innerHTML=s;
+})();
+
+// 小人
+person.innerHTML=`<svg viewBox="0 0 54 88" width="54" height="88">
+  <ellipse cx="27" cy="86" rx="16" ry="3" fill="#000" opacity="0.35"/>
+  <rect x="20" y="50" width="14" height="22" rx="5" fill="#ffd368"/>
+  <circle cx="27" cy="32" r="11" fill="#ffd9b0"/>
+  <path d="M22,30 Q27,25 32,30" stroke="#3a2a1a" stroke-width="1.4" fill="none"/>
+  <circle cx="24" cy="32" r="1.2" fill="#3a2a1a"/>
+  <circle cx="30" cy="32" r="1.2" fill="#3a2a1a"/>
+  <rect x="13" y="52" width="6" height="20" rx="3" fill="#5a8fd6"/>
+  <rect x="35" y="52" width="6" height="20" rx="3" fill="#5a8fd6"/>
+  <rect x="20" y="70" width="6" height="16" rx="2" fill="#3a4a6a"/>
+  <rect x="28" y="70" width="6" height="16" rx="2" fill="#3a4a6a"/>
+</svg>`;
+
+// 状态
+let walk=0,isDragging=false,dragStartX=0,dragStartWalk=0;
+let moonFactor=0.05,mode='moon';
+let hasMoved=false,step='explore',predictChoice=null;
+
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+function setMode(m){
+  mode=m;
+  if(m==='moon'){
+    moonLayer.innerHTML=makeMoon();
+    moonLayer.style.top='6%';moonLayer.style.height='52%';
+    swapBtn.textContent='把月亮换成气球';
+    updateMoonFactor();
+  }else{
+    moonLayer.innerHTML=makeBalloon();
+    moonLayer.style.top='2%';moonLayer.style.height='68%';
+    swapBtn.textContent='把气球换回月亮';
+    moonFactor=0.85;
+    distVal.textContent='很近（气球）';
+    update();
+  }
+}
+function updateMoonFactor(){
+  if(mode!=='moon') return;
+  const v=+distSlider.value;
+  moonFactor=0.02+(v/100)*0.55;
+  let label;
+  if(v<15) label='很远（像真的月亮）';
+  else if(v<40) label='远';
+  else if(v<70) label='有点近';
+  else label='很近';
+  distVal.textContent=label;
+  update();
+}
+function update(){
+  treeLayer.style.transform=`translate3d(${-walk}px,0,0)`;
+  grassLayer.style.transform=`translate3d(${-walk}px,0,0)`;
+  moonLayer.style.transform=`translate3d(${-walk*moonFactor}px,0,0)`;
+  mountainsLayer.style.transform=`translate3d(${-walk*0.25}px,0,0)`;
+  starsLayer.style.transform=`translate3d(${-walk*0.08}px,0,0)`;
+}
+setMode('moon');
+update();
+
+// 拖动
+scene.addEventListener('pointerdown',e=>{
+  isDragging=true;dragStartX=e.clientX;dragStartWalk=walk;
+  try{scene.setPointerCapture(e.pointerId);}catch(_){}
+  person.classList.add('walking');
+});
+scene.addEventListener('pointermove',e=>{
+  if(!isDragging) return;
+  const dx=e.clientX-dragStartX;
+  walk=clamp(dragStartWalk+dx,-280,280);
+  update();
+  if(Math.abs(dx)>4 && !hasMoved){
+    hasMoved=true;
+    draghint.classList.add('hide');
+    if(step==='explore'){
+      curiositySay('你走起来啦。看看树和月亮有什么不一样。');
+      setFeedback('看，树在很快地往后跑。月亮呢，是不是几乎没动？','dark');
+    }else if(step==='verify'){
+      setFeedback('走得真好。看清楚月亮到底动了没动，然后点"我看到了"。','dark');
+    }
+  }
+});
+function endDrag(){
+  if(!isDragging) return;
+  isDragging=false;
+  person.classList.remove('walking');
+}
+scene.addEventListener('pointerup',endDrag);
+scene.addEventListener('pointercancel',endDrag);
+scene.addEventListener('pointerleave',e=>{ if(isDragging) endDrag(); });
+
+// 滑块
+distSlider.addEventListener('input',()=>{
+  if(mode!=='moon'){ // 切回月亮
+    setMode('moon');
+  }
+  updateMoonFactor();
+  if(step==='explore'){
+    setFeedback('月亮变近了一点。再走走看，它还跟不跟着你？','dark');
+  }
+});
+
+// 切换月亮/气球
+swapBtn.addEventListener('click',()=>{
+  if(mode==='moon'){
+    setMode('balloon');
+    curiositySay('这是气球，它离你很近。走走看。');
+    setFeedback('气球离你很近。你一走，它会像树一样很快跑走。','dark');
+  }else{
+    setMode('moon');
+    curiositySay('月亮回来了，它又很远很远。');
+    setFeedback('月亮回来了。它特别远，所以你走几步，它几乎不动。','dark');
+  }
+});
+
+function setFeedback(t,c){
+  feedback.textContent=t;
+  feedback.className='feedback'+(c?' '+c:'');
+}
+
+function setStep(i){
+  const dots=stepbar.querySelectorAll('.dot');
+  dots.forEach((d,idx)=>{
+    d.classList.remove('active','done');
+    if(idx<i) d.classList.add('done');
+    else if(idx===i) d.classList.add('active');
+  });
+}
+
+// 预测
+predictBtn.addEventListener('click',()=>{
+  step='predict';setStep(1);
+  predictCard.classList.remove('hidden');
+  predictBtn.classList.add('hidden');
+  predictFb.textContent='';
+  predictFb.className='feedback muted';
+  verifyBtn.classList.add('hidden');
+  document.querySelectorAll('#predictCard .opt').forEach(o=>o.classList.remove('chosen','correct','wrong'));
+  lead.textContent='先别动手，先在心里选一个答案。';
+  curiositySay('你觉得，月亮会怎样？选一个答案。');
+});
+
+document.querySelectorAll('#predictCard .opt').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('#predictCard .opt').forEach(o=>o.classList.remove('chosen'));
+    btn.classList.add('chosen');
+    predictChoice=+btn.dataset.opt;
+    predictFb.textContent='好，记住你的答案。现在再走一次，看月亮到底怎样。';
+    predictFb.className='feedback';
+    verifyBtn.classList.remove('hidden');
+    curiositySay('好，再走一次，看月亮到底怎样。');
+  });
+});
+
+verifyBtn.addEventListener('click',()=>{
+  step='verify';setStep(2);
+  predictCard.classList.add('hidden');
+  revealCard.classList.remove('hidden');
+  revealTitle.textContent='先走一次，再点下面';
+  revealText.classList.add('hidden');
+  revealBtn.classList.remove('hidden');
+  migrateBtn.classList.add('hidden');
+  lead.textContent='再拖动画面走一次，然后点"我看到了"。';
+  setFeedback('走一走，看月亮到底动了没动。','dark');
+  curiositySay('再走一次，看月亮到底动了没动。');
+});
+
+revealBtn.addEventListener('click',()=>{
+  revealTitle.textContent='原来是这样';
+  const correct=predictChoice===1;
+  let txt='你看：树离你近，你一走它就飞快往后跑，很快就到身后了。';
+  txt+='月亮特别特别远，远到你走几步，看它的方向几乎没变，所以它好像一直待在你前面，像在跟着你。';
+  txt+='其实它没有动，是你动了。';
+  revealText.textContent=txt;
+  revealText.classList.remove('hidden');
+  revealBtn.classList.add('hidden');
+  migrateBtn.classList.remove('hidden');
+  if(correct){
+    setFeedback('你猜对啦！月亮几乎不动，一直待在你前面。','dark');
+    curiositySay('你猜对啦，月亮几乎不动，一直待在你前面。');
+  }else{
+    setFeedback('没关系，现在你亲眼看到啦。月亮几乎不动，因为它太远了。','dark');
+    curiositySay('没关系，你亲眼看到啦。月亮几乎不动，因为它太远了。');
+  }
+});
+
+migrateBtn.addEventListener('click',()=>{
+  step='migrate';setStep(3);
+  revealCard.classList.add('hidden');
+  migrateCard.classList.remove('hidden');
+  migrateFb.textContent='';
+  migrateFb.className='feedback muted';
+  finishBtn.classList.add('hidden');
+  document.querySelectorAll('#migrateCard .opt').forEach(o=>o.classList.remove('chosen','correct','wrong'));
+  lead.textContent='新场景：山和路灯，哪个更像月亮？';
+  curiositySay('远处那座山，是不是也像月亮一样，好像在跟着你？');
+});
+
+document.querySelectorAll('#migrateCard .opt').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const v=+btn.dataset.mopt;
+    document.querySelectorAll('#migrateCard .opt').forEach(o=>o.classList.remove('chosen','correct','wrong'));
+    btn.classList.add('chosen');
+    if(v===1){
+      btn.classList.add('correct');
+      migrateFb.textContent='对！山很远，走起来方向变化小，所以像月亮一样"跟着你"。路灯近，一走就跑掉了。';
+      migrateFb.className='feedback';
+      finishBtn.classList.remove('hidden');
+      curiositySay('对啦，远处的山也像月亮一样，好像在跟着你。');
+    }else{
+      btn.classList.add('wrong');
+      migrateFb.textContent='再想想。近处的东西你一走就跑掉了，不会"跟着你"。试试远的那一个。';
+      migrateFb.className='feedback';
+      curiositySay('再想想，试试远的那一个。');
+    }
+  });
+});
+
+finishBtn.addEventListener('click',()=>{
+  step='done';
+  migrateCard.classList.add('hidden');
+  endCard.classList.remove('hidden');
+  lead.textContent='你做完啦。';
+  curiositySay('你发现了，越远的东西，越像在跟着你。');
+});
+
+againBtn.addEventListener('click',()=>{
+  step='explore';setStep(0);
+  walk=0;hasMoved=false;predictChoice=null;
+  setMode('moon');
+  distSlider.value=5;updateMoonFactor();
+  update();
+  predictCard.classList.add('hidden');
+  revealCard.classList.add('hidden');
+  migrateCard.classList.add('hidden');
+  endCard.classList.add('hidden');
+  predictBtn.classList.remove('hidden');
+  draghint.classList.remove('hide');
+  lead.textContent='用手指拖动画面，让小人左右走走。看看近处的树和远处的月亮，谁先跑出画面？';
+  setFeedback('随便拖，多走几次也没关系。','muted');
+});
+</script>
+</body>
+</html>

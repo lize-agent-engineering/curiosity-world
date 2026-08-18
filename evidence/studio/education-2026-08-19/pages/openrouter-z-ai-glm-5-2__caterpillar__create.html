@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>毛毛虫变蝴蝶</title>
+<style>
+:root{
+  --bg:#cfe8f5;
+  --bg-warm:#ffe0b3;
+  --surface:#fbf8ee;
+  --text:#2d3a2d;
+  --muted:#6b7d6b;
+  --accent:#e8893a;
+  --border:#8a9a8a;
+  --leaf:#5fa84e;
+  --leaf-dark:#3d7a35;
+  --caterpillar:#8bc34a;
+  --caterpillar-dark:#558b2f;
+  --pupa:#7a5a3d;
+  --pupa-dark:#4a3528;
+  --butterfly:#ff7043;
+  --butterfly-dark:#bf360c;
+  --flower-pink:#ec5ba0;
+  --flower-yellow:#f5c842;
+  --ground:#7cb342;
+  --ground-dark:#558b2f;
+  --branch:#5d4037;
+  --branch-light:#8d6e53;
+  --hill:#9bbf8a;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);overflow:hidden;touch-action:none;user-select:none}
+#stage{position:fixed;inset:0;background:linear-gradient(180deg,var(--bg) 0%,var(--bg) 55%,#b8d8a8 100%);transition:background 400ms}
+#scene{width:100%;height:100%;display:block}
+.cat-fill{fill:var(--caterpillar);stroke:var(--caterpillar-dark);transition:fill 300ms}
+#catScale.full .cat-fill{fill:var(--caterpillar-dark)}
+.cat-stroke{stroke:var(--caterpillar-dark);fill:none;stroke-linecap:round}
+.leaf-fill{fill:var(--leaf);stroke:var(--leaf-dark)}
+.leaf-stem{stroke:var(--branch);stroke-width:2}
+.leaf-vein{stroke:var(--leaf-dark);opacity:0.5}
+.bite{fill:var(--bg)}
+.sun-body{fill:#ffd54f;stroke:#f9a825;stroke-width:2}
+.sun-glow{fill:#fff3c4}
+.sun-ray{stroke:#ffd54f;stroke-width:3;stroke-linecap:round}
+.branch-stroke{stroke:var(--branch);fill:none;stroke-linecap:round}
+.branch-light{stroke:var(--branch-light);fill:none;stroke-linecap:round;opacity:0.7}
+.ground-fill{fill:var(--ground)}
+.ground-line{stroke:var(--ground-dark);fill:none;stroke-width:3}
+.hill-fill{fill:var(--hill);opacity:0.5}
+.flower-stem{stroke:var(--leaf-dark);stroke-width:3}
+.flower-c{fill:var(--accent)}
+.pupa-fill{fill:var(--pupa);stroke:var(--pupa-dark);stroke-width:2}
+.pupa-line{stroke:var(--pupa-dark);fill:none;opacity:0.5}
+.b-wing{fill:var(--butterfly);stroke:var(--butterfly-dark);stroke-width:1.5}
+.b-body{fill:#3e2723}
+.b-ant{stroke:#3e2723;stroke-width:1.2;fill:none;stroke-linecap:round}
+.b-spot{fill:#fff;opacity:0.85}
+#caterpillar{transition:opacity 400ms}
+#pupa{transition:opacity 500ms}
+#butterfly{transition:opacity 600ms}
+.wing-l{animation:flap 240ms infinite;transform-box:fill-box;transform-origin:right center}
+.wing-r{animation:flap 240ms infinite;transform-box:fill-box;transform-origin:left center}
+@keyframes flap{0%,100%{transform:scaleX(1)}50%{transform:scaleX(0.28)}}
+.fullbar{position:fixed;left:12px;top:12px;background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.fullbar .ring{width:18px;height:18px;border-radius:50%;background:var(--caterpillar);border:2px solid var(--leaf-dark);transition:all 200ms}
+.fullbar .ring.full{background:var(--caterpillar-dark);transform:scale(1.3);box-shadow:0 0 8px var(--caterpillar-dark)}
+.tipbar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:2px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:12px;min-height:54px}
+.tipbar .ico{font-size:26px;line-height:1;flex-shrink:0}
+.tipbar .txt{font-size:15px;line-height:1.3}
+.toast{position:fixed;left:50%;top:26%;transform:translate(-50%,-50%);background:var(--surface);border:3px solid var(--accent);border-radius:16px;padding:14px 20px;font-size:17px;font-weight:700;max-width:80vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity 200ms;z-index:30}
+.toast.show{opacity:1}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity 200ms;z-index:40}
+.overlay.show{opacity:1;pointer-events:auto}
+.card{background:var(--surface);border:3px solid var(--accent);border-radius:16px;padding:20px;max-width:340px;width:100%;box-shadow:0 12px 32px rgba(0,0,0,.3)}
+.card h3{margin:0 0 10px;font-size:18px;color:var(--text)}
+.card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:var(--muted)}
+.card .btns{display:flex;flex-direction:column;gap:8px}
+.card button{padding:12px;border:2px solid var(--border);border-radius:10px;background:var(--surface);font-size:15px;font-family:inherit;color:var(--text);cursor:pointer;transition:all 180ms;min-height:48px}
+.card button:hover{border-color:var(--accent);background:#fff}
+.card button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.card button:active{transform:scale(.97)}
+.parent{position:fixed;left:0;right:0;bottom:54px;background:#f7f4ea;border-top:2px dashed var(--border);padding:10px 14px;font-size:12px;line-height:1.55;color:var(--muted);max-height:0;overflow:hidden;transition:max-height 300ms}
+.parent.show{max-height:200px}
+.parent b{color:var(--text)}
+@media (prefers-reduced-motion: reduce){.wing-l,.wing-r{animation:none}*{transition-duration:1ms!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+<svg id="scene" viewBox="0 0 400 640" preserveAspectRatio="xMidYMid meet">
+  <path class="hill-fill" d="M0,310 Q100,270 200,300 T400,290 L400,420 L0,420 Z"/>
+  <rect class="ground-fill" x="0" y="558" width="400" height="82"/>
+  <path class="ground-line" d="M0,558 Q200,554 400,558"/>
+  <g id="sun">
+    <g id="sunRays"></g>
+    <circle id="sunGlow" class="sun-glow" cx="340" cy="80" r="40" opacity="0.5"/>
+    <circle id="sunBody" class="sun-body" cx="340" cy="80" r="24"/>
+    <circle cx="334" cy="76" r="3" fill="#f9a825" opacity="0.6"/>
+  </g>
+  <g id="branch">
+    <path class="branch-stroke" d="M10,300 Q200,285 390,295" stroke-width="16"/>
+    <path class="branch-light" d="M10,300 Q200,285 390,295" stroke-width="7"/>
+    <path class="branch-stroke" d="M120,290 L112,250" stroke-width="5"/>
+    <path class="branch-stroke" d="M280,290 L290,255" stroke-width="5"/>
+  </g>
+  <g id="leaves"></g>
+  <g id="pupaSpot">
+    <circle cx="340" cy="295" r="20" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="4 4" opacity="0.85"/>
+    <text x="340" y="330" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">结蛹位</text>
+  </g>
+  <g id="flowers"></g>
+  <g id="pupa" opacity="0">
+    <path class="pupa-fill" d="M340,272 Q324,295 330,320 Q340,330 350,320 Q356,295 340,272 Z"/>
+    <line class="pupa-line" x1="340" y1="278" x2="340" y2="322" stroke-width="1.5"/>
+    <path class="pupa-line" d="M332,288 Q340,293 348,288" stroke-width="1"/>
+    <path class="pupa-line" d="M332,305 Q340,310 348,305" stroke-width="1"/>
+  </g>
+  <g id="caterpillar" transform="translate(60,560)">
+    <g id="catScale">
+      <ellipse class="cat-fill" cx="40" cy="2" rx="44" ry="20" stroke-width="2"/>
+      <circle class="cat-fill" cx="12" cy="0" r="14" stroke-width="1.5"/>
+      <circle class="cat-fill" cx="35" cy="-1" r="15" stroke-width="1.5"/>
+      <circle class="cat-fill" cx="58" cy="-1" r="15" stroke-width="1.5"/>
+      <circle class="cat-fill" cx="80" cy="-3" r="15" stroke-width="1.5"/>
+      <path class="cat-stroke" d="M76,-15 Q72,-24 70,-28" stroke-width="2"/>
+      <path class="cat-stroke" d="M86,-15 Q90,-24 92,-28" stroke-width="2"/>
+      <circle cx="70" cy="-28" r="2.5" fill="var(--accent)"/>
+      <circle cx="92" cy="-28" r="2.5" fill="var(--accent)"/>
+      <circle cx="85" cy="-6" r="3" fill="#222"/>
+      <circle cx="84" cy="-7" r="1" fill="#fff"/>
+      <path d="M82,2 Q86,6 90,2" stroke="#222" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <line class="cat-stroke" x1="12" y1="14" x2="12" y2="22" stroke-width="2"/>
+      <line class="cat-stroke" x1="35" y1="14" x2="35" y2="22" stroke-width="2"/>
+      <line class="cat-stroke" x1="58" y1="14" x2="58" y2="22" stroke-width="2"/>
+    </g>
+  </g>
+  <g id="butterflyGroup" transform="translate(340,295)">
+    <g id="butterfly" opacity="0">
+      <g id="wingL" class="wing-l">
+        <path class="b-wing" d="M0,0 Q-28,-24 -38,-6 Q-40,12 -20,16 Z"/>
+        <circle class="b-spot" cx="-24" cy="-4" r="4.5"/>
+        <circle cx="-30" cy="6" r="2.5" fill="#fff" opacity="0.7"/>
+      </g>
+      <g id="wingR" class="wing-r">
+        <path class="b-wing" d="M0,0 Q28,-24 38,-6 Q40,12 20,16 Z"/>
+        <circle class="b-spot" cx="24" cy="-4" r="4.5"/>
+        <circle cx="30" cy="6" r="2.5" fill="#fff" opacity="0.7"/>
+      </g>
+      <ellipse class="b-body" cx="0" cy="0" rx="3.5" ry="14"/>
+      <circle class="b-body" cx="0" cy="-13" r="3.8"/>
+      <path class="b-ant" d="M-1,-16 Q-5,-21 -7,-24"/>
+      <path class="b-ant" d="M1,-16 Q5,-21 7,-24"/>
+      <circle cx="-7" cy="-24" r="1.2" fill="#3e2723"/>
+      <circle cx="7" cy="-24" r="1.2" fill="#3e2723"/>
+    </g>
+  </g>
+</svg>
+</div>
+
+<div class="fullbar"><span class="ring" id="fullRing"></span><span id="fullText">肚子 0</span></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="overlay" id="predictOverlay">
+  <div class="card">
+    <h3>猜一猜</h3>
+    <p>毛毛虫吃饱啦，要进蛹里了。你觉得它在蛹里会做什么呢？</p>
+    <div class="btns">
+      <button data-a="sleep">睡大觉，什么都没变</button>
+      <button data-a="grow">重新长出翅膀和脚</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="transferOverlay">
+  <div class="card">
+    <h3>再猜一个</h3>
+    <p>小蝌蚪在水里游，长大后变成青蛙跳上岸。蝌蚪和青蛙，是同一个动物吗？</p>
+    <div class="btns">
+      <button data-a="same">是同一个动物</button>
+      <button data-a="diff">是两个不同的动物</button>
+    </div>
+  </div>
+</div>
+
+<div class="parent" id="parent"><b>给家长看：</b>孩子刚才亲手喂毛毛虫、调太阳、结蛹，看到"吃够叶子才有力气变蝴蝶"。生活里可以继续观察：菜叶上的虫眼、公园树干上的蛹壳、不同蝴蝶的翅膀花纹。也可以问孩子"毛毛虫和蝴蝶是不是同一个？"帮助巩固这个规律。</div>
+
+<div class="tipbar"><span class="ico" id="tipIco">🐛</span><span class="txt" id="tipTxt">把毛毛虫拖到叶子上吃叶子，也可以拖动太阳</span></div>
+
+<script>
+window.curiositySay = window.curiositySay || function (t) { try { var u = new SpeechSynthesisUtterance(String(t)); u.lang = 'zh-CN'; u.rate = 0.95; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} };
+
+const svg=document.getElementById('scene');
+const stage=document.getElementById('stage');
+const cat=document.getElementById('caterpillar');
+const catScale=document.getElementById('catScale');
+const sun=document.getElementById('sun');
+const sunGlow=document.getElementById('sunGlow');
+const sunRays=document.getElementById('sunRays');
+const leavesG=document.getElementById('leaves');
+const flowersG=document.getElementById('flowers');
+const pupa=document.getElementById('pupa');
+const butterflyGroup=document.getElementById('butterflyGroup');
+const butterfly=document.getElementById('butterfly');
+const tipIco=document.getElementById('tipIco');
+const tipTxt=document.getElementById('tipTxt');
+const toast=document.getElementById('toast');
+const fullRing=document.getElementById('fullRing');
+const fullText=document.getElementById('fullText');
+const parentEl=document.getElementById('parent');
+const predictOverlay=document.getElementById('predictOverlay');
+const transferOverlay=document.getElementById('transferOverlay');
+const SVGNS='http://www.w3.org/2000/svg';
+
+const LEAVES=[
+  {x:80,y:278,rx:22,ry:13,eaten:0,rot:-8},
+  {x:140,y:272,rx:22,ry:13,eaten:0,rot:8},
+  {x:200,y:280,rx:22,ry:13,eaten:0,rot:-6},
+  {x:260,y:274,rx:22,ry:13,eaten:0,rot:10},
+];
+const FLOWERS=[{x:70,y:595,c:'var(--flower-pink)'},{x:200,y:605,c:'var(--flower-yellow)'},{x:330,y:595,c:'var(--flower-pink)'}];
+const PUPA_SPOT={x:340,y:295};
+const SUN_X=340, SUN_BASE_Y=80;
+
+let state={
+  phase:'cat',
+  catX:60,catY:560,
+  fullness:0,
+  sunY:80,
+  brightness:1,
+  eating:null,
+  eatingTimer:null,
+  pupaTimer:null,
+  butterflyPos:{x:340,y:295},
+  dragging:null,
+  dragOffset:{x:0,y:0},
+  predicted:false,
+  finished:false,
+  lastSpeak:0,
+};
+
+function el(tag,attrs){
+  const e=document.createElementNS(SVGNS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  return e;
+}
+
+function renderLeaves(){
+  leavesG.innerHTML='';
+  LEAVES.forEach((l,i)=>{
+    const remain=1-l.eaten/100;
+    if(remain<=0.04) return;
+    const g=el('g',{transform:`translate(${l.x},${l.y}) rotate(${l.rot})`});
+    g.appendChild(el('line',{x1:0,y1:0,x2:-5,y2:8,class:'leaf-stem'}));
+    const rx=Math.max(2,l.rx*remain);
+    g.appendChild(el('ellipse',{cx:0,cy:0,rx:rx,ry:l.ry,class:'leaf-fill','stroke-width':1.5}));
+    g.appendChild(el('line',{x1:-rx*0.8,y1:0,x2:rx*0.8,y2:0,class:'leaf-vein','stroke-width':1}));
+    if(l.eaten>10 && l.eaten<95){
+      g.appendChild(el('circle',{cx:rx*0.5,cy:-2,r:3,class:'bite'}));
+      g.appendChild(el('circle',{cx:rx*0.2,cy:3,r:2,class:'bite'}));
+    }
+    leavesG.appendChild(g);
+  });
+}
+
+function renderFlowers(){
+  flowersG.innerHTML='';
+  FLOWERS.forEach((f,i)=>{
+    const g=el('g',{transform:`translate(${f.x},${f.y})`});
+    g.appendChild(el('line',{x1:0,y1:0,x2:0,y2:18,class:'flower-stem'}));
+    for(let a=0;a<5;a++){
+      const ang=a*72-90;
+      g.appendChild(el('circle',{cx:Math.cos(ang*Math.PI/180)*6,cy:Math.sin(ang*Math.PI/180)*6,r:6,fill:f.c,opacity:0.9}));
+    }
+    g.appendChild(el('circle',{cx:0,cy:0,r:3.5,class:'flower-c'}));
+    flowersG.appendChild(g);
+  });
+}
+
+function renderSun(){
+  sun.setAttribute('transform',`translate(0,${state.sunY-SUN_BASE_Y})`);
+  const b=state.brightness;
+  sunGlow.setAttribute('r',28+b*30);
+  sunGlow.setAttribute('opacity',0.25+b*0.45);
+  sunRays.innerHTML='';
+  const rayLen=14+b*24;
+  for(let i=0;i<8;i++){
+    const ang=i*45;
+    const r1=26, r2=26+rayLen;
+    sunRays.appendChild(el('line',{
+      x1:SUN_X+Math.cos(ang*Math.PI/180)*r1,
+      y1:SUN_BASE_Y+Math.sin(ang*Math.PI/180)*r1,
+      x2:SUN_X+Math.cos(ang*Math.PI/180)*r2,
+      y2:SUN_BASE_Y+Math.sin(ang*Math.PI/180)*r2,
+      class:'sun-ray',opacity:0.35+b*0.55
+    }));
+  }
+  const w=b;
+  const tr=Math.round(207+w*40), tg=Math.round(232+w*10), tb=Math.round(245-w*70);
+  const br=Math.round(184+w*55), bg=Math.round(216+w*25), bb=Math.round(168-w*30);
+  stage.style.background=`linear-gradient(180deg, rgb(${tr},${tg},${tb}) 0%, rgb(${tr},${tg},${tb}) 55%, rgb(${br},${bg},${bb}) 100%)`;
+}
+
+function renderCat(){
+  cat.setAttribute('transform',`translate(${state.catX},${state.catY})`);
+  const s=1+state.fullness/100*0.45;
+  catScale.setAttribute('transform',`scale(${s})`);
+  catScale.classList.toggle('full',state.fullness>60);
+  fullText.textContent=`肚子 ${Math.round(state.fullness)}`;
+  fullRing.classList.toggle('full',state.fullness>=80);
+}
+
+function svgPoint(evt){
+  const pt=svg.createSVGPoint();
+  pt.x=evt.clientX; pt.y=evt.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function setTip(ico,txt){tipIco.textContent=ico; tipTxt.textContent=txt;}
+function showToast(t,d=1800){toast.textContent=t; toast.classList.add('show'); clearTimeout(showToast._t); showToast._t=setTimeout(()=>toast.classList.remove('show'),d);}
+function say(t){
+  const now=Date.now();
+  if(now-state.lastSpeak<80) return;
+  state.lastSpeak=now;
+  window.curiositySay(t);
+}
+
+svg.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  const p=svgPoint(e);
+  if(state.phase==='cat' && state.eating===null){
+    const dx=p.x-state.catX-40, dy=p.y-state.catY;
+    if(dx*dx+dy*dy<58*58){
+      state.dragging='cat';
+      state.dragOffset={x:p.x-state.catX,y:p.y-state.catY};
+      try{svg.setPointerCapture(e.pointerId);}catch(_){}
+      return;
+    }
+  }
+  {
+    const dx=p.x-SUN_X, dy=p.y-state.sunY;
+    if(dx*dx+dy*dy<58*58){
+      state.dragging='sun';
+      state.dragOffset={x:0,y:dy};
+      try{svg.setPointerCapture(e.pointerId);}catch(_){}
+      return;
+    }
+  }
+  if(state.phase==='butterfly'){
+    const dx=p.x-state.butterflyPos.x, dy=p.y-state.butterflyPos.y;
+    if(dx*dx+dy*dy<58*58){
+      state.dragging='butterfly';
+      state.dragOffset={x:dx,y:dy};
+      try{svg.setPointerCapture(e.pointerId);}catch(_){}
+      return;
+    }
+  }
+});
+
+svg.addEventListener('pointermove',e=>{
+  if(!state.dragging) return;
+  e.preventDefault();
+  const p=svgPoint(e);
+  if(state.dragging==='cat'){
+    state.catX=Math.max(10,Math.min(390,p.x-state.dragOffset.x));
+    state.catY=Math.max(200,Math.min(610,p.y-state.dragOffset.y));
+    renderCat();
+  } else if(state.dragging==='sun'){
+    state.sunY=Math.max(20,Math.min(230,p.y-state.dragOffset.y));
+    state.brightness=1-(state.sunY-20)/210;
+    renderSun();
+  } else if(state.dragging==='butterfly'){
+    state.butterflyPos.x=Math.max(20,Math.min(380,p.x-state.dragOffset.x));
+    state.butterflyPos.y=Math.max(40,Math.min(610,p.y-state.dragOffset.y));
+    butterflyGroup.setAttribute('transform',`translate(${state.butterflyPos.x},${state.butterflyPos.y})`);
+  }
+});
+
+function endDrag(e){
+  if(!state.dragging) return;
+  const d=state.dragging;
+  state.dragging=null;
+  try{svg.releasePointerCapture(e.pointerId);}catch(_){}
+  if(d==='cat') handleCatDrop();
+  else if(d==='sun') handleSunDrop();
+  else if(d==='butterfly') handleButterflyDrop();
+}
+svg.addEventListener('pointerup',endDrag);
+svg.addEventListener('pointercancel',endDrag);
+
+function handleCatDrop(){
+  const pdx=state.catX+40-PUPA_SPOT.x, pdy=state.catY-PUPA_SPOT.y;
+  if(pdx*pdx+pdy*pdy<58*58){
+    tryPupate();
+    return;
+  }
+  let nearest=-1,minD=999;
+  LEAVES.forEach((l,i)=>{
+    if(l.eaten>=95) return;
+    const dx=state.catX+80-l.x, dy=state.catY-l.y;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<minD){minD=d;nearest=i;}
+  });
+  if(nearest>=0 && minD<58){
+    startEating(nearest);
+  } else {
+    setTip('🐛','把我拖到绿色的叶子上吃叶子');
+  }
+}
+
+function startEating(idx){
+  state.eating=idx;
+  state.catX=LEAVES[idx].x-78;
+  state.catY=LEAVES[idx].y+8;
+  renderCat();
+  setTip('🌿','毛毛虫在吃叶子，肚子一点点鼓起来');
+  say('好好吃呀');
+  if(state.eatingTimer) clearInterval(state.eatingTimer);
+  state.eatingTimer=setInterval(()=>{
+    const l=LEAVES[state.eating];
+    if(!l){clearInterval(state.eatingTimer);state.eatingTimer=null;state.eating=null;return;}
+    l.eaten=Math.min(100,l.eaten+9);
+    state.fullness=Math.min(100,state.fullness+4);
+    renderLeaves(); renderCat();
+    if(l.eaten>=95 || state.fullness>=100){
+      clearInterval(state.eatingTimer); state.eatingTimer=null; state.eating=null;
+      if(state.fullness>=80){
+        if(!state.predicted){showPredict();}
+        else{setTip('🌙','吃饱啦！把我拖到树枝圈圈里结蛹'); say('我吃饱啦，快带我结蛹');}
+      } else {
+        setTip('🌿','这片吃完啦，再拖我去另一片叶子');
+        say('还要再吃一片');
+      }
+    }
+  },340);
+}
+
+function showPredict(){
+  state.predicted=true;
+  predictOverlay.classList.add('show');
+  say('你猜猜，我在蛹里会做什么');
+  setTip('❓','先猜一猜，再拖毛毛虫去结蛹');
+}
+predictOverlay.querySelectorAll('button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    predictOverlay.classList.remove('show');
+    setTip('🌙','现在拖我到树枝上的圈圈里结蛹');
+    say('好，带我到树枝上结蛹，看看会变成什么');
+  });
+});
+
+function tryPupate(){
+  if(state.fullness>=80){
+    state.phase='pupa';
+    cat.style.opacity='0';
+    pupa.setAttribute('opacity','1');
+    setTip('🌙','毛毛虫在蛹里重新长翅膀和脚，等一等');
+    say('我在蛹里慢慢长翅膀');
+    state.pupaTimer=setTimeout(()=>{
+      state.phase='butterfly';
+      pupa.setAttribute('opacity','0');
+      butterfly.setAttribute('opacity','1');
+      state.butterflyPos={x:PUPA_SPOT.x,y:PUPA_SPOT.y-8};
+      butterflyGroup.setAttribute('transform',`translate(${state.butterflyPos.x},${state.butterflyPos.y})`);
+      renderFlowers();
+      setTip('🦋','蝴蝶出来啦！拖动它飞，碰到花会停下');
+      say('我变成蝴蝶啦，带我飞到花朵上');
+      parentEl.classList.add('show');
+    },3500);
+  } else {
+    state.catX=60; state.catY=560;
+    renderCat();
+    showToast('还没吃饱！再吃几片叶子',2000);
+    say('我还没吃饱，变不出翅膀');
+    fullRing.style.background='#e53935';
+    fullRing.style.borderColor='#c62828';
+    setTimeout(()=>{fullRing.style.background='';fullRing.style.borderColor='';},700);
+    setTip('🌿','先吃够叶子，再拖到树枝上结蛹');
+  }
+}
+
+function handleSunDrop(){
+  if(state.brightness>0.7) say('太阳好亮，叶子长得快');
+  else if(state.brightness<0.35) say('太阳低了，叶子不长了');
+  else say('这个光刚好');
+}
+
+function handleButterflyDrop(){
+  let onF=-1,minD=999;
+  FLOWERS.forEach((f,i)=>{
+    const dx=state.butterflyPos.x-f.x, dy=state.butterflyPos.y-(f.y-6);
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<minD){minD=d;onF=i;}
+  });
+  if(onF>=0 && minD<38){
+    state.butterflyPos.x=FLOWERS[onF].x;
+    state.butterflyPos.y=FLOWERS[onF].y-6;
+    butterflyGroup.setAttribute('transform',`translate(${state.butterflyPos.x},${state.butterflyPos.y})`);
+    say('花朵上有蜜，真好喝');
+    setTip('🦋','蝴蝶停在花上喝蜜啦！你做到了');
+    setTimeout(()=>{ if(!state.finished){state.finished=true; showTransfer();} }, 1400);
+  } else {
+    setTip('🦋','拖我到花朵上，我会停下来喝蜜');
+  }
+}
+
+function showTransfer(){
+  transferOverlay.classList.add('show');
+  say('再猜一个，蝌蚪和青蛙是同一个动物吗');
+}
+transferOverlay.querySelectorAll('button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const a=b.dataset.a;
+    transferOverlay.classList.remove('show');
+    if(a==='same'){
+      say('对啦，和毛毛虫变蝴蝶一样');
+      showToast('答对啦！小时候和长大了是同一个动物',3200);
+    } else {
+      say('再想想，它们其实是同一个动物哦');
+      showToast('其实是同一个动物，只是小时候和长大了长得不一样',3200);
+    }
+    setTip('🌟','你发现了：毛毛虫和蝴蝶是同一个动物');
+  });
+});
+
+setInterval(()=>{
+  if(state.phase!=='cat') return;
+  let changed=false;
+  LEAVES.forEach(l=>{
+    if(l.eaten>0 && state.brightness>0.45){
+      l.eaten=Math.max(0,l.eaten-state.brightness*1.2);
+      changed=true;
+    }
+  });
+  if(changed) renderLeaves();
+},800);
+
+renderLeaves();
+renderSun();
+renderCat();
+setTip('🐛','把毛毛虫拖到叶子上吃叶子，也可以拖动太阳');
+</script>
+</body>
+</html>

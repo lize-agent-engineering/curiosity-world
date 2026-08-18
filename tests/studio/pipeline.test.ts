@@ -220,34 +220,49 @@ describe('modifying an app', () => {
     expect(prompt).toContain('start is not defined');
   });
 
-  it('falls back to a full rewrite when the edit blocks do not match', async () => {
+  it('falls back to a full rewrite after both targeted attempts miss', async () => {
     const bundle = models({
       planner: [planJson()],
-      coder: [editBlock('<h1>不存在的标题</h1>', '<h1>x</h1>'), page('<h1>专注钟</h1>')],
+      coder: [
+        editBlock('<h1>不存在的标题</h1>', '<h1>x</h1>'),
+        editBlock('<h1>还是不存在</h1>', '<h1>y</h1>'),
+        page('<h1>专注钟</h1>'),
+      ],
     });
     const result = await runStudioPipeline({ request: '改标题', current }, bundle);
     expect(result.editMode).toBe('rewrite');
     expect(result.html).toContain('专注钟');
-    expect(named(bundle).coder.calls[1]!.prompt).toContain('完整');
+    expect(named(bundle).coder.calls[2]!.prompt).toContain('完整');
   });
 
   it('keeps an excerpt of the unusable coder response so the failure is diagnosable', async () => {
     const bundle = models({
       planner: [planJson()],
-      coder: ['<<<<<<< SEARCH\n<h1>x</h1>\n没有分隔行也没有结束行', page('<h1>专注钟</h1>')],
+      coder: [
+        '<<<<<<< SEARCH\n<h1>x</h1>\n没有分隔行也没有结束行',
+        '<<<<<<< SEARCH\n<h1>x</h1>\n还是没有结束行',
+        page('<h1>专注钟</h1>'),
+      ],
     });
     const result = await runStudioPipeline({ request: '改标题', current }, bundle);
-    expect(result.editBlockFailures).toEqual(['EDIT_BLOCK_MALFORMED']);
-    expect(result.patchResponseExcerpt).toContain('没有分隔行');
+    expect(result.editBlockFailures).toEqual(['EDIT_BLOCK_MALFORMED', 'EDIT_BLOCK_MALFORMED']);
+    // The excerpt holds the most recent unusable response, which is the one
+    // worth reading when diagnosing why the fallback happened.
+    expect(result.patchResponseExcerpt).toContain('还是没有结束行');
   });
 
-  it('reports the edit-block failure it fell back from', async () => {
+  it('reports every edit-block failure it fell back from', async () => {
     const bundle = models({
       planner: [planJson()],
-      coder: [editBlock('<h1>不存在</h1>', '<h1>x</h1>'), page('<h1>专注钟</h1>')],
+      coder: [
+        editBlock('<h1>不存在</h1>', '<h1>x</h1>'),
+        editBlock('<h1>仍然不存在</h1>', '<h1>y</h1>'),
+        page('<h1>专注钟</h1>'),
+      ],
     });
     const result = await runStudioPipeline({ request: '改标题', current }, bundle);
-    expect(result.editBlockFailures).toEqual(['EDIT_BLOCK_NOT_FOUND']);
+    // Two attempts at a targeted edit, both missing, then the rewrite.
+    expect(result.editBlockFailures).toEqual(['EDIT_BLOCK_NOT_FOUND', 'EDIT_BLOCK_NOT_FOUND']);
   });
 
   it('fails clearly when both the patch and the rewrite fail', async () => {
@@ -330,5 +345,40 @@ describe('schema repair rounds', () => {
     const retryPrompt = (bundle['studio.planner'] as ReturnType<typeof scripted>).calls[1]!.prompt;
     expect(retryPrompt).toContain('【格式提醒，不属于用户需求】');
     expect(retryPrompt).toContain('不要提到 JSON、格式或这次重试');
+  });
+});
+
+describe('the aimed patch retry', () => {
+  const current = { html: good, plan: currentPlan, summary: '第一版', runtimeErrors: [] };
+
+  it('replays the applier guidance once before giving up on a targeted edit', async () => {
+    const bundle = models({
+      planner: [planJson()],
+      coder: [
+        editBlock('<h1>不存在的标题</h1>', '<h1>x</h1>'),
+        editBlock('<h1>番茄钟</h1>', '<h1>专注钟</h1>'),
+      ],
+    });
+    const result = await runStudioPipeline({ request: '改标题', current }, bundle);
+    // Second attempt landed, so the page keeps the untouched-region guarantee.
+    expect(result.editMode).toBe('patch');
+    expect(result.editBlockFailures).toEqual(['EDIT_BLOCK_NOT_FOUND']);
+    const retryPrompt = (bundle['studio.coder'] as ReturnType<typeof scripted>).calls[1]!.prompt;
+    expect(retryPrompt).toContain('上一次的编辑块没能对上原文');
+    expect(retryPrompt).toContain('逐字复制');
+  });
+
+  it('falls back to a rewrite only after both attempts miss', async () => {
+    const bundle = models({
+      planner: [planJson()],
+      coder: [
+        editBlock('<h1>不存在的标题</h1>', '<h1>x</h1>'),
+        editBlock('<h1>还是不存在</h1>', '<h1>y</h1>'),
+        page('<h1>专注钟</h1>'),
+      ],
+    });
+    const result = await runStudioPipeline({ request: '改标题', current }, bundle);
+    expect(result.editMode).toBe('rewrite');
+    expect(result.editBlockFailures).toEqual(['EDIT_BLOCK_NOT_FOUND', 'EDIT_BLOCK_NOT_FOUND']);
   });
 });

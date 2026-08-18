@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>彩虹从哪来</title>
+<style>
+:root{
+  --bg: #0a1626;
+  --surface: #16263a;
+  --text: #f0f4f8;
+  --muted: #9aa6b8;
+  --accent: #ffd166;
+  --border: #2c3e55;
+  --sky-top: #1b3a5c;
+  --sky-bottom: #4a7ba8;
+  --ground-top: #3a5a3a;
+  --ground-bottom: #244024;
+  --mountain: #2a3f55;
+  --sun: #ffd166;
+  --sun-glow: #fff3a0;
+  --sun-line: #8a6a1a;
+  --mist: #cfe5ff;
+  --kid-shirt: #e84855;
+  --kid-skin: #f4c4a0;
+  --kid-pants: #3a4f6a;
+  --sprayer: #8fb3d6;
+  --sprayer-dark: #3a4f6a;
+  --det-bg: #1a2a3e;
+  --det-line: #5a6a8a;
+  --rainbow-red:#ff5b5e; --rainbow-orange:#ff924c; --rainbow-yellow:#ffd23f;
+  --rainbow-green:#7bc950; --rainbow-blue:#3a8fd4; --rainbow-indigo:#5a5aa8; --rainbow-violet:#9b59d6;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background:var(--bg); color:var(--text); overflow:hidden;
+  -webkit-user-select:none; user-select:none;
+}
+.app{display:flex; flex-direction:column; height:100vh; height:100dvh; max-width:920px; margin:0 auto;}
+.scene{flex:1; position:relative; min-height:0; touch-action:none; background:var(--bg);}
+.scene svg{width:100%; height:100%; display:block;}
+.hint{
+  position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  background:rgba(10,22,38,.72); border:1px solid var(--border);
+  padding:8px 14px; border-radius:16px; font-size:14px; color:var(--text);
+  backdrop-filter:blur(6px); max-width:92%; text-align:center; pointer-events:none; z-index:5;
+}
+.tip-toast{
+  position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+  background:rgba(10,22,38,.88); border:1px solid var(--accent); color:var(--text);
+  padding:10px 16px; border-radius:12px; font-size:14px; z-index:10;
+  opacity:0; transition:opacity 200ms; pointer-events:none; max-width:92%; text-align:center;
+}
+.tip-toast.show{opacity:1;}
+.controls{
+  display:flex; gap:8px; padding:10px 12px; background:var(--surface);
+  border-top:1px solid var(--border); justify-content:center; flex-wrap:wrap;
+}
+.btn{
+  font-family:inherit; font-size:15px; background:var(--surface); color:var(--text);
+  border:1px solid var(--border); border-radius:10px; padding:10px 14px;
+  min-height:44px; min-width:44px; cursor:pointer; transition:all 180ms;
+}
+.btn:hover{border-color:var(--accent);}
+.btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+.btn:active{transform:scale(.97);}
+.btn.active{background:var(--accent); color:var(--bg); border-color:var(--accent); font-weight:600;}
+#sun, #detector{cursor:grab;}
+#sun:active, #detector:active{cursor:grabbing;}
+#kid{pointer-events:none;}
+.card-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.62); display:flex;
+  align-items:center; justify-content:center; z-index:100; padding:16px;
+  opacity:0; pointer-events:none; transition:opacity 200ms;
+}
+.card-overlay.show{opacity:1; pointer-events:auto;}
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:22px 22px 20px; max-width:420px; width:100%; text-align:center;
+  transform:translateY(16px); transition:transform 200ms;
+}
+.card-overlay.show .card{transform:translateY(0);}
+.card h2{margin:0 0 10px; font-size:18px;}
+.card p{margin:0 0 18px; color:var(--muted); font-size:15px; line-height:1.6;}
+.card p b{color:var(--text);}
+.card .choices{display:flex; gap:12px; justify-content:center; flex-wrap:wrap;}
+.choice{
+  background:var(--bg); border:1px solid var(--border); color:var(--text);
+  border-radius:12px; padding:14px 18px; font-size:15px; cursor:pointer;
+  min-width:110px; min-height:56px; transition:all 180ms; font-family:inherit;
+}
+.choice:hover{border-color:var(--accent); transform:translateY(-2px);}
+.choice:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+.choice:active{transform:scale(.97);}
+.choice.correct{background:#2d5e3a; border-color:#4caf6a;}
+.choice.wrong{background:#5e2d3a; border-color:#af4c5a;}
+.parent{
+  background:var(--surface); border-top:1px solid var(--border);
+  padding:10px 14px; font-size:13px; color:var(--muted); line-height:1.55;
+}
+.parent b{color:var(--text);}
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important;}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scene" id="scene">
+    <div class="hint" id="hint">你猜猜看：彩虹是贴在天上的吗？</div>
+    <svg id="svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" style="stop-color:var(--sky-top)"/>
+          <stop offset="1" style="stop-color:var(--sky-bottom)"/>
+        </linearGradient>
+        <linearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" style="stop-color:var(--ground-top)"/>
+          <stop offset="1" style="stop-color:var(--ground-bottom)"/>
+        </linearGradient>
+        <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" style="stop-color:var(--sun-glow);stop-opacity:.9"/>
+          <stop offset=".5" style="stop-color:var(--sun);stop-opacity:.45"/>
+          <stop offset="1" style="stop-color:var(--sun);stop-opacity:0"/>
+        </radialGradient>
+      </defs>
+
+      <rect x="0" y="0" width="800" height="430" fill="url(#skyGrad)"/>
+      <path d="M0,430 L100,380 L220,410 L340,360 L460,400 L580,350 L700,390 L800,370 L800,430 Z"
+            style="fill:var(--mountain);opacity:.55"/>
+      <rect x="0" y="430" width="800" height="170" fill="url(#groundGrad)"/>
+
+      <!-- 喷壶位置槽 -->
+      <g id="slots">
+        <g class="slot" transform="translate(180,430)">
+          <ellipse cx="0" cy="0" rx="42" ry="9" style="fill:#1a2a1a;stroke:var(--ground-top);stroke-width:2;stroke-dasharray:4 3"/>
+        </g>
+        <g class="slot" transform="translate(400,430)">
+          <ellipse cx="0" cy="0" rx="42" ry="9" style="fill:#1a2a1a;stroke:var(--ground-top);stroke-width:2;stroke-dasharray:4 3"/>
+        </g>
+        <g class="slot" transform="translate(620,430)">
+          <ellipse cx="0" cy="0" rx="42" ry="9" style="fill:#1a2a1a;stroke:var(--ground-top);stroke-width:2;stroke-dasharray:4 3"/>
+        </g>
+      </g>
+
+      <!-- 彩虹 -->
+      <g id="rainbow" opacity="0">
+        <g id="rainbow-content"></g>
+      </g>
+
+      <!-- 水雾 -->
+      <g id="mist"></g>
+
+      <!-- 太阳 -->
+      <g id="sun" transform="translate(400,90)">
+        <circle r="62" fill="url(#sunGlow)"/>
+        <g style="stroke:var(--sun);stroke-width:3;stroke-linecap:round;opacity:.7">
+          <line x1="-40" y1="0" x2="-54" y2="0"/>
+          <line x1="40" y1="0" x2="54" y2="0"/>
+          <line x1="0" y1="-40" x2="0" y2="-54"/>
+          <line x1="-28" y1="-28" x2="-40" y2="-40"/>
+          <line x1="28" y1="-28" x2="40" y2="-40"/>
+          <line x1="-28" y1="28" x2="-40" y2="40"/>
+          <line x1="28" y1="28" x2="40" y2="40"/>
+        </g>
+        <circle r="26" style="fill:var(--sun)"/>
+        <circle r="19" style="fill:var(--sun-glow);opacity:.6"/>
+        <circle cx="-8" cy="-4" r="2.4" style="fill:var(--sun-line)"/>
+        <circle cx="8" cy="-4" r="2.4" style="fill:var(--sun-line)"/>
+        <path d="M-8,6 Q0,13 8,6" style="stroke:var(--sun-line);stroke-width:2.4;fill:none;stroke-linecap:round"/>
+      </g>
+
+      <!-- 喷壶 -->
+      <g id="sprayer" transform="translate(400,425)">
+        <ellipse cx="0" cy="-4" rx="22" ry="18" style="fill:var(--sprayer);stroke:var(--sprayer-dark);stroke-width:2"/>
+        <rect x="-9" y="-30" width="18" height="14" rx="3" style="fill:var(--sprayer);stroke:var(--sprayer-dark);stroke-width:2"/>
+        <path d="M0,-26 L22,-40 L26,-36 L4,-22 Z" style="fill:var(--sprayer-dark)"/>
+        <circle cx="22" cy="-40" r="3" style="fill:var(--sprayer-dark)"/>
+        <path d="M-22,-2 Q-31,9 -22,18" style="stroke:var(--sprayer-dark);stroke-width:3;fill:none"/>
+      </g>
+
+      <!-- 小人 -->
+      <g id="kid" transform="translate(400,510)">
+        <rect x="-10" y="-30" width="20" height="32" rx="6" style="fill:var(--kid-shirt)"/>
+        <circle cx="0" cy="-40" r="11" style="fill:var(--kid-skin)"/>
+        <circle cx="-4" cy="-42" r="1.6" style="fill:#2a1a1a"/>
+        <circle cx="4" cy="-42" r="1.6" style="fill:#2a1a1a"/>
+        <path d="M-3,-37 Q0,-34 3,-37" style="stroke:#2a1a1a;stroke-width:1.6;fill:none;stroke-linecap:round"/>
+        <rect x="-9" y="2" width="6" height="14" rx="2" style="fill:var(--kid-pants)"/>
+        <rect x="3" y="2" width="6" height="14" rx="2" style="fill:var(--kid-pants)"/>
+      </g>
+
+      <!-- 探测器圆盘 -->
+      <g id="detector" transform="translate(400,560)">
+        <circle r="44" style="fill:var(--det-bg);stroke:var(--sprayer-dark);stroke-width:2"/>
+        <g style="stroke:var(--det-line);stroke-width:1.2">
+          <line x1="40" y1="0" x2="34" y2="0"/>
+          <line x1="-40" y1="0" x2="-34" y2="0"/>
+          <line x1="0" y1="-40" x2="0" y2="-34"/>
+          <line x1="0" y1="40" x2="0" y2="34"/>
+        </g>
+        <text x="48" y="4" font-size="11" style="fill:var(--muted)">右</text>
+        <text x="-58" y="4" font-size="11" style="fill:var(--muted)">左</text>
+        <g id="detector-handle" transform="rotate(0)">
+          <line x1="0" y1="0" x2="34" y2="0" style="stroke:var(--accent);stroke-width:5;stroke-linecap:round"/>
+          <polygon points="34,0 24,-8 24,8" style="fill:var(--accent)"/>
+          <circle r="9" style="fill:var(--accent)"/>
+          <circle r="3.5" style="fill:var(--bg)"/>
+        </g>
+      </g>
+    </svg>
+    <div class="tip-toast" id="tip"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" data-pos="left">喷壶放左边</button>
+    <button class="btn" data-pos="center">放中间</button>
+    <button class="btn" data-pos="right">放右边</button>
+    <button class="btn" id="spray-btn">喷水！</button>
+  </div>
+
+  <div class="parent">
+    <b>给家长看：</b>这页孩子要凑出彩虹，得做三件事——把太阳挪到天空一边、把喷壶放到对面、把方向手柄转向喷壶。真正的条件是「阳光从背后照来、面前有水珠」，所以彩虹总在背对太阳的方向。请别提前告诉他答案。下次雨后初晴，让他背对太阳找彩虹，验证今天的发现。
+  </div>
+</div>
+
+<div class="card-overlay" id="predict-card">
+  <div class="card">
+    <h2>猜一猜</h2>
+    <p>水雾喷出来了。你觉得彩虹会从哪边冒出来？</p>
+    <div class="choices">
+      <button class="choice" data-answer="toward">朝着太阳那边</button>
+      <button class="choice" data-answer="away">背对太阳那边</button>
+    </div>
+  </div>
+</div>
+
+<div class="card-overlay" id="transfer-card">
+  <div class="card">
+    <h2>新问题</h2>
+    <p>傍晚下过雨，太阳从西边落下去。<br>这时候彩虹会在哪一边？</p>
+    <div class="choices">
+      <button class="choice" data-tanswer="west">西边</button>
+      <button class="choice" data-tanswer="east">东边</button>
+    </div>
+  </div>
+</div>
+
+<div class="card-overlay" id="end-card">
+  <div class="card">
+    <h2>你发现了！</h2>
+    <p>彩虹不是贴在天上的。<br>它是阳光照进小水珠、又折回来的光。<br>所以彩虹总在<b>太阳的反方向</b>。</p>
+    <button class="btn" id="restart-btn" style="margin-top:6px;">再玩一次</button>
+  </div>
+</div>
+
+<script>
+window.curiositySay = window.curiositySay || function (t) { try { var u = new SpeechSynthesisUtterance(String(t)); u.lang = 'zh-CN'; u.rate = 0.95; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} };
+
+const svg = document.getElementById('svg');
+const sunEl = document.getElementById('sun');
+const sprayerEl = document.getElementById('sprayer');
+const mistEl = document.getElementById('mist');
+const rainbowEl = document.getElementById('rainbow');
+const rainbowContent = document.getElementById('rainbow-content');
+const detectorEl = document.getElementById('detector');
+const handleEl = document.getElementById('detector-handle');
+const tipEl = document.getElementById('tip');
+const sprayBtn = document.getElementById('spray-btn');
+
+const SVG_W = 800, SVG_H = 600;
+const slotPos = { left: 180, center: 400, right: 620 };
+
+let sunX = 400;
+let sprayerPos = 'center';
+let isSpraying = false;
+let detectorAngle = 0;
+let sprayInterval = null;
+let interacted = false;
+let predicted = false;
+let foundRainbow = false;
+
+function ptInSvg(clientX, clientY) {
+  const r = svg.getBoundingClientRect();
+  return {
+    x: (clientX - r.left) / r.width * SVG_W,
+    y: (clientY - r.top) / r.height * SVG_H
+  };
+}
+
+function markInteract() {
+  if (!interacted) {
+    interacted = true;
+    setTimeout(() => {
+      curiositySay('试试把太阳挪到一边，再选个喷壶的位置。');
+    }, 250);
+  }
+}
+
+// 太阳拖动
+let sunDragging = false;
+sunEl.addEventListener('pointerdown', e => {
+  sunDragging = true;
+  try { sunEl.setPointerCapture(e.pointerId); } catch(_){}
+  markInteract();
+  e.preventDefault();
+});
+sunEl.addEventListener('pointermove', e => {
+  if (!sunDragging) return;
+  const p = ptInSvg(e.clientX, e.clientY);
+  sunX = Math.max(70, Math.min(730, p.x));
+  updateSun();
+  updateRainbow();
+});
+sunEl.addEventListener('pointerup', e => {
+  sunDragging = false;
+  try { sunEl.releasePointerCapture(e.pointerId); } catch(_){}
+});
+sunEl.addEventListener('pointercancel', () => { sunDragging = false; });
+
+function updateSun() {
+  sunEl.setAttribute('transform', `translate(${sunX},90)`);
+}
+
+// 探测器
+let detDragging = false;
+detectorEl.addEventListener('pointerdown', e => {
+  detDragging = true;
+  try { detectorEl.setPointerCapture(e.pointerId); } catch(_){}
+  markInteract();
+  e.preventDefault();
+});
+detectorEl.addEventListener('pointermove', e => {
+  if (!detDragging) return;
+  const p = ptInSvg(e.clientX, e.clientY);
+  const dx = p.x - 400;
+  const dy = p.y - 560;
+  if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+  detectorAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+  handleEl.setAttribute('transform', `rotate(${detectorAngle})`);
+  updateRainbow();
+});
+detectorEl.addEventListener('pointerup', e => {
+  detDragging = false;
+  try { detectorEl.releasePointerCapture(e.pointerId); } catch(_){}
+});
+detectorEl.addEventListener('pointercancel', () => { detDragging = false; });
+
+// 喷壶位置按钮
+document.querySelectorAll('.btn[data-pos]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sprayerPos = btn.dataset.pos;
+    moveSprayer();
+    markInteract();
+    document.querySelectorAll('.btn[data-pos]').forEach(b => b.classList.toggle('active', b === btn));
+  });
+});
+
+function moveSprayer() {
+  sprayerEl.setAttribute('transform', `translate(${slotPos[sprayerPos]},425)`);
+  updateRainbow();
+}
+
+// 喷水
+sprayBtn.addEventListener('click', () => {
+  if (isSpraying) stopSpray(); else startSpray();
+  markInteract();
+});
+
+function startSpray() {
+  isSpraying = true;
+  sprayBtn.textContent = '关掉水';
+  sprayBtn.classList.add('active');
+  if (sprayInterval) clearInterval(sprayInterval);
+  sprayInterval = setInterval(spawnMist, 90);
+  if (!predicted) {
+    setTimeout(() => {
+      if (!predicted && isSpraying) {
+        showCard('predict-card');
+        curiositySay('水雾出来了，猜猜彩虹从哪边冒出来？');
+      }
+    }, 700);
+  }
+  updateRainbow();
+}
+
+function stopSpray() {
+  isSpraying = false;
+  sprayBtn.textContent = '喷水！';
+  sprayBtn.classList.remove('active');
+  if (sprayInterval) { clearInterval(sprayInterval); sprayInterval = null; }
+  updateRainbow();
+}
+
+function spawnMist() {
+  if (!isSpraying) return;
+  const x = slotPos[sprayerPos];
+  const ox = x + 22;
+  const oy = 385;
+  const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  const vx = (Math.random() - 0.3) * 1.2;
+  const vy = -Math.random() * 1.1 - 0.5;
+  c.setAttribute('cx', ox);
+  c.setAttribute('cy', oy);
+  c.setAttribute('r', Math.random() * 2 + 1.6);
+  c.style.fill = 'var(--mist)';
+  c.setAttribute('opacity', '0.85');
+  mistEl.appendChild(c);
+  let life = 0;
+  const maxLife = 70;
+  let px = ox, py = oy;
+  const animate = () => {
+    life++;
+    px += vx;
+    py += vy + life * 0.012;
+    c.setAttribute('cx', px);
+    c.setAttribute('cy', py);
+    c.setAttribute('opacity', 0.85 * (1 - life / maxLife));
+    if (life < maxLife) requestAnimationFrame(animate);
+    else if (c.parentNode) c.remove();
+  };
+  requestAnimationFrame(animate);
+}
+
+function angleDiff(a, b) {
+  let d = Math.abs(((a - b) % 360 + 540) % 360);
+  if (d > 180) d = 360 - d;
+  return d;
+}
+
+function sunSide() {
+  if (sunX < 305) return 'left';
+  if (sunX > 495) return 'right';
+  return 'mid';
+}
+
+function checkRainbow() {
+  if (!isSpraying) return false;
+  const ss = sunSide();
+  if (ss === 'mid') return false;
+  const back = ss === 'left' ? 'right' : 'left';
+  const targetAngle = back === 'right' ? 0 : 180;
+  if (angleDiff(detectorAngle, targetAngle) > 38) return false;
+  if (sprayerPos !== back) return false;
+  return true;
+}
+
+function updateRainbow() {
+  const show = checkRainbow();
+  if (show) {
+    drawRainbow();
+    rainbowEl.setAttribute('opacity', '0.9');
+    if (!foundRainbow) {
+      foundRainbow = true;
+      curiositySay('彩虹出来啦！它在背对太阳的那一边。');
+      setTimeout(() => {
+        showCard('transfer-card');
+        curiositySay('傍晚太阳从西边落下去，彩虹会在哪边？');
+      }, 2000);
+    }
+  } else {
+    rainbowEl.setAttribute('opacity', '0');
+  }
+}
+
+function drawRainbow() {
+  const cx = slotPos[sprayerPos];
+  const cy = 388;
+  const colors = ['var(--rainbow-red)','var(--rainbow-orange)','var(--rainbow-yellow)','var(--rainbow-green)','var(--rainbow-blue)','var(--rainbow-indigo)','var(--rainbow-violet)'];
+  rainbowContent.innerHTML = '';
+  colors.forEach((col, i) => {
+    const r = 115 - i * 9;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy}`);
+    path.setAttribute('stroke', col);
+    path.setAttribute('stroke-width', '8.5');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('opacity', '0.9');
+    path.setAttribute('stroke-linecap', 'round');
+    rainbowContent.appendChild(path);
+  });
+}
+
+// 卡片
+function showCard(id) { document.getElementById(id).classList.add('show'); }
+function hideCard(id) { document.getElementById(id).classList.remove('show'); }
+
+document.querySelectorAll('#predict-card .choice').forEach(c => {
+  c.addEventListener('click', () => {
+    const ans = c.dataset.answer;
+    predicted = true;
+    if (ans === 'away') {
+      c.classList.add('correct');
+      curiositySay('好眼力，等会儿你自己试试看。');
+    } else {
+      c.classList.add('wrong');
+      curiositySay('没关系，自己试试就知道了。');
+    }
+    setTimeout(() => hideCard('predict-card'), 1100);
+  });
+});
+
+document.querySelectorAll('#transfer-card .choice').forEach(c => {
+  c.addEventListener('click', () => {
+    const ans = c.dataset.tanswer;
+    if (ans === 'east') {
+      c.classList.add('correct');
+      setTimeout(() => {
+        hideCard('transfer-card');
+        showCard('end-card');
+        curiositySay('对啦，太阳在西边，彩虹就在东边。你发现这个规律了。');
+      }, 850);
+    } else {
+      c.classList.add('wrong');
+      curiositySay('再想想，太阳在西边，反方向是哪边？');
+      setTimeout(() => c.classList.remove('wrong'), 1200);
+    }
+  });
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+  hideCard('end-card');
+  sunX = 400; updateSun();
+  sprayerPos = 'center'; moveSprayer();
+  document.querySelectorAll('.btn[data-pos]').forEach(b => b.classList.remove('active'));
+  stopSpray();
+  detectorAngle = 0; handleEl.setAttribute('transform', 'rotate(0)');
+  foundRainbow = false; predicted = false;
+  rainbowEl.setAttribute('opacity', '0');
+});
+
+// 初始化
+updateSun();
+moveSprayer();
+handleEl.setAttribute('transform', 'rotate(0)');
+</script>
+</body>
+</html>

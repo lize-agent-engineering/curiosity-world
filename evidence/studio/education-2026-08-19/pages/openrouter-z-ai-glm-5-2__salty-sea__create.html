@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>把盐搬进大海</title>
+<style>
+:root{
+  --bg:#0e1530;
+  --surface:#1a2342;
+  --surface2:#222e54;
+  --text:#e8eef7;
+  --muted:#8a96b8;
+  --accent:#f5b942;
+  --accent2:#7fd1e9;
+  --border:#2a3556;
+  --river:#3a82b8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:radial-gradient(1200px 600px at 70% -10%, #1b2a55, var(--bg) 60%);
+  color:var(--text);
+  min-height:100vh;
+  -webkit-tap-highlight-color:transparent;
+}
+.app{max-width:960px;margin:0 auto;padding:16px 16px 32px}
+header h1{margin:0 0 4px;font-size:clamp(20px,5vw,28px);font-weight:800}
+header .hint{margin:0 0 4px;color:var(--muted);font-size:14px}
+header .note{margin:0 0 12px;color:var(--accent);font-size:13px;font-weight:600}
+
+.stage{display:flex;flex-direction:column;gap:12px}
+.scene{
+  position:relative;width:100%;
+  aspect-ratio:10/5.6;
+  max-height:62vh;
+  background:linear-gradient(180deg,#0c1838,#13234a 60%,#0a1730);
+  border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  touch-action:none;
+}
+.bg{position:absolute;inset:0;width:100%;height:100%}
+.rocks{position:absolute;left:7%;bottom:34%;width:26%;height:16%;pointer-events:none;z-index:3}
+.rock{position:absolute;width:26px;height:18px;background:#9a8e7a;border-radius:50% 50% 45% 45%;box-shadow:inset -3px -3px 0 rgba(0,0,0,.18),0 2px 3px rgba(0,0,0,.3)}
+
+.rain,.vapour{position:absolute;inset:0;pointer-events:none;display:none;z-index:4}
+.rain.show,.vapour.show{display:block}
+.raindrop{position:absolute;top:10%;width:3px;height:14px;background:linear-gradient(var(--accent2),rgba(127,209,233,0));border-radius:2px;animation:fall .7s linear infinite}
+.vapour i{position:absolute;width:8px;height:8px;border-radius:50%;background:rgba(127,209,233,.5);animation:rise 1.8s ease-out infinite}
+
+@keyframes fall{0%{transform:translateY(-10px);opacity:0}10%{opacity:.85}100%{transform:translateY(180px);opacity:0}}
+@keyframes rise{0%{transform:translateY(0) scale(.6);opacity:0}25%{opacity:.7}100%{transform:translateY(-80px) scale(1.2);opacity:0}}
+
+.sun,.cloud{position:absolute;top:0;left:0;width:64px;height:64px;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;touch-action:none;font-size:52px;line-height:1;will-change:transform;z-index:6}
+.sun{filter:drop-shadow(0 0 10px rgba(245,185,66,.6))}
+.cloud{filter:drop-shadow(0 3px 4px rgba(0,0,0,.3));color:#e8eef7}
+.sun:active,.cloud:active{cursor:grabbing}
+.sun:focus-visible,.cloud:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:50%}
+
+.label{position:absolute;font-size:12px;color:var(--muted);background:rgba(10,20,40,.55);padding:2px 8px;border-radius:8px;pointer-events:none;z-index:2}
+.label.sea{bottom:8px;right:8px}
+.label.mtn{bottom:8px;left:8px}
+
+.panel{display:flex;flex-direction:column;gap:12px}
+.meters{display:flex;gap:8px;flex-wrap:wrap}
+.meter{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 10px;position:relative}
+.meter span{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.meter b{position:absolute;top:8px;right:10px;font-size:13px;font-weight:700;color:var(--text)}
+.meter .bar{height:10px;background:var(--surface2);border-radius:6px;overflow:hidden}
+.meter .bar i{display:block;height:100%;width:0;border-radius:6px;transition:width .2s ease}
+.meter.river .bar i{background:var(--accent2)}
+.meter.sea .bar i{background:var(--accent)}
+.meter.rock .bar i{background:#b9a682}
+
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+button{
+  font-family:inherit;font-size:15px;font-weight:600;
+  padding:10px 16px;min-height:44px;border-radius:10px;
+  border:1px solid var(--border);background:var(--surface);color:var(--text);
+  cursor:pointer;transition:transform .15s,background .15s,border-color .15s;
+}
+button:hover{background:var(--surface2);border-color:#3a4a78}
+button:active{transform:translateY(1px)}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:#2a1c00;border-color:var(--accent)}
+button.primary:hover{filter:brightness(1.08)}
+button:disabled{opacity:.45;cursor:not-allowed}
+
+.overlay{position:fixed;inset:0;background:rgba(6,10,24,.72);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20;backdrop-filter:blur(4px)}
+.overlay[hidden]{display:none}
+.card{max-width:440px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.card h2{margin:0 0 8px;font-size:20px}
+.card p{margin:8px 0;color:var(--text);line-height:1.6;font-size:15px}
+.cups,.choices{display:flex;gap:12px;margin:14px 0}
+.cup,.choices button{flex:1;min-height:80px;border-radius:12px;font-size:16px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.cup{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.cup .em{font-size:34px}
+.choices button{background:var(--surface2);border:1px solid var(--border)}
+#guessResult,#chResult{min-height:1.4em;color:var(--accent);font-weight:600;font-size:14px}
+
+.for-parents{margin-top:24px;padding:16px;background:var(--surface);border:1px dashed var(--border);border-radius:12px;color:var(--muted);font-size:14px;line-height:1.7}
+.for-parents h3{margin:0 0 6px;font-size:15px;color:var(--text)}
+
+@media (max-width:520px){
+  .scene{aspect-ratio:10/7}
+  .meter{min-width:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;transition-duration:.001s!important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>海水为什么是咸的？</h1>
+    <p class="hint">拖动云和太阳，看看盐是怎么一点点跑进海里的。</p>
+    <p class="note" id="note" hidden></p>
+  </header>
+  <main class="stage">
+    <div class="scene" id="scene">
+      <svg class="bg" viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="seaG" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1f4d80"/>
+            <stop offset="1" stop-color="#123056"/>
+          </linearGradient>
+          <linearGradient id="mtnG" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#3a7350"/>
+            <stop offset="1" stop-color="#234029"/>
+          </linearGradient>
+        </defs>
+        <polygon points="0,300 180,180 360,300" fill="#243a5c" opacity=".55"/>
+        <polygon points="240,330 460,210 700,330" fill="#1f3350" opacity=".45"/>
+        <polygon points="-20,360 60,300 140,250 220,300 320,360" fill="url(#mtnG)"/>
+        <path d="M0 360 L1000 360 L1000 380 L0 380 Z" fill="#2a4a30"/>
+        <path d="M180 360 C 280 380, 360 402, 460 412 C 560 422, 620 418, 700 428 L 700 448 C 620 438, 560 442, 460 432 C 360 422, 280 400, 180 380 Z" fill="#3a82b8" opacity=".92"/>
+        <rect x="540" y="430" width="470" height="130" fill="url(#seaG)"/>
+        <path d="M540 432 q 30 -8 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0" stroke="#6aa3cf" stroke-width="2" fill="none" opacity=".7"/>
+        <path d="M540 462 q 30 -8 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0" stroke="#6aa3cf" stroke-width="1.5" fill="none" opacity=".4"/>
+      </svg>
+      <div class="rocks" id="rocks"></div>
+      <div class="rain" id="rain"></div>
+      <div class="vapour" id="vapour"></div>
+      <div class="sun" id="sun" tabindex="0" role="button" aria-label="太阳，可拖动">☀</div>
+      <div class="cloud" id="cloud" tabindex="0" role="button" aria-label="云，可拖动">☁</div>
+      <div class="label mtn">山顶</div>
+      <div class="label sea">大海</div>
+    </div>
+    <div class="panel">
+      <div class="meters">
+        <div class="meter river"><span>河里的盐（流走的）</span><b id="riverVal">0</b><div class="bar"><i id="riverBar"></i></div></div>
+        <div class="meter sea"><span>海里的盐（攒下的）</span><b id="seaVal">0</b><div class="bar"><i id="seaBar"></i></div></div>
+        <div class="meter rock"><span>山上岩石</span><b id="rockVal">60</b><div class="bar"><i id="rockBar"></i></div></div>
+      </div>
+      <div class="controls">
+        <button id="addRock">加些岩石</button>
+        <button id="removeRock">搬走岩石</button>
+        <button id="guess" class="primary">来猜一猜</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="overlay" id="guessCard" hidden>
+    <div class="card">
+      <h2>哪杯水尝起来更咸？</h2>
+      <p>同样的杯子，一杯装河水，一杯装海水。你猜哪杯更咸？</p>
+      <div class="cups">
+        <button class="cup" data-cup="river"><span class="em">🥤</span>河水杯</button>
+        <button class="cup" data-cup="sea"><span class="em">🥤</span>海水杯</button>
+      </div>
+      <p id="guessResult"></p>
+      <button id="nextBtn" hidden>接着挑战</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="challengeCard" hidden>
+    <div class="card">
+      <h2>换个地方试试</h2>
+      <p>有一条河一直流进一个湖，太阳也天天晒这个湖。一年后，湖水会变咸吗？</p>
+      <div class="choices">
+        <button data-ch="yes">会变咸</button>
+        <button data-ch="no">不会变咸</button>
+      </div>
+      <p id="chResult"></p>
+      <button id="finishBtn" hidden>看看我发现了什么</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="endCard" hidden>
+    <div class="card">
+      <h2>你发现了……</h2>
+      <p>大自然有个小搬运工：雨把岩石里的盐冲进河，河把盐送进海；太阳把海里的水蒸走，把盐留下。日子一久，海就越来越咸啦。</p>
+      <button id="restartBtn">再玩一次</button>
+    </div>
+  </div>
+
+  <section class="for-parents">
+    <h3>给家长看</h3>
+    <p>这一节里，孩子拖动云和太阳，自己“看到”了雨水冲刷岩石、河流把盐带进大海、蒸发让盐留下并累积的过程，还做了对比预测和一次情境迁移。生活里可以一起观察：雨后水流过泥地是不是有点浑；晾衣服时水没了留下什么；煮粥烧干后锅底的白印。这些都是“水带走东西、水跑了东西留下”的同一种小规律。</p>
+  </section>
+</div>
+
+<script>
+window.curiositySay = window.curiositySay || function (t) { try { var u = new SpeechSynthesisUtterance(String(t)); u.lang = 'zh-CN'; u.rate = 0.95; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} };
+
+(function(){
+  const state = {
+    rocks: 60, riverSalt: 0, seaSalt: 0,
+    rainOn: false, evapOn: false,
+    done: { guess:false, challenge:false }
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem('saltMoveApp')||'null');
+    if (saved && typeof saved==='object') Object.assign(state.done, saved);
+  } catch(e){}
+
+  const $ = id => document.getElementById(id);
+  const scene=$('scene'), sunEl=$('sun'), cloudEl=$('cloud'),
+        rainEl=$('rain'), vapourEl=$('vapour'), rocksEl=$('rocks');
+
+  if(state.done.guess && state.done.challenge){
+    const n=$('note'); n.hidden=false; n.textContent='上次你已经发现大海咸的秘密啦，可以再玩一次。';
+  }
+
+  function initPos(){
+    const r=scene.getBoundingClientRect();
+    sunEl.dataset.x = String(r.width*0.62);
+    sunEl.dataset.y = String(r.height*0.06);
+    cloudEl.dataset.x = String(r.width*0.05);
+    cloudEl.dataset.y = String(r.height*0.05);
+    sunEl.style.transform='translate('+(+sunEl.dataset.x)+'px,'+(+sunEl.dataset.y)+'px)';
+    cloudEl.style.transform='translate('+(+cloudEl.dataset.x)+'px,'+(+cloudEl.dataset.y)+'px)';
+  }
+
+  function buildRain(){
+    let h='';
+    for(let i=0;i<22;i++){
+      const x=Math.random()*45+3, d=(Math.random()*0.5).toFixed(2);
+      h+='<i class="raindrop" style="left:'+x+'%;animation-delay:'+d+'s"></i>';
+    }
+    rainEl.innerHTML=h;
+  }
+  function buildVapour(){
+    let h='';
+    for(let i=0;i<14;i++){
+      const x=58+Math.random()*38, d=(Math.random()*1.4).toFixed(2);
+      h+='<i style="left:'+x+'%;bottom:23%;animation-delay:'+d+'s"></i>';
+    }
+    vapourEl.innerHTML=h;
+  }
+  buildRain();buildVapour();
+
+  function renderRocks(){
+    rocksEl.innerHTML='';
+    const n=Math.round(state.rocks/10);
+    for(let i=0;i<n;i++){
+      const r=document.createElement('div');
+      r.className='rock';
+      r.style.left=(2+(i%5)*16)+'%';
+      r.style.bottom=(2+Math.floor(i/5)*30)+'%';
+      rocksEl.appendChild(r);
+    }
+  }
+  renderRocks();
+
+  let prevRain=false, prevEvap=false;
+  function updateZones(){
+    const r=scene.getBoundingClientRect();
+    const cx=parseFloat(cloudEl.dataset.x)+32, cy=parseFloat(cloudEl.dataset.y)+32;
+    state.rainOn = cx < r.width*0.46 && cy < r.height*0.55;
+    const sx=parseFloat(sunEl.dataset.x)+32, sy=parseFloat(sunEl.dataset.y)+32;
+    state.evapOn = sx > r.width*0.54 && sy < r.height*0.6;
+    rainEl.classList.toggle('show', state.rainOn);
+    vapourEl.classList.toggle('show', state.evapOn);
+    if(state.rainOn && !prevRain){ curiositySay('下雨啦，雨把岩石里的盐冲进河里。'); }
+    if(state.evapOn && !prevEvap){ curiositySay('太阳晒着大海，水飞走啦，盐留了下来。'); }
+    prevRain=state.rainOn; prevEvap=state.evapOn;
+  }
+
+  let saidFirst=false;
+  function markActed(){
+    if(saidFirst)return;saidFirst=true;
+    curiositySay('你开始搬盐啦，试试把云拖到山顶上。');
+  }
+
+  function makeDraggable(el){
+    let dragging=false,sx,sy,ox,oy;
+    el.addEventListener('pointerdown',e=>{
+      dragging=true; el.setPointerCapture(e.pointerId);
+      sx=e.clientX;sy=e.clientY;ox=parseFloat(el.dataset.x||0);oy=parseFloat(el.dataset.y||0);
+      el.style.cursor='grabbing';markActed();
+    });
+    el.addEventListener('pointermove',e=>{
+      if(!dragging)return;
+      const r=scene.getBoundingClientRect();
+      let nx=ox+e.clientX-sx, ny=oy+e.clientY-sy;
+      nx=Math.max(-8,Math.min(r.width-56,nx));
+      ny=Math.max(-8,Math.min(r.height-56,ny));
+      el.dataset.x=String(nx);el.dataset.y=String(ny);
+      el.style.transform='translate('+nx+'px,'+ny+'px)';
+      updateZones();
+    });
+    const end=()=>{dragging=false;el.style.cursor='grab';};
+    el.addEventListener('pointerup',end);
+    el.addEventListener('pointercancel',end);
+    el.addEventListener('keydown',e=>{
+      const step=26;let nx=parseFloat(el.dataset.x||0),ny=parseFloat(el.dataset.y||0);
+      if(e.key==='ArrowLeft')nx-=step;else if(e.key==='ArrowRight')nx+=step;
+      else if(e.key==='ArrowUp')ny-=step;else if(e.key==='ArrowDown')ny+=step;else return;
+      e.preventDefault();markActed();
+      const r=scene.getBoundingClientRect();
+      nx=Math.max(-8,Math.min(r.width-56,nx));ny=Math.max(-8,Math.min(r.height-56,ny));
+      el.dataset.x=String(nx);el.dataset.y=String(ny);
+      el.style.transform='translate('+nx+'px,'+ny+'px)';
+      updateZones();
+    });
+  }
+  makeDraggable(sunEl);makeDraggable(cloudEl);
+
+  $('addRock').addEventListener('click',()=>{
+    state.rocks=Math.min(100,state.rocks+20);renderRocks();updateMeters();
+    markActed();curiositySay('岩石变多啦。');
+  });
+  $('removeRock').addEventListener('click',()=>{
+    state.rocks=Math.max(0,state.rocks-20);renderRocks();updateMeters();
+    markActed();curiositySay('岩石变少啦。');
+  });
+
+  let last=performance.now();
+  function loop(now){
+    const dt=Math.min(60,now-last);last=now;const k=dt*0.06;
+    if(state.rainOn && state.rocks>0){
+      state.rocks=Math.max(0,state.rocks-0.025*k);
+      state.riverSalt=Math.min(20,state.riverSalt+0.045*k);
+      state.seaSalt=Math.min(100,state.seaSalt+0.02*k);
+      if(Math.random()<0.03)renderRocks();
+    } else {
+      state.riverSalt=Math.max(0,state.riverSalt-0.015*k);
+    }
+    if(state.evapOn){
+      state.seaSalt=Math.min(100,state.seaSalt+0.03*k);
+    }
+    updateMeters();
+    requestAnimationFrame(loop);
+  }
+  function updateMeters(){
+    $('riverBar').style.width=Math.min(100,state.riverSalt/20*100)+'%';
+    $('seaBar').style.width=Math.min(100,state.seaSalt)+'+'';
+    $('seaBar').style.width=Math.min(100,state.seaSalt)+'%';
+    $('rockBar').style.width=state.rocks+'%';
+    $('riverVal').textContent=Math.round(state.riverSalt*5);
+    $('seaVal').textContent=Math.round(state.seaSalt);
+    $('rockVal').textContent=Math.round(state.rocks);
+  }
+  updateMeters();
+
+  const guessCard=$('guessCard'), guessResult=$('guessResult'), nextBtn=$('nextBtn');
+  $('guess').addEventListener('click',()=>{
+    guessCard.hidden=false;
+    curiositySay('哪杯水尝起来更咸？你猜猜看。');
+  });
+  guessCard.querySelectorAll('.cup').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const cup=b.dataset.cup;
+      if(cup==='sea'){
+        guessResult.textContent='答对啦！海水杯更咸。河只是把盐搬走，大海才是攒盐的地方。';
+        curiositySay('答对啦，海水杯更咸。');
+        guessCard.querySelectorAll('.cup').forEach(x=>x.disabled=true);
+        nextBtn.hidden=false;
+        state.done.guess=true;save();
+      } else {
+        guessResult.textContent='再想想：河是把盐运走的小车，盐在哪儿攒起来呢？再选一次。';
+        curiositySay('再想想，海水杯才更咸哦。');
+      }
+    });
+  });
+  nextBtn.addEventListener('click',()=>{
+    guessCard.hidden=true;
+    $('challengeCard').hidden=false;
+    curiositySay('有条河一直流进一个湖，太阳也天天晒，一年后湖水会变咸吗？');
+  });
+
+  const chResult=$('chResult'), finishBtn=$('finishBtn');
+  $('challengeCard').querySelectorAll('[data-ch]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      if(b.dataset.ch==='yes'){
+        chResult.textContent='对！湖和海一样：水进来了又被太阳蒸走，盐被留下，越攒越咸。';
+        curiositySay('对啦，湖也会变咸。');
+        $('challengeCard').querySelectorAll('[data-ch]').forEach(x=>x.disabled=true);
+        finishBtn.hidden=false;
+        state.done.challenge=true;save();
+      } else {
+        chResult.textContent='想想看：水进来了又被太阳蒸走，盐能去哪儿？再选一次。';
+        curiositySay('再想想，盐会留在湖里哦。');
+      }
+    });
+  });
+  finishBtn.addEventListener('click',()=>{
+    $('challengeCard').hidden=true;
+    $('endCard').hidden=false;
+    curiositySay('你发现了，是大自然的小搬运工把盐搬进了大海。');
+  });
+  $('restartBtn').addEventListener('click',()=>{
+    $('endCard').hidden=true;
+    state.rocks=60;state.riverSalt=0;state.seaSalt=0;
+    renderRocks();updateMeters();
+    initPos();updateZones();
+  });
+
+  function save(){try{localStorage.setItem('saltMoveApp',JSON.stringify(state.done));}catch(e){}}
+
+  window.addEventListener('resize',()=>{initPos();updateZones();});
+  requestAnimationFrame(()=>{initPos();updateZones();requestAnimationFrame(loop);});
+})();
+</script>
+</body>
+</html>

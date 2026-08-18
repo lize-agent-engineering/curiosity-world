@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>让飞机飞起来</title>
+<style>
+:root{
+  --bg:#0e1626; --surface:#172238; --surface2:#202d48;
+  --text:#eaf1fb; --muted:#8b9bbd; --accent:#ffb547; --accent2:#5ec8f7;
+  --border:#2c3a5a; --danger:#ff7676; --ok:#7ed38a;
+  --radius:16px; --radius2:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text);
+  min-height:100vh; line-height:1.5;
+  -webkit-tap-highlight-color:transparent;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:16px}
+header.top{padding:8px 4px 12px}
+header.top h1{font-size:clamp(22px,5vw,30px);margin:0 0 4px}
+header.top p{color:var(--muted);font-size:15px;margin:0}
+.stage{
+  display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-top:8px;
+}
+@media(max-width:760px){.stage{grid-template-columns:1fr}}
+.scene-wrap{
+  background:linear-gradient(180deg,#1b2942 0%,#243a5e 60%,#2c4769 100%);
+  border:1px solid var(--border); border-radius:var(--radius);
+  padding:8px; position:relative; overflow:hidden;
+}
+#scene{width:100%; height:auto; display:block; touch-action:none}
+.status-bar{
+  position:absolute; left:12px; bottom:12px;
+  background:rgba(0,0,0,.45); border:1px solid var(--border);
+  padding:6px 12px; border-radius:999px; font-size:14px;
+  backdrop-filter:blur(4px); transition:color 180ms;
+}
+.status-bar.flying{color:var(--ok);border-color:var(--ok)}
+.status-bar.stall{color:var(--danger);border-color:var(--danger)}
+.panel{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:16px;
+  display:flex; flex-direction:column; gap:16px;
+}
+.ctl{display:flex;flex-direction:column;gap:8px}
+.ctl > label{font-size:14px;color:var(--muted);font-weight:600}
+.ctl .hint{font-size:13px;color:var(--accent2);min-height:18px}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:44px;background:transparent;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:8px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);
+}
+input[type=range]::-moz-range-track{
+  height:8px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:26px;height:26px;border-radius:50%;
+  background:var(--accent);border:3px solid #fff;margin-top:-10px;cursor:grab;
+}
+input[type=range]::-moz-range-thumb{
+  width:26px;height:26px;border-radius:50%;background:var(--accent);border:3px solid #fff;cursor:grab;
+}
+input[type=range]:focus-visible{outline:3px solid var(--accent2);outline-offset:4px;border-radius:8px}
+input[type=range]::-webkit-slider-thumb:active{cursor:grabbing}
+#gauge{width:100%;max-width:220px;height:auto;display:block;margin:0 auto}
+.btns{display:flex;gap:8px}
+.btns button{
+  flex:1; min-height:48px; padding:8px; font-size:14px;
+  background:var(--surface2); color:var(--text); border:1px solid var(--border);
+  border-radius:var(--radius2); cursor:pointer; transition:all 180ms;
+}
+.btns button:hover{border-color:var(--accent2)}
+.btns button.active{background:var(--accent);color:#1a1408;border-color:var(--accent);font-weight:700}
+.btns button:focus-visible{outline:3px solid var(--accent2);outline-offset:2px}
+.btns button:active{transform:scale(.97)}
+.btns button:disabled{opacity:.5;cursor:default}
+.angle-ctl{font-size:13px;color:var(--muted)}
+#angleVal{font-size:22px;color:var(--accent);font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+button.primary{
+  min-height:50px; padding:12px; font-size:16px; font-weight:700;
+  background:var(--accent); color:#1a1408; border:none; border-radius:var(--radius2);
+  cursor:pointer; transition:all 180ms;
+}
+button.primary:hover{filter:brightness(1.08)}
+button.primary:active{transform:scale(.98)}
+button.primary:focus-visible{outline:3px solid var(--accent2);outline-offset:3px}
+.overlay{
+  position:fixed; inset:0; background:rgba(8,12,22,.78);
+  display:flex; align-items:center; justify-content:center; padding:16px; z-index:50;
+  backdrop-filter:blur(6px);
+}
+.overlay.hide{display:none}
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:24px; max-width:440px; width:100%;
+}
+.card h2{font-size:20px;margin:0 0 8px}
+.card p{color:var(--muted);font-size:15px;margin:0 0 16px}
+.card .opts{display:flex;flex-direction:column;gap:10px}
+.card .opts button{
+  min-height:50px; padding:10px 14px; font-size:15px; text-align:left;
+  background:var(--surface2); color:var(--text); border:1px solid var(--border);
+  border-radius:var(--radius2); cursor:pointer; transition:all 180ms;
+}
+.card .opts button:hover{border-color:var(--accent)}
+.card .opts button:active{transform:scale(.98)}
+.card .opts button:focus-visible{outline:3px solid var(--accent2);outline-offset:2px}
+.reveal{display:none}
+.reveal.show{display:block}
+.section{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px; margin-top:16px;
+}
+.section h2{font-size:20px;margin:0 0 12px}
+.section p{font-size:15px;color:var(--text);margin:0 0 8px}
+.section .diagram{margin:12px 0;display:block}
+.section .muted{color:var(--muted)}
+.challenge-opts{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.challenge-opts button{
+  min-height:50px;padding:10px 14px;font-size:15px;text-align:left;
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:var(--radius2);cursor:pointer;transition:all 180ms;
+}
+.challenge-opts button:hover{border-color:var(--accent)}
+.challenge-opts button:focus-visible{outline:3px solid var(--accent2);outline-offset:2px}
+.challenge-opts button.correct{background:var(--ok);color:#0c1a0c;border-color:var(--ok);font-weight:700}
+.challenge-opts button.wrong{background:var(--danger);color:#1a0808;border-color:var(--danger)}
+.feedback{font-size:14px;margin-top:10px;min-height:20px}
+.parent{
+  margin-top:24px; padding:16px; background:var(--surface); border:1px dashed var(--border);
+  border-radius:var(--radius); font-size:14px; color:var(--muted);
+}
+.parent h3{font-size:15px;color:var(--text);margin:0 0 8px}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <h1>让飞机飞起来 ✈️</h1>
+  <p>飞机那么重，为什么能飞起来？拉一拉风速、拖一拖翅膀，自己找答案。</p>
+</header>
+
+<main class="stage">
+  <section class="scene-wrap">
+    <svg id="scene" viewBox="0 0 600 420" aria-label="飞行场景">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#1a2747"/>
+          <stop offset="0.7" stop-color="#2a476e"/>
+          <stop offset="1" stop-color="#3a5a82"/>
+        </linearGradient>
+        <linearGradient id="runwayG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#4a5570"/>
+          <stop offset="1" stop-color="#2c3550"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="600" height="420" fill="url(#sky)"/>
+      <ellipse cx="120" cy="70" rx="40" ry="14" fill="#3a5278" opacity="0.6"/>
+      <ellipse cx="470" cy="50" rx="50" ry="16" fill="#3a5278" opacity="0.5"/>
+      <circle cx="520" cy="80" r="22" fill="#ffd27a" opacity="0.85"/>
+
+      <g id="scale" font-size="9" fill="#9fb2d4">
+        <line x1="548" y1="180" x2="548" y2="356" stroke="#465a82" stroke-width="2"/>
+      </g>
+
+      <rect x="0" y="356" width="600" height="64" fill="url(#runwayG)"/>
+      <line x1="0" y1="356" x2="600" y2="356" stroke="#5a6c8e" stroke-width="1"/>
+      <line x1="20" y1="388" x2="580" y2="388" stroke="#c9d4ea" stroke-width="3" stroke-dasharray="18 14"/>
+
+      <g id="wind"></g>
+
+      <g id="plane" transform="translate(0,0)">
+        <g transform="translate(300,310)">
+          <line x1="-18" y1="32" x2="-18" y2="46" stroke="#8896b4" stroke-width="2"/>
+          <line x1="22" y1="32" x2="22" y2="46" stroke="#8896b4" stroke-width="2"/>
+          <circle cx="-18" cy="48" r="4" fill="#8896b4"/>
+          <circle cx="22" cy="48" r="4" fill="#8896b4"/>
+          <ellipse cx="0" cy="22" rx="52" ry="12" fill="#e8eef7"/>
+          <ellipse cx="48" cy="22" rx="8" ry="8" fill="#cdd9ee"/>
+          <path d="M -48 22 L -60 4 L -52 22 Z" fill="#cdd9ee"/>
+          <path d="M -52 22 L -58 36 L -48 30 Z" fill="#cdd9ee"/>
+          <path d="M 30 16 Q 42 14 46 20 L 36 22 Z" fill="#5ec8f7"/>
+          <circle cx="10" cy="20" r="2.5" fill="#5ec8f7"/>
+          <circle cx="-2" cy="20" r="2.5" fill="#5ec8f7"/>
+          <circle cx="-14" cy="20" r="2.5" fill="#5ec8f7"/>
+          <circle cx="-26" cy="20" r="2.5" fill="#5ec8f7"/>
+          <g id="wing" transform="rotate(0)">
+            <path id="wingShape" d="M -42 2 Q 0 -22 42 2 Q 0 6 -42 2 Z" fill="#ffb547" stroke="#c98a30" stroke-width="1.5"/>
+            <g id="flowArrows" opacity="0.85">
+              <path d="M -50 -10 Q 0 -28 50 -10" stroke="#5ec8f7" stroke-width="2" fill="none" stroke-dasharray="4 3"/>
+              <path d="M -50 14 L 50 14" stroke="#7ed38a" stroke-width="2" fill="none" stroke-dasharray="4 3" opacity="0.7"/>
+            </g>
+            <circle id="handle" cx="-42" cy="0" r="12" fill="#fff" stroke="#1a1408" stroke-width="2.5" style="cursor:grab;touch-action:none"/>
+          </g>
+        </g>
+      </g>
+      <text x="14" y="404" fill="#9fb2d4" font-size="11">地面</text>
+      <text x="560" y="174" fill="#9fb2d4" font-size="10">高度</text>
+    </svg>
+    <div class="status-bar" id="status">停在地面</div>
+  </section>
+
+  <section class="panel">
+    <div class="ctl">
+      <label>🌬️ 风速（拉动滑块）</label>
+      <input type="range" id="wind" min="0" max="100" value="0" aria-label="风速">
+      <div class="hint" id="windHint">没有风</div>
+    </div>
+    <div class="ctl">
+      <label>📐 升力计</label>
+      <svg id="gauge" viewBox="0 0 160 104" aria-label="升力计">
+        <path d="M 18 88 A 62 62 0 0 1 142 88" stroke="#2c3a5a" stroke-width="10" fill="none" stroke-linecap="round"/>
+        <path id="gaugeFill" d="M 18 88 A 62 62 0 0 1 142 88" stroke="#5ec8f7" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="0 200"/>
+        <line id="needle" x1="80" y1="88" x2="80" y2="34" stroke="#ffb547" stroke-width="3" stroke-linecap="round" transform="rotate(-90 80 88)"/>
+        <circle cx="80" cy="88" r="6" fill="#ffb547" stroke="#1a1408" stroke-width="1.5"/>
+        <text x="16" y="100" fill="#8b9bbd" font-size="9">小</text>
+        <text x="138" y="100" fill="#8b9bbd" font-size="9">大</text>
+      </svg>
+    </div>
+    <div class="ctl">
+      <label>翅膀形状</label>
+      <div class="btns">
+        <button id="flatBtn">平直翼</button>
+        <button id="curvedBtn" class="active">弧形上凸翼</button>
+      </div>
+    </div>
+    <div class="ctl angle-ctl">
+      <label>翅膀角度（拖动翅膀上的白点）</label>
+      <div id="angleVal">0°</div>
+    </div>
+    <button id="discover" class="primary">我发现了！</button>
+  </section>
+</main>
+
+<div id="prediction" class="overlay">
+  <div class="card">
+    <h2>先猜一猜 ✋</h2>
+    <p>飞机那么重，要怎样的风才能把它托上天空？</p>
+    <div class="opts">
+      <button data-p="small">一点点风就行</button>
+      <button data-p="big">要很大很大的风</button>
+      <button data-p="wing">光有风不够，还得看翅膀</button>
+    </div>
+  </div>
+</div>
+
+<section id="explain" class="section reveal">
+  <h2>💡 原来是这样</h2>
+  <p>空气流过翅膀时，<b>上面跑得比下面快</b>。空气跑得快的地方，推挤的力气小；跑得慢的地方，力气大。</p>
+  <svg class="diagram" viewBox="0 0 360 160" style="max-width:380px">
+    <path d="M 30 100 Q 180 30 330 100 Q 180 118 30 100 Z" fill="#ffb547" stroke="#c98a30" stroke-width="1.5"/>
+    <path d="M 40 62 Q 180 16 320 62" stroke="#5ec8f7" stroke-width="3" fill="none"/>
+    <polygon points="320,62 310,56 310,68" fill="#5ec8f7"/>
+    <text x="150" y="42" fill="#5ec8f7" font-size="13">上面：快</text>
+    <path d="M 40 124 L 320 124" stroke="#7ed38a" stroke-width="3" fill="none"/>
+    <polygon points="320,124 310,118 310,130" fill="#7ed38a"/>
+    <text x="150" y="142" fill="#7ed38a" font-size="13">下面：慢</text>
+    <line x1="180" y1="96" x2="180" y2="22" stroke="#ff7676" stroke-width="3"/>
+    <polygon points="180,22 173,34 187,34" fill="#ff7676"/>
+    <text x="192" y="52" fill="#ff7676" font-size="13">往上推</text>
+  </svg>
+  <p>下面空气力气大，就把翅膀<b>往上推</b>——这就是<b>升力</b>。</p>
+  <p>风越快，升力越大；翅膀上面鼓起来（弧形翼），上面空气跑得更快，升力更大。翅膀微微上翘能加点升力，但翘太多空气会变乱，升力突然掉下来，这叫<b>失速</b>。</p>
+  <p class="muted">发动机不是把飞机顶起来的，它只是把飞机往前推，让空气快快流过翅膀。</p>
+</section>
+
+<section id="challenge" class="section reveal">
+  <h2>🪶 换个地方想一想</h2>
+  <p>小鸟在天上飞，它的翅膀是平平的，还是上面鼓起来有一点弧度？</p>
+  <div class="challenge-opts" id="chOpts">
+    <button data-c="flat">平平的</button>
+    <button data-c="curved">上面鼓起来有弧度</button>
+  </div>
+  <div class="feedback" id="chFb"></div>
+</section>
+
+<section id="ending" class="section reveal">
+  <h2>🎉 你发现了！</h2>
+  <p>飞机虽然很重，但只要风快快流过<b>有弧度的翅膀</b>，上面空气快、下面空气慢，下面的空气就把飞机<b>托上去</b>了。</p>
+  <p>翅膀微微上翘飞得更好，翘太多会失速。这就是重重的飞机能飞起来的秘密。🌟</p>
+</section>
+
+<aside class="parent">
+  <h3>给家长看</h3>
+  <p>孩子这次通过调节风速、翅膀迎角和形状，直观感受了：升力与风速平方成正比、迎角增大升力增大但超过临界角失速骤降、弧形上凸翼升力系数远大于平直翼。生活中可继续观察：纸飞机不同折法的滑翔差异、电风扇吹不同形状纸片谁能浮更高、鸟类滑翔时翅膀的弧度。请避免"发动机把飞机顶起来"的说法——发动机只提供向前的推力，把飞机托起来的是机翼上下的压力差。</p>
+</aside>
+</div>
+
+<script>
+window.curiositySay = window.curiositySay || function (t) { try { var u = new SpeechSynthesisUtterance(String(t)); u.lang = 'zh-CN'; u.rate = 0.95; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} };
+
+(function(){
+  const scene=document.getElementById('scene');
+  const plane=document.getElementById('plane');
+  const wing=document.getElementById('wing');
+  const wingShape=document.getElementById('wingShape');
+  const handle=document.getElementById('handle');
+  const windInput=document.getElementById('wind');
+  const windHint=document.getElementById('windHint');
+  const needle=document.getElementById('needle');
+  const gaugeFill=document.getElementById('gaugeFill');
+  const flatBtn=document.getElementById('flatBtn');
+  const curvedBtn=document.getElementById('curvedBtn');
+  const angleVal=document.getElementById('angleVal');
+  const status=document.getElementById('status');
+  const discover=document.getElementById('discover');
+  const prediction=document.getElementById('prediction');
+  const explain=document.getElementById('explain');
+  const challenge=document.getElementById('challenge');
+  const ending=document.getElementById('ending');
+  const chOpts=document.getElementById('chOpts');
+  const chFb=document.getElementById('chFb');
+  const windGroup=document.getElementById('wind');
+  const scaleG=document.getElementById('scale');
+
+  const SVGNS='http://www.w3.org/2000/svg';
+  for(let i=0;i<=6;i++){
+    const y=356-i*29;
+    const tk=document.createElementNS(SVGNS,'line');
+    tk.setAttribute('x1','548');tk.setAttribute('x2', i%2===0?'562':'554');
+    tk.setAttribute('y1',y);tk.setAttribute('y2',y);
+    tk.setAttribute('stroke','#465a82');tk.setAttribute('stroke-width','2');
+    scaleG.appendChild(tk);
+    if(i%2===0&&i>0){
+      const txt=document.createElementNS(SVGNS,'text');
+      txt.setAttribute('x','568');txt.setAttribute('y',y+3);txt.setAttribute('fill','#9fb2d4');txt.setAttribute('font-size','9');
+      txt.textContent=i;
+      scaleG.appendChild(txt);
+    }
+  }
+
+  let windSpeed=0, angle=0, wingType='curved';
+  let planeY=0, targetY=0;
+  let stall=false;
+  let firstWind=false, firstLift=false, firstStall=false;
+
+  const WEIGHT=1.0;
+  const MAXLIFT=3.5;
+
+  function computeLift(){
+    const v=windSpeed/100;
+    const baseCl=wingType==='curved'?0.45:0.15;
+    let af;
+    if(angle<=15){ af=1+angle*0.06; }
+    else { const over=angle-15; af=(1+15*0.06)*Math.max(0.18,1-over*0.32); }
+    if(angle<-2) af*=0.55;
+    return 5*v*v*baseCl*af;
+  }
+
+  function setWingRot(){
+    wing.setAttribute('transform','rotate('+angle+')');
+  }
+
+  function update(){
+    const lift=computeLift();
+    stall = angle>15 && windSpeed>20;
+    if(lift>WEIGHT){
+      targetY=Math.min(170,(lift-WEIGHT)*75);
+    } else {
+      targetY=0;
+    }
+    const ratio=Math.min(1,Math.max(0,lift/MAXLIFT));
+    const nang=-90+ratio*180;
+    needle.setAttribute('transform','rotate('+nang+' 80 88)');
+    const total=196;
+    gaugeFill.setAttribute('stroke-dasharray', (ratio*total)+' '+(total));
+    angleVal.textContent=(angle>=0?'+':'')+Math.round(angle)+'°';
+    setWingRot();
+
+    status.classList.remove('flying','stall');
+    let st='停在地面';
+    if(stall && planeY>8){ st='失速下坠！空气变乱了'; status.classList.add('stall'); }
+    else if(lift<WEIGHT*0.98){ st = planeY>8?'正在落下':'停在地面'; }
+    else if(lift<WEIGHT*1.7){ st='正在爬升'; status.classList.add('flying'); }
+    else { st='稳定飞行'; status.classList.add('flying'); }
+    status.textContent=st;
+
+    if(windSpeed>0 && !firstWind){
+      firstWind=true;
+      curiositySay('风开始吹了，看看飞机动了没有？');
+    }
+    if(targetY>20 && planeY>15 && !firstLift){
+      firstLift=true;
+      curiositySay('飞起来了！风把飞机托起来了！');
+    }
+    if(stall && planeY>8 && !firstStall){
+      firstStall=true;
+      curiositySay('哎呀，翘太多了，飞机在发抖！');
+    }
+
+    if(windSpeed===0) windHint.textContent='没有风';
+    else if(windSpeed<35) windHint.textContent='小风';
+    else if(windSpeed<70) windHint.textContent='中风';
+    else windHint.textContent='大风';
+  }
+
+  const lines=[];
+  for(let i=0;i<10;i++){
+    const y=200+i*15;
+    const x=Math.random()*600;
+    const len=38+Math.random()*30;
+    const ln=document.createElementNS(SVGNS,'line');
+    ln.setAttribute('stroke','#9fd0ee');
+    ln.setAttribute('stroke-width','2');
+    ln.setAttribute('stroke-linecap','round');
+    windGroup.appendChild(ln);
+    lines.push({el:ln,x:x,y:y,len:len});
+  }
+
+  function animLoop(){
+    const sp=windSpeed/100*7;
+    for(const L of lines){
+      if(windSpeed>0){
+        L.x+=sp;
+        if(L.x>620){ L.x=-L.len-10; }
+      }
+      L.el.setAttribute('x1',L.x);
+      L.el.setAttribute('x2',L.x+L.len);
+      L.el.setAttribute('y1',L.y);
+      L.el.setAttribute('y2',L.y);
+      L.el.setAttribute('opacity', windSpeed>0?Math.min(0.85,0.2+windSpeed/120):0.0);
+    }
+    planeY += (targetY-planeY)*0.12;
+    if(Math.abs(targetY-planeY)<0.2) planeY=targetY;
+    let dx=0;
+    if(stall && planeY>8){
+      var reduce=false;
+      try{reduce=window.matchMedia('(prefers-reduced-motion:reduce)').matches;}catch(e){}
+      if(!reduce){ dx=(Math.random()-0.5)*6; }
+    }
+    plane.style.transform='translate('+dx.toFixed(2)+'px,'+(-planeY).toFixed(2)+'px)';
+    requestAnimationFrame(animLoop);
+  }
+
+  windInput.addEventListener('input',function(){ windSpeed=+this.value; update(); });
+
+  flatBtn.addEventListener('click',function(){
+    wingType='flat';
+    flatBtn.classList.add('active');curvedBtn.classList.remove('active');
+    wingShape.setAttribute('d','M -42 -1 L 42 1 L 42 4 L -42 4 Z');
+    update();
+    curiositySay(windSpeed>0?'换了平平的翅膀，看看还能飞吗？':'换了平平的翅膀，拉拉风试试看。');
+  });
+  curvedBtn.addEventListener('click',function(){
+    wingType='curved';
+    curvedBtn.classList.add('active');flatBtn.classList.remove('active');
+    wingShape.setAttribute('d','M -42 2 Q 0 -22 42 2 Q 0 6 -42 2 Z');
+    update();
+    curiositySay(windSpeed>0?'换了鼓鼓的翅膀，飞得是不是更高了？':'换了鼓鼓的翅膀，拉拉风试试看。');
+  });
+
+  let dragging=false, startY=0, startAngle=0;
+  function svgY(clientY){
+    const r=scene.getBoundingClientRect();
+    return (clientY-r.top)/r.height*420;
+  }
+  handle.addEventListener('pointerdown',function(e){
+    e.preventDefault();
+    dragging=true;
+    startY=svgY(e.clientY);
+    startAngle=angle;
+    try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+    handle.style.cursor='grabbing';
+  });
+  handle.addEventListener('pointermove',function(e){
+    if(!dragging)return;
+    const y=svgY(e.clientY);
+    let a=startAngle + (startY-y)*0.25;
+    a=Math.max(-5,Math.min(20,a));
+    angle=a;
+    update();
+  });
+  function endDrag(){ dragging=false; handle.style.cursor='grab'; }
+  handle.addEventListener('pointerup',endDrag);
+  handle.addEventListener('pointercancel',endDrag);
+  handle.addEventListener('lostpointercapture',endDrag);
+
+  prediction.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){
+      prediction.classList.add('hide');
+      const p=b.dataset.p;
+      let say='好，我们试试看！';
+      if(p==='small') say='你觉得一点点风就行？拉拉风速试试。';
+      else if(p==='big') say='你觉得要很大的风？拉拉看就知道了。';
+      else say='你说得对，翅膀也很重要！试试换翅膀。';
+      curiositySay(say);
+    });
+  });
+
+  discover.addEventListener('click',function(){
+    explain.classList.add('show');
+    challenge.classList.add('show');
+    discover.style.display='none';
+    explain.scrollIntoView({behavior:'smooth',block:'center'});
+    curiositySay('你发现了秘密！空气从翅膀上面跑得快，就把飞机托上去了。');
+  });
+
+  chOpts.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){
+      const c=b.dataset.c;
+      if(c==='curved'){
+        b.classList.add('correct');
+        chFb.textContent='对啦！小鸟翅膀上面鼓鼓的，和弧形翼一样，空气上面跑得快，就把小鸟托上去了。';
+        chFb.style.color='var(--ok)';
+        chOpts.querySelectorAll('button').forEach(function(x){x.disabled=true});
+        ending.classList.add('show');
+        setTimeout(function(){ ending.scrollIntoView({behavior:'smooth',block:'center'}); },350);
+        curiositySay('对啦！小鸟的翅膀也是上面鼓鼓的，所以能飞起来。');
+      } else {
+        b.classList.add('wrong');
+        chFb.textContent='再想想看，看看上面那张图，哪种翅膀上面空气跑得更快？';
+        chFb.style.color='var(--danger)';
+        curiositySay('再试一次看看，看看上面那张图。');
+        setTimeout(function(){ b.classList.remove('wrong'); },1100);
+      }
+    });
+  });
+
+  setWingRot();
+  update();
+  requestAnimationFrame(animLoop);
+})();
+</script>
+</body>
+</html>

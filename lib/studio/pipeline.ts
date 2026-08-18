@@ -122,8 +122,9 @@ export interface StudioPipelineResult {
   /** The blocks that produced this version, when the round applied a patch. */
   editBlocks?: StudioEditBlock[];
   /**
-   * The head of a coder response whose edit blocks could not be applied. Kept so
-   * a mismatch is diagnosable from the job afterwards instead of guessed at.
+   * The head of the most recent coder response whose edit blocks could not be
+   * applied. Kept so a mismatch is diagnosable from the job afterwards instead
+   * of guessed at.
    */
   patchResponseExcerpt?: string;
 }
@@ -293,23 +294,36 @@ export async function runStudioPipeline(
     }
 
     const current = input.current;
-    const patchResponse = await writeCode(
-      renderStudioPatchPrompt({
-        request: input.request,
-        plan,
-        html: current.html,
-        findings: options.findings,
-        runtimeErrors: current.runtimeErrors,
-      }),
-    );
+    /**
+     * Two attempts at a targeted edit before falling back. The measured failure
+     * is EDIT_BLOCK_NOT_FOUND — the coder emits blocks whose SEARCH text does
+     * not match the stored document — and the applier already explains that in
+     * terms the coder can act on, so replaying its guidance is much cheaper than
+     * rewriting a 20KB page and keeps the "untouched regions stay untouched"
+     * guarantee that rewriting gives up.
+     */
     let patched: { html: string; blocks: StudioEditBlock[] } | undefined;
-    try {
-      const blocks = parseStudioEditBlocks(patchResponse);
-      patched = { html: applyStudioEditBlocks(current.html, blocks), blocks };
-    } catch (error) {
-      if (!(error instanceof StudioEditBlockError)) throw error;
-      editBlockFailures.push(error.code);
-      patchResponseExcerpt = patchResponse.slice(0, 800);
+    let retryGuidance: string | undefined;
+    for (let attempt = 1; attempt <= 2 && !patched; attempt += 1) {
+      const patchResponse = await writeCode(
+        renderStudioPatchPrompt({
+          request: input.request,
+          plan,
+          html: current.html,
+          findings: options.findings,
+          runtimeErrors: current.runtimeErrors,
+          retryGuidance,
+        }),
+      );
+      try {
+        const blocks = parseStudioEditBlocks(patchResponse);
+        patched = { html: applyStudioEditBlocks(current.html, blocks), blocks };
+      } catch (error) {
+        if (!(error instanceof StudioEditBlockError)) throw error;
+        editBlockFailures.push(error.code);
+        patchResponseExcerpt = patchResponse.slice(0, 800);
+        retryGuidance = error.retryGuidance;
+      }
     }
     if (patched) {
       const validation = validateStudioHtml(patched.html, { education: Boolean(education) });
