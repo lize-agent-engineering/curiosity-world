@@ -12,3 +12,4 @@ out/
 *.md
 *.yml
 *.yaml
+evidence/**/pages/
