@@ -103,7 +103,7 @@ describe('the workbench', () => {
 
   it('streams the code out while the coder writes it', () => {
     const html = render({ turns: [turn({ job: job(), code: '<!doctype html><h1>番' })] });
-    expect(html).toContain('正在写入代码');
+    expect(html).toContain('正在写入');
     expect(html).toContain('&lt;!doctype html&gt;&lt;h1&gt;番');
   });
 
@@ -248,7 +248,7 @@ describe('the workbench', () => {
 
   it('tells the user what will happen before the first version exists', () => {
     const html = render({ view: { ...view, versions: [] }, selectedVersionId: null, html: null });
-    expect(html).toContain('第一版生成完成后');
+    expect(html).toContain('第一版做好之后');
   });
 
   it('keeps the follow-up input available as the way to modify the app', () => {
@@ -312,10 +312,18 @@ describe('the studio home', () => {
 
   it('leads with the child question, not with an app description', () => {
     const html = renderToStaticMarkup(<StudioHomeView {...homeProps} />);
-    expect(html).toContain('把孩子的每一个“为什么”');
-    expect(html).toContain('孩子在好奇什么？');
+    expect(html).toContain('孩子最近在问什么？');
+    expect(html).toContain('做给他看');
+  });
+
+  it('keeps the age as a quiet setting rather than a second question', () => {
+    const html = renderToStaticMarkup(<StudioHomeView {...homeProps} />);
+    // It is still reachable and labelled, just not competing with the question.
     expect(html).toContain('孩子年龄');
-    expect(html).toContain('开始这次探索');
+    expect(html).toContain('做给');
+    expect(html).toContain('的孩子');
+    // The question is the one thing set in the display face at hero size.
+    expect(html).not.toContain('他今年');
   });
 
   it('offers example questions from many domains, not just the three old families', () => {
@@ -325,20 +333,21 @@ describe('the studio home', () => {
     expect(html).toContain('彩虹是从哪里来的？');
   });
 
-  it('spells out the basic flow when nothing has been made yet', () => {
+  it('invites the first question when the sky is empty', () => {
     const html = renderToStaticMarkup(<StudioHomeView {...homeProps} />);
-    expect(html).toContain('三步走完一次');
+    expect(html).toContain('第一颗星还没有亮');
   });
 
-  it('frames the general generator as an extension, not as the product', () => {
+  it('keeps the general generator to one quiet line in the footer', () => {
     const html = renderToStaticMarkup(<StudioHomeView {...homeProps} />);
-    expect(html).toContain('延展能力');
-    expect(html).toContain('同一套智能体，也能生成任意网页应用');
+    expect(html).toContain('也可以生成任意网页应用');
+    // It is no longer a card competing with the main flow.
+    expect(html).not.toContain('延展能力');
   });
 
   it('switches the composer to app requests in general mode', () => {
     const html = renderToStaticMarkup(<StudioHomeView {...homeProps} mode="general" />);
-    expect(html).toContain('描述你想要的应用');
+    expect(html).toContain('你想要一个什么应用？');
     expect(html).toContain('开始生成');
     expect(html).not.toContain('孩子年龄');
   });

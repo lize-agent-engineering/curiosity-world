@@ -73,6 +73,17 @@
   --color-pane-rule: var(--pane-rule);
   --color-pane-code: var(--pane-code);
   --color-pane-ink: var(--pane-ink);
+
+  /* 为什么世界 — the night. See ":root" for what each one is for. */
+  --color-night: var(--night);
+  --color-night-raised: var(--night-raised);
+  --color-night-card: var(--night-card);
+  --color-star: var(--star);
+  --color-star-soft: var(--star-soft);
+  --color-star-faint: var(--star-faint);
+  --color-moon: var(--moon);
+  --color-moon-ink: var(--moon-ink);
+  --color-night-rule: var(--night-rule);
 }
 
 :root {
@@ -127,6 +138,24 @@
   --pane-rule: #22302f;
   --pane-code: #a9dcc0;
   --pane-ink: #c4d2cf;
+
+  /* ── 为什么世界 ────────────────────────────────────────────────────────────
+     The bench above is the parent's side: a workshop where a page is being
+     made. This is the other side. The questions that start this product get
+     asked on an evening walk — "why is the moon following us" — so the surface
+     that receives one is a night sky, and the single accent is the light in it.
+
+     Contrast against --night: star 15:1, star-soft 8.4:1, star-faint 5.2:1,
+     moon 11:1. --star-faint is a floor for secondary text, never for controls. */
+  --night: #071528;
+  --night-raised: #0d2340;
+  --night-card: #12304f;
+  --star: #f4f1e6;
+  --star-soft: #a9c4d4;
+  --star-faint: #7f9db2;
+  --moon: #ffd97a;
+  --moon-ink: #2a2008;
+  --night-rule: rgba(244, 241, 230, 0.14);
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -218,7 +247,7 @@
     background-color: var(--bench);
   }
   body:has([data-surface='night']) {
-    background-color: #07152f;
+    background-color: var(--night);
   }
 }
 

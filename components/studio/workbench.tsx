@@ -3,6 +3,8 @@
 import { useEffect, useRef, type FormEvent } from 'react';
 import { ArrowLeft, SendHorizontal } from 'lucide-react';
 
+import { RegistrationMark } from './registration-mark';
+
 import type { StudioMode, StudioRuntimeError } from '@/lib/studio/contracts';
 import type { StudioProjectView, StudioTurn, StudioVersionView } from '@/lib/studio/client';
 import { StudioGenerationCard } from './generation-card';
@@ -44,22 +46,23 @@ export function StudioWorkbench(props: StudioWorkbenchProps) {
   }, [props.turns.length, streaming]);
 
   return (
-    <main className="flex h-dvh flex-col overflow-hidden bg-[#061223] text-[#e6eef4]">
-      <header className="flex items-center gap-3 border-b border-white/8 px-4 py-3">
+    <main className="flex h-dvh flex-col overflow-hidden bg-bench text-ink">
+      <header className="flex items-center gap-3 border-b border-rule bg-sheet px-4 py-3">
         <button
           type="button"
           onClick={props.onBack}
-          className="grid size-9 place-items-center rounded-lg border border-white/12 text-[#93aec0] transition hover:text-[#e6eef4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffe08a]"
+          className="grid size-9 place-items-center rounded-edge border border-rule text-ink-soft transition hover:bg-bench hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-spot"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           <span className="sr-only">回到首页</span>
         </button>
+        <RegistrationMark className="size-5 shrink-0 text-spot" />
         <div className="min-w-0">
           <h1 className="truncate text-base font-black leading-tight">
             {props.view?.project.title ?? '正在载入…'}
           </h1>
-          <p className="mt-0.5 text-[11px] font-bold tracking-[.14em] text-[#7f9cae]">
-            {education ? '为什么世界' : 'CURIOSITY STUDIO'} · {versionsOf(props.view).length} 个版本
+          <p className="label-machine mt-1 text-ink-soft">
+            {education ? '为什么世界' : 'GENERAL'} · {versionsOf(props.view).length} 个版本
             {education && props.view?.project.targetAge
               ? ` · ${props.view.project.targetAge} 岁`
               : ''}
@@ -68,7 +71,7 @@ export function StudioWorkbench(props: StudioWorkbenchProps) {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col-reverse lg:grid lg:grid-cols-[minmax(340px,420px)_1fr]">
-        <section className="flex min-h-0 flex-1 flex-col border-white/8 lg:border-r">
+        <section className="flex min-h-0 flex-1 flex-col border-rule bg-bench lg:border-r">
           <div ref={threadRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5">
             {props.turns.map((turn) => (
               <StudioGenerationCard
@@ -81,15 +84,15 @@ export function StudioWorkbench(props: StudioWorkbenchProps) {
             {props.error && (
               <p
                 role="alert"
-                className="rounded-xl border border-[#e08a7a]/40 bg-[#2b1512] p-3 text-xs font-bold leading-6 text-[#ffb9a6]"
+                className="rounded-plate border border-fail/30 bg-fail-wash p-3 text-[13px] font-bold leading-6 text-fail"
               >
                 {props.error}
               </p>
             )}
           </div>
 
-          <form onSubmit={props.onSubmit} className="border-t border-white/8 p-3">
-            <div className="flex items-end gap-2 rounded-2xl border border-white/12 bg-[#0c1e35] p-2 focus-within:border-[#ffe08a]/60">
+          <form onSubmit={props.onSubmit} className="border-t border-rule bg-sheet p-3">
+            <div className="flex items-end gap-2 rounded-plate border border-rule bg-sheet-raised p-2 focus-within:border-spot">
               <textarea
                 value={props.draft}
                 onChange={(event) => props.onDraftChange(event.target.value)}
@@ -107,18 +110,18 @@ export function StudioWorkbench(props: StudioWorkbenchProps) {
                       ? '接着说要改什么，例如：他只有 6 岁，再直观一点'
                       : '继续说要改什么，例如：加一个今日完成计数'
                 }
-                className="min-h-11 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm leading-6 outline-none placeholder:text-[#6b8699]"
+                className="min-h-11 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm leading-6 outline-none placeholder:text-ink-faint"
               />
               <button
                 type="submit"
                 disabled={props.busy || props.draft.trim().length === 0}
-                className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#ffe08a] text-[#26200c] transition hover:bg-[#ffd45f] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffe08a]"
+                className="grid size-10 shrink-0 place-items-center rounded-edge bg-spot text-spot-ink transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-spot"
               >
                 <SendHorizontal className="size-4" aria-hidden="true" />
                 <span className="sr-only">发送</span>
               </button>
             </div>
-            <p className="mt-1.5 px-1 text-[11px] text-[#6b8699]">⌘/Ctrl + Enter 发送</p>
+            <p className="label-machine mt-2 px-1 text-ink-soft">⌘ + ENTER 发送</p>
           </form>
         </section>
 

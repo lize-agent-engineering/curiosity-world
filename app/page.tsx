@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, useSyncExternalStore, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { StudioHomeView } from '@/components/studio/home-view';
@@ -10,12 +10,18 @@ import {
   listStudioProjects,
   type StudioProjectSummary,
 } from '@/lib/studio/client';
+import {
+  readTargetAge,
+  serverTargetAge,
+  subscribeTargetAge,
+  writeTargetAge,
+} from '@/lib/studio/target-age';
 
 export default function StudioHomePage() {
   const router = useRouter();
   const [mode, setMode] = useState<StudioMode>('education');
   const [draft, setDraft] = useState('');
-  const [targetAge, setTargetAge] = useState(8);
+  const targetAge = useSyncExternalStore(subscribeTargetAge, readTargetAge, serverTargetAge);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<StudioProjectSummary[]>([]);
@@ -61,7 +67,7 @@ export default function StudioHomePage() {
         setError(null);
       }}
       onDraftChange={setDraft}
-      onTargetAgeChange={setTargetAge}
+      onTargetAgeChange={writeTargetAge}
       onSubmit={onSubmit}
       onOpenProject={(projectId) => router.push(`/studio/${projectId}`)}
     />

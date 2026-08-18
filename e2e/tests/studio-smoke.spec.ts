@@ -9,7 +9,7 @@ test('从孩子的问题生成探索，再对话式修改并切换版本', async
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('把孩子的每一个');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('孩子最近在问什么');
 
   await page
     .getByRole('button', { name: /毛毛虫为什么会变成蝴蝶/ })
@@ -17,10 +17,10 @@ test('从孩子的问题生成探索，再对话式修改并切换版本', async
     .click();
   await expect(page.getByLabel('孩子在好奇什么')).toHaveValue(/毛毛虫/);
   await expect(page.getByLabel('孩子年龄')).toHaveValue('8');
-  await page.getByRole('button', { name: /开始这次探索/ }).click();
+  await page.getByRole('button', { name: /做给他看/ }).click();
 
   await expect(page).toHaveURL(/\/studio\/prj_/, { timeout: 30_000 });
-  await expect(page.getByRole('button', { name: /在预览里打开这一版/ })).toBeVisible({
+  await expect(page.getByRole('button', { name: /在右边打开这一版/ })).toBeVisible({
     timeout: 60_000,
   });
 

@@ -70,7 +70,7 @@ export function CuriosityHomeView({
               <Moon className="size-5 fill-current" aria-hidden="true" />
             </span>
             <div>
-              <p className="font-[var(--font-curiosity-display)] text-lg leading-none text-[#fff4c7]">
+              <p className="font-[family-name:var(--font-curiosity-display)] text-lg leading-none text-[#fff4c7]">
                 为什么世界
               </p>
               <p className="mt-1 text-[10px] font-bold tracking-[.22em] text-[#8fbed0]">
@@ -91,7 +91,7 @@ export function CuriosityHomeView({
             </p>
             <h1
               aria-label="把孩子的“为什么”变成亲手发现。"
-              className="mt-5 max-w-xl font-[var(--font-curiosity-display)] text-[clamp(3.25rem,7vw,6rem)] leading-[.91] tracking-[-.055em] text-[#fff9e6]"
+              className="mt-5 max-w-xl font-[family-name:var(--font-curiosity-display)] text-[clamp(3.25rem,7vw,6rem)] leading-[.91] tracking-[-.055em] text-[#fff9e6]"
             >
               <span aria-hidden="true" className="block">
                 把孩子的

@@ -75,8 +75,8 @@ export function StudioPreviewPanel({
   }, [onRuntimeErrors, selectedVersionId, document]);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-[#061223]">
-      <header className="flex flex-wrap items-center gap-2 border-b border-white/8 px-4 py-3">
+    <section className="flex min-h-0 flex-1 flex-col bg-bench">
+      <header className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
         <label className="sr-only" htmlFor="studio-version">
           选择版本
         </label>
@@ -85,7 +85,7 @@ export function StudioPreviewPanel({
           value={selectedVersionId ?? ''}
           onChange={(event) => onSelectVersion(event.target.value)}
           disabled={versions.length === 0}
-          className="min-h-9 rounded-lg border border-white/12 bg-[#0c1e35] px-2 text-xs font-bold text-[#e6eef4] outline-none transition focus-visible:border-[#ffe08a]"
+          className="min-h-9 rounded-edge border border-rule bg-sheet px-2 text-xs font-bold text-ink outline-none transition focus-visible:border-spot"
         >
           {versions.length === 0 && <option value="">还没有版本</option>}
           {[...versions]
@@ -105,7 +105,7 @@ export function StudioPreviewPanel({
           <button
             type="button"
             onClick={() => onRollback(selected.id)}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#ffe08a]/50 px-3 text-xs font-black text-[#ffe08a] transition hover:bg-[#ffe08a]/10"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-edge bg-spot px-3 text-xs font-black text-spot-ink transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-spot"
           >
             <RotateCcw className="size-3.5" aria-hidden="true" /> 回到这一版
           </button>
@@ -125,19 +125,19 @@ export function StudioPreviewPanel({
               link.click();
               URL.revokeObjectURL(url);
             }}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/12 px-3 text-xs font-black text-[#c7dbe3] transition hover:border-[#ffe08a]/50 hover:text-[#fff4c7]"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-edge border border-rule px-3 text-xs font-black text-ink transition hover:bg-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-spot"
           >
             <Download className="size-3.5" aria-hidden="true" /> 下载带走
           </button>
         )}
 
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-white/12 p-0.5">
+        <div className="ml-auto flex items-center gap-1 rounded-edge border border-rule p-0.5">
           <button
             type="button"
             aria-pressed={width === 'desktop'}
             onClick={() => setWidth('desktop')}
             title="桌面宽度"
-            className={`grid size-8 place-items-center rounded-md transition ${width === 'desktop' ? 'bg-white/12 text-[#ffe08a]' : 'text-[#7f9cae] hover:text-[#e6eef4]'}`}
+            className={`grid size-8 place-items-center rounded-edge transition ${width === 'desktop' ? 'bg-spot text-spot-ink' : 'text-ink-soft hover:bg-sheet'}`}
           >
             <Monitor className="size-4" aria-hidden="true" />
             <span className="sr-only">桌面宽度</span>
@@ -147,7 +147,7 @@ export function StudioPreviewPanel({
             aria-pressed={width === 'mobile'}
             onClick={() => setWidth('mobile')}
             title="手机宽度"
-            className={`grid size-8 place-items-center rounded-md transition ${width === 'mobile' ? 'bg-white/12 text-[#ffe08a]' : 'text-[#7f9cae] hover:text-[#e6eef4]'}`}
+            className={`grid size-8 place-items-center rounded-edge transition ${width === 'mobile' ? 'bg-spot text-spot-ink' : 'text-ink-soft hover:bg-sheet'}`}
           >
             <Smartphone className="size-4" aria-hidden="true" />
             <span className="sr-only">手机宽度</span>
@@ -159,7 +159,7 @@ export function StudioPreviewPanel({
             type="button"
             onClick={() => setShowErrors((value) => !value)}
             aria-expanded={showErrors}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#e08a7a]/50 bg-[#2b1512] px-3 text-xs font-black text-[#ffb9a6] transition hover:bg-[#3a1c17]"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-edge border border-fail/40 bg-fail-wash px-3 text-xs font-black text-fail transition hover:bg-fail-wash/70"
           >
             <AlertTriangle className="size-3.5" aria-hidden="true" />
             运行报错 {runtimeErrors.length}
@@ -168,11 +168,11 @@ export function StudioPreviewPanel({
       </header>
 
       {showErrors && runtimeErrors.length > 0 && (
-        <div className="border-b border-[#e08a7a]/30 bg-[#1d0f0c] px-4 py-3">
-          <p className="text-xs font-bold text-[#ffb9a6]">
-            这些错误会自动带给下一轮生成，直接说“修一下报错”即可。
+        <div className="border-b border-rule bg-fail-wash px-4 py-3">
+          <p className="text-[13px] font-bold text-fail">
+            这些错误会自动带给下一轮，直接说“修一下报错”就行。
           </p>
-          <ul className="mt-2 space-y-1 font-mono text-[11px] leading-5 text-[#f0cdc4]">
+          <ul className="mt-2 space-y-1 font-mono text-[11px] leading-5 text-ink">
             {runtimeErrors.map((error) => (
               <li key={`${error.errorKind}:${error.message}`}>
                 [{error.errorKind}] {error.message}
@@ -182,7 +182,7 @@ export function StudioPreviewPanel({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 justify-center overflow-auto bg-[#0a1728] p-3">
+      <div className="flex min-h-0 flex-1 justify-center overflow-auto bg-bench-deep p-3">
         {document ? (
           <iframe
             ref={frameRef}
@@ -190,13 +190,13 @@ export function StudioPreviewPanel({
             title="应用预览"
             srcDoc={document}
             sandbox="allow-scripts"
-            className={`h-full rounded-xl border border-white/10 bg-white shadow-[0_20px_60px_rgba(0,0,0,.35)] ${
+            className={`h-full rounded-edge border border-rule bg-white shadow-[0_10px_30px_rgba(16,22,25,.18)] ${
               width === 'mobile' ? 'w-[390px] max-w-full' : 'w-full'
             }`}
           />
         ) : (
-          <p className="self-center text-sm text-[#7f9cae]">
-            {loading ? '正在载入这一版…' : '第一版生成完成后，应用会出现在这里。'}
+          <p className="self-center max-w-xs text-center text-[13px] leading-6 text-ink-soft">
+            {loading ? '正在载入这一版…' : '第一版做好之后，页面会出现在这里，可以直接玩。'}
           </p>
         )}
       </div>

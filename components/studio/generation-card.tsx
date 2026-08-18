@@ -16,11 +16,11 @@ const EDIT_MODE_LABEL: Record<string, string> = {
 function Disclosure({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-t border-white/8 pt-2">
+    <div className="border-t border-rule-soft pt-2">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-1.5 text-left text-xs font-bold text-[#93aec0] transition hover:text-[#e6eef4]"
+        className="label-machine flex w-full items-center gap-1.5 text-left text-ink-soft transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-spot"
       >
         {open ? (
           <ChevronDown className="size-3.5" aria-hidden="true" />
@@ -29,7 +29,7 @@ function Disclosure({ title, children }: { title: string; children: React.ReactN
         )}
         {title}
       </button>
-      {open && <div className="mt-2 text-xs leading-6 text-[#bcd3de]">{children}</div>}
+      {open && <div className="mt-2 text-[13px] leading-6 text-ink-soft">{children}</div>}
     </div>
   );
 }
@@ -39,19 +39,34 @@ function PlanDetails({ artifacts }: { artifacts: StudioTurnArtifacts }) {
   if (!plan) return null;
   return (
     <Disclosure title="方案（planner 的中间产物）">
-      <p className="font-bold text-[#e6eef4]">
-        {plan.appName} · {plan.appKind}
-      </p>
+      <p className="font-bold text-ink">{plan.appName}</p>
       <p className="mt-1">{plan.summary}</p>
       <ul className="mt-2 list-disc space-y-1 pl-4">
         {plan.features.map((feature) => (
           <li key={feature}>{feature}</li>
         ))}
       </ul>
-      <p className="mt-2 text-[#93aec0]">布局：{plan.layout}</p>
-      <p className="text-[#93aec0]">
-        数据留存：{plan.persistence === 'local-storage' ? 'localStorage，刷新不丢' : '不留存'}
-      </p>
+      {plan.knowledgePoints && plan.knowledgePoints.length > 0 && (
+        <>
+          <p className="label-machine mt-3 text-ink-soft">孩子该弄明白的</p>
+          <ul className="mt-1 list-disc space-y-1 pl-4">
+            {plan.knowledgePoints.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {plan.misconceptions && plan.misconceptions.length > 0 && (
+        <>
+          <p className="label-machine mt-3 text-ink-soft">要避开的说法</p>
+          <ul className="mt-1 list-disc space-y-1 pl-4">
+            {plan.misconceptions.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="mt-3 text-ink-soft">布局：{plan.layout}</p>
     </Disclosure>
   );
 }
@@ -67,9 +82,15 @@ function ReviewDetails({ artifacts }: { artifacts: StudioTurnArtifacts }) {
         <ul className="space-y-1">
           {review.findings.map((finding) => (
             <li key={finding.detail}>
-              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-[#ffe08a]">
+              <span
+                className={`label-machine mr-1.5 inline-block px-1.5 py-0.5 ${
+                  finding.severity === 'blocker'
+                    ? 'bg-fail-wash text-fail'
+                    : 'bg-spot-wash text-spot'
+                }`}
+              >
                 {finding.severity === 'blocker' ? '必改' : '建议'}
-              </span>{' '}
+              </span>
               {finding.detail}
             </li>
           ))}
@@ -90,9 +111,9 @@ export function StudioEditDiff({
       {blocks.map((block, index) => (
         <div
           key={`${index}-${block.search.slice(0, 24)}`}
-          className="overflow-hidden rounded-lg border border-white/10 bg-[#050f1c]"
+          className="overflow-hidden rounded-edge bg-pane"
         >
-          <pre className="overflow-x-auto border-b border-white/8 px-2 py-1.5 font-mono text-[10px] leading-4 text-[#ffb9a6]">
+          <pre className="overflow-x-auto border-b border-pane-rule px-2 py-1.5 font-mono text-[10px] leading-4 text-[#f0a08e]">
             <code>
               {block.search
                 .split('\n')
@@ -100,7 +121,7 @@ export function StudioEditDiff({
                 .join('\n')}
             </code>
           </pre>
-          <pre className="overflow-x-auto px-2 py-1.5 font-mono text-[10px] leading-4 text-[#8fd6b4]">
+          <pre className="overflow-x-auto px-2 py-1.5 font-mono text-[10px] leading-4 text-pane-code">
             <code>
               {block.replace === ''
                 ? '（删除）'
@@ -147,12 +168,12 @@ export function StudioGenerationCard({ turn, onRetry, onOpenVersion }: StudioGen
   const hasArtifacts = Boolean(artifacts.plan || artifacts.review || artifacts.editMode);
   return (
     <article className="space-y-3">
-      <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-sm bg-[#ffe08a] px-4 py-2.5 text-sm font-semibold leading-6 text-[#26200c]">
+      <p className="ml-auto w-fit max-w-[88%] rounded-plate bg-spot px-4 py-2.5 text-sm font-semibold leading-6 text-spot-ink">
         {turn.request}
       </p>
 
       {job && !job.done && (
-        <div className="rounded-2xl border border-white/10 bg-[#0c1e35] p-4">
+        <div className="rounded-plate border border-rule bg-sheet p-4">
           <StudioStageProgress job={job} />
           <StudioCodeStream code={turn.code ?? ''} streaming={job.stage === 'coding'} />
           <PlanDetails artifacts={artifacts} />
@@ -172,17 +193,17 @@ export function StudioGenerationCard({ turn, onRetry, onOpenVersion }: StudioGen
             <button
               type="button"
               onClick={onRetry}
-              className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#e08a7a] px-3 text-xs font-black text-[#2b1512] transition hover:bg-[#eda495] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffe08a]"
+              className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-edge bg-fail px-3 text-xs font-black text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fail"
             >
-              <RotateCcw className="size-3.5" aria-hidden="true" /> 用同样的要求再试一次
+              <RotateCcw className="size-3.5" aria-hidden="true" /> 用同样的话再试一次
             </button>
           )}
         </div>
       )}
 
       {(turn.reply || (job?.done && !failed)) && (
-        <div className="rounded-2xl border border-white/10 bg-[#0c1e35] p-4">
-          <p className="text-sm font-semibold leading-6 text-[#e6eef4]">
+        <div className="rounded-plate border border-rule bg-sheet p-4">
+          <p className="text-sm font-semibold leading-6 text-ink">
             {turn.reply ?? job?.result?.summary}
           </p>
           {job?.done && !failed && <StudioCodeStream code={turn.code ?? ''} streaming={false} />}
@@ -197,9 +218,9 @@ export function StudioGenerationCard({ turn, onRetry, onOpenVersion }: StudioGen
             <button
               type="button"
               onClick={() => onOpenVersion(turn.versionId!)}
-              className="mt-3 text-xs font-bold text-[#ffe08a] underline-offset-4 hover:underline"
+              className="label-machine mt-3 text-spot underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-spot"
             >
-              在预览里打开这一版
+              在右边打开这一版
             </button>
           )}
         </div>
