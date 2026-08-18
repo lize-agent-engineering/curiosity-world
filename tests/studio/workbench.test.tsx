@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
+import { StudioEditDiff } from '@/components/studio/generation-card';
+import { StudioHomeView } from '@/components/studio/home-view';
 import { StudioWorkbench, type StudioWorkbenchProps } from '@/components/studio/workbench';
 import type { StudioJobView, StudioProjectView, StudioTurn } from '@/lib/studio/client';
 
@@ -162,6 +164,21 @@ describe('the workbench', () => {
     expect(html).toContain('整页重写');
   });
 
+  it('offers the applied edits as an expandable product of the round', () => {
+    const html = render({
+      turns: [
+        turn({
+          reply: '改了标题。',
+          artifacts: {
+            editMode: 'patch',
+            editBlocks: [{ search: '<h1>番茄钟</h1>', replace: '<h1>专注钟</h1>' }],
+          },
+        }),
+      ],
+    });
+    expect(html).toContain('修改方式：定点修改');
+  });
+
   it('offers a retry with the same request when a round fails', () => {
     const html = render({
       turns: [
@@ -236,5 +253,63 @@ describe('the workbench', () => {
   it('keeps the follow-up input available as the way to modify the app', () => {
     const html = render();
     expect(html).toContain('继续说要改什么');
+  });
+});
+
+describe('the edit diff', () => {
+  it('renders each applied block as removed and added lines', () => {
+    const html = renderToStaticMarkup(
+      <StudioEditDiff blocks={[{ search: '<h1>番茄钟</h1>', replace: '<h1>专注钟</h1>' }]} />,
+    );
+    expect(html).toContain('- &lt;h1&gt;番茄钟&lt;/h1&gt;');
+    expect(html).toContain('+ &lt;h1&gt;专注钟&lt;/h1&gt;');
+  });
+
+  it('prefixes every line of a multi-line block', () => {
+    const html = renderToStaticMarkup(
+      <StudioEditDiff blocks={[{ search: 'a\nb', replace: 'c\nd' }]} />,
+    );
+    expect(html).toContain('- a\n- b');
+    expect(html).toContain('+ c\n+ d');
+  });
+
+  it('labels an emptied replacement as a deletion instead of a blank pane', () => {
+    const html = renderToStaticMarkup(
+      <StudioEditDiff blocks={[{ search: '<p>x</p>', replace: '' }]} />,
+    );
+    expect(html).toContain('（删除）');
+  });
+
+  it('renders every block, not just the first', () => {
+    const html = renderToStaticMarkup(
+      <StudioEditDiff
+        blocks={[
+          { search: 'one', replace: 'ONE' },
+          { search: 'two', replace: 'TWO' },
+        ]}
+      />,
+    );
+    expect(html).toContain('- one');
+    expect(html).toContain('- two');
+  });
+});
+
+describe('the studio home empty state', () => {
+  it('spells out the basic flow and points at the template for a first look', () => {
+    const html = renderToStaticMarkup(
+      <StudioHomeView
+        draft=""
+        busy={false}
+        error={null}
+        projects={[]}
+        onDraftChange={vi.fn()}
+        onSubmit={vi.fn()}
+        onOpenProject={vi.fn()}
+        onOpenCuriosity={vi.fn()}
+      />,
+    );
+    expect(html).toContain('三步就能跑完一次');
+    expect(html).toContain('「为什么世界」模板');
+    expect(html).toContain('为什么世界 · 儿童科普探索');
   });
 });

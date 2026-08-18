@@ -185,3 +185,26 @@ export function applyStudioEditBlocks(html: string, blocks: StudioEditBlock[]): 
   }
   return next;
 }
+
+/** How many blocks and how much of each side are kept for display on a version. */
+const MAX_STORED_BLOCKS = 8;
+const MAX_STORED_SIDE = 1_200;
+
+function clip(value: string): string {
+  return value.length <= MAX_STORED_SIDE
+    ? value
+    : `${value.slice(0, MAX_STORED_SIDE)}\n…（已截断）`;
+}
+
+/**
+ * Shrink applied blocks to something worth storing on a version.
+ *
+ * The blocks are shown in the conversation as the diff the coder actually made,
+ * so they have to survive a reload — but a rewrite-sized block would put a whole
+ * document into the record twice.
+ */
+export function summarizeStudioEditBlocks(blocks: StudioEditBlock[]): StudioEditBlock[] {
+  return blocks
+    .slice(0, MAX_STORED_BLOCKS)
+    .map((block) => ({ search: clip(block.search), replace: clip(block.replace) }));
+}

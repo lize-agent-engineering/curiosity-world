@@ -171,7 +171,9 @@ export function StudioHomeView({
           <h2 className="text-xs font-bold tracking-[.18em] text-[#8fbed0]">最近的项目</h2>
           {projects.length === 0 ? (
             <p className="mt-3 max-w-xl text-sm leading-7 text-[#9fbccb]">
-              还没有项目。在上面写一句你想要的应用，或者点一个示例——第一版通常两到四分钟做完，中途可以看着代码一行行写出来。
+              还没有项目。三步就能跑完一次：在上面写一句你想要的应用（或点一个示例）→
+              看着规划、编码、审查三个智能体把它做出来 → 继续对话让它改。第一版通常两到四分钟，
+              中途代码是一行行写出来的。想先看看成品，就点上面的「为什么世界」模板。
             </p>
           ) : (
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

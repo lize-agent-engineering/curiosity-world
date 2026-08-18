@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import {
   studioAppKindSchema,
+  studioEditBlockRecordSchema,
   studioMessageSchema,
   studioPlannerOutputSchema,
   studioProjectSchema,
@@ -47,6 +48,7 @@ export const studioJobViewSchema = z.object({
   review: studioReviewSchema.optional(),
   editMode: z.enum(['create', 'patch', 'rewrite']).optional(),
   editBlockFailures: z.array(z.string()).optional(),
+  editBlocks: z.array(studioEditBlockRecordSchema).optional(),
   errorCode: z.string().optional(),
   error: z.string().optional(),
   result: z.object({ versionId: z.string(), revision: z.number(), summary: z.string() }).optional(),
@@ -210,6 +212,7 @@ export interface StudioTurnArtifacts {
   review?: z.infer<typeof studioReviewSchema>;
   editMode?: 'create' | 'patch' | 'rewrite';
   editBlockFailures?: string[];
+  editBlocks?: z.infer<typeof studioEditBlockRecordSchema>[];
 }
 
 export interface StudioTurn {
@@ -264,6 +267,7 @@ export function buildStudioTurns(input: {
       review: version.review,
       editMode: version.editMode,
       editBlockFailures: version.editBlockFailures,
+      editBlocks: version.editBlocks,
     };
   }
   const active = input.activeJob;
@@ -277,6 +281,7 @@ export function buildStudioTurns(input: {
         review: active.review ?? target.artifacts?.review,
         editMode: active.editMode ?? target.artifacts?.editMode,
         editBlockFailures: active.editBlockFailures ?? target.artifacts?.editBlockFailures,
+        editBlocks: active.editBlocks ?? target.artifacts?.editBlocks,
       };
     }
   }

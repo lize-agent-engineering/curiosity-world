@@ -34,6 +34,7 @@ import {
   applyStudioEditBlocks,
   parseStudioEditBlocks,
   StudioEditBlockError,
+  summarizeStudioEditBlocks,
   type StudioEditBlock,
 } from './edit-blocks';
 import {
@@ -108,6 +109,8 @@ export interface StudioPipelineResult {
   validation: StudioValidationReport;
   codeAttempts: number;
   editBlockFailures: string[];
+  /** The blocks that produced this version, when the round applied a patch. */
+  editBlocks?: StudioEditBlock[];
   /**
    * The head of a coder response whose edit blocks could not be applied. Kept so
    * a mismatch is diagnosable from the job afterwards instead of guessed at.
@@ -234,6 +237,7 @@ export async function runStudioPipeline(
     html: string;
     editMode: StudioEditMode;
     validation: StudioValidationReport;
+    editBlocks?: StudioEditBlock[];
   }
 
   /** One coding round: produce a document, or throw with the reason it is unusable. */
@@ -291,7 +295,12 @@ export async function runStudioPipeline(
       const validation = validateStudioHtml(patched.html);
       if (validation.errors.length === 0) {
         await emit({ type: 'code-done', editMode: 'patch' });
-        return { html: patched.html, editMode: 'patch', validation };
+        return {
+          html: patched.html,
+          editMode: 'patch',
+          validation,
+          editBlocks: summarizeStudioEditBlocks(patched.blocks),
+        };
       }
       editBlockFailures.push(validation.errors[0]!.code);
     }
@@ -383,6 +392,7 @@ export async function runStudioPipeline(
     validation: round.validation,
     codeAttempts,
     editBlockFailures,
+    ...(round.editBlocks ? { editBlocks: round.editBlocks } : {}),
     ...(patchResponseExcerpt ? { patchResponseExcerpt } : {}),
   };
 }

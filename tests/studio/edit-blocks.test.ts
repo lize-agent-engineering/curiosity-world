@@ -5,6 +5,7 @@ import {
   parseStudioEditBlocks,
   StudioEditBlockError,
   STUDIO_EDIT_BLOCK_FORMAT,
+  summarizeStudioEditBlocks,
 } from '@/lib/studio/edit-blocks';
 
 const block = (search: string, replace: string) =>
@@ -190,5 +191,26 @@ describe('applyStudioEditBlocks', () => {
     );
     expect(error.retryGuidance).toContain('SEARCH');
     expect(error.retryGuidance.length).toBeGreaterThan(20);
+  });
+});
+
+describe('summarizeStudioEditBlocks', () => {
+  it('keeps small blocks verbatim so the diff is the real thing', () => {
+    const blocks = [{ search: '<h1>a</h1>', replace: '<h1>b</h1>' }];
+    expect(summarizeStudioEditBlocks(blocks)).toEqual(blocks);
+  });
+
+  it('truncates a long side and says so, rather than storing a whole document', () => {
+    const [block] = summarizeStudioEditBlocks([{ search: 'x'.repeat(5000), replace: 'y' }]);
+    expect(block!.search.length).toBeLessThan(1400);
+    expect(block!.search).toContain('…');
+  });
+
+  it('caps how many blocks are kept', () => {
+    const many = Array.from({ length: 20 }, (_, index) => ({
+      search: `a${index}`,
+      replace: `b${index}`,
+    }));
+    expect(summarizeStudioEditBlocks(many)).toHaveLength(8);
   });
 });

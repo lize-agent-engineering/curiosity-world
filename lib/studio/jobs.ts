@@ -13,6 +13,7 @@ import path from 'path';
 import lockfile from 'proper-lockfile';
 
 import type { StudioEditMode, StudioPlan, StudioReview } from './contracts';
+import type { StudioEditBlock } from './edit-blocks';
 
 export type StudioJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 export type StudioJobStage = 'queued' | 'planning' | 'coding' | 'reviewing' | 'done' | 'failed';
@@ -33,6 +34,7 @@ export interface StudioGenerationJob {
   review?: StudioReview;
   editMode?: StudioEditMode;
   editBlockFailures?: string[];
+  editBlocks?: StudioEditBlock[];
   /** Head of a coder response whose edit blocks failed, for diagnosis. */
   patchResponseExcerpt?: string;
   codeAttempts?: number;

@@ -79,6 +79,43 @@ function ReviewDetails({ artifacts }: { artifacts: StudioTurnArtifacts }) {
   );
 }
 
+/** The edits the coder actually made, rendered as a plain +/- diff. */
+export function StudioEditDiff({
+  blocks,
+}: {
+  blocks: NonNullable<StudioTurnArtifacts['editBlocks']>;
+}) {
+  return (
+    <div className="mt-2 space-y-2">
+      {blocks.map((block, index) => (
+        <div
+          key={`${index}-${block.search.slice(0, 24)}`}
+          className="overflow-hidden rounded-lg border border-white/10 bg-[#050f1c]"
+        >
+          <pre className="overflow-x-auto border-b border-white/8 px-2 py-1.5 font-mono text-[10px] leading-4 text-[#ffb9a6]">
+            <code>
+              {block.search
+                .split('\n')
+                .map((line) => `- ${line}`)
+                .join('\n')}
+            </code>
+          </pre>
+          <pre className="overflow-x-auto px-2 py-1.5 font-mono text-[10px] leading-4 text-[#8fd6b4]">
+            <code>
+              {block.replace === ''
+                ? '（删除）'
+                : block.replace
+                    .split('\n')
+                    .map((line) => `+ ${line}`)
+                    .join('\n')}
+            </code>
+          </pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EditDetails({ artifacts }: { artifacts: StudioTurnArtifacts }) {
   const editMode = artifacts.editMode;
   if (!editMode) return null;
@@ -89,6 +126,9 @@ function EditDetails({ artifacts }: { artifacts: StudioTurnArtifacts }) {
       {editMode === 'create' && <p>这是这个项目的第一版，整页生成。</p>}
       {artifacts.editBlockFailures && artifacts.editBlockFailures.length > 0 && (
         <p className="mt-1 text-[#93aec0]">失配原因：{artifacts.editBlockFailures.join('、')}</p>
+      )}
+      {artifacts.editBlocks && artifacts.editBlocks.length > 0 && (
+        <StudioEditDiff blocks={artifacts.editBlocks} />
       )}
     </Disclosure>
   );

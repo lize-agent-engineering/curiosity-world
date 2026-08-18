@@ -176,6 +176,24 @@ describe('modifying an app', () => {
     expect(result.summary).toBe('加上今日完成计数。');
   });
 
+  it('reports the blocks it applied so the diff can be shown', async () => {
+    const bundle = models({
+      planner: [planJson()],
+      coder: [editBlock('<h1>番茄钟</h1>', '<h1>专注钟</h1>')],
+    });
+    const result = await runStudioPipeline({ request: '改标题', current }, bundle);
+    expect(result.editBlocks).toEqual([{ search: '<h1>番茄钟</h1>', replace: '<h1>专注钟</h1>' }]);
+  });
+
+  it('reports no blocks when the round fell back to a rewrite', async () => {
+    const bundle = models({
+      planner: [planJson()],
+      coder: [editBlock('<h1>不存在</h1>', '<h1>x</h1>'), page('<h1>专注钟</h1>')],
+    });
+    const result = await runStudioPipeline({ request: '改标题', current }, bundle);
+    expect(result.editBlocks).toBeUndefined();
+  });
+
   it('feeds the stored html and the previous runtime errors to the coder', async () => {
     const bundle = models({
       planner: [planJson()],

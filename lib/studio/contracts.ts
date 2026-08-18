@@ -97,6 +97,12 @@ export const studioRuntimeErrorSchema = z.strictObject({
 
 export type StudioRuntimeError = z.infer<typeof studioRuntimeErrorSchema>;
 
+/** One applied search/replace block, clipped for display. */
+export const studioEditBlockRecordSchema = z.strictObject({
+  search: z.string().min(1).max(2_000),
+  replace: z.string().max(2_000),
+});
+
 export const studioProjectSchema = z.strictObject({
   id: projectIdSchema,
   title: z.string().trim().min(1).max(80),
@@ -129,6 +135,8 @@ export const studioVersionSchema = z.strictObject({
   plan: studioPlannerOutputSchema.optional(),
   review: studioReviewSchema.optional(),
   editBlockFailures: z.array(z.string().max(64)).max(8).optional(),
+  /** The edits this version was made by, when it came from a targeted patch. */
+  editBlocks: z.array(studioEditBlockRecordSchema).max(8).optional(),
 });
 
 export type StudioVersion = z.infer<typeof studioVersionSchema>;

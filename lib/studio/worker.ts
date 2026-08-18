@@ -228,6 +228,7 @@ export async function runStudioWorkerOnce(input: StudioWorkerInput): Promise<boo
       plan: result.plan,
       review: result.review,
       editBlockFailures: result.editBlockFailures,
+      editBlocks: result.editBlocks,
     };
     const message: StudioMessage = {
       id: ids.messageId,
@@ -254,6 +255,7 @@ export async function runStudioWorkerOnce(input: StudioWorkerInput): Promise<boo
       review: result.review,
       editMode: result.editMode,
       editBlockFailures: result.editBlockFailures,
+      editBlocks: result.editBlocks,
       patchResponseExcerpt: result.patchResponseExcerpt,
       codeAttempts: result.codeAttempts,
       result: {
