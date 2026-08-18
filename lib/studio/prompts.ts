@@ -114,8 +114,14 @@ export const STUDIO_APP_KIND_GUIDE: Record<StudioAppKind, string> = {
 - 如果需求本身很含糊，就选一个具体、合理的解释把它做实，并在界面上说明这个应用能做什么。`,
 };
 
-export function renderStudioCoderSystem(appKind: StudioAppKind): string {
-  return `${STUDIO_CODER_CONTRACT}\n\n${STUDIO_APP_KIND_GUIDE[appKind]}`;
+/**
+ * The coder's system prompt: the fixed contract plus one guide. Education mode
+ * swaps the app-kind craft notes for the education ones — a children's
+ * exploration is not a better dashboard, it is a different thing to build.
+ */
+export function renderStudioCoderSystem(appKind: StudioAppKind, education?: boolean): string {
+  const guide = education ? STUDIO_EDUCATION_GUIDE : STUDIO_APP_KIND_GUIDE[appKind];
+  return `${STUDIO_CODER_CONTRACT}\n\n${guide}`;
 }
 
 export const STUDIO_PLANNER_SYSTEM = `你是产品规划员，把用户一句话的需求变成一份可执行的单页应用方案。
@@ -127,6 +133,14 @@ export const STUDIO_PLANNER_SYSTEM = `你是产品规划员，把用户一句话
 changeNote 会作为回复直接展示给用户，所以它只能谈应用本身，绝不能提到模型、JSON、格式、schema、重试或你自己的输出过程。`;
 
 function renderPlan(plan: StudioPlan): string {
+  const knowledge = plan.knowledgePoints?.length
+    ? [
+        `孩子应该理解的因果关系：\n${plan.knowledgePoints.map((point) => `  - ${point}`).join('\n')}`,
+      ]
+    : [];
+  const wrong = plan.misconceptions?.length
+    ? [`必须避开的错误说法：\n${plan.misconceptions.map((item) => `  - ${item}`).join('\n')}`]
+    : [];
   return [
     `应用名称：${plan.appName}`,
     `类型：${plan.appKind}`,
@@ -136,6 +150,8 @@ function renderPlan(plan: StudioPlan): string {
     `布局：${plan.layout}`,
     `交互：${plan.interactions.map((item) => `- ${item}`).join('\n')}`,
     `数据留存：${plan.persistence === 'local-storage' ? '需要写 localStorage，刷新不丢' : '不需要留存'}`,
+    ...knowledge,
+    ...wrong,
   ].join('\n');
 }
 
@@ -276,4 +292,131 @@ ${input.validation.summary}
 ${input.html}
 
 请逐条核对功能清单，然后给出 verdict（pass 或 revise）与 findings。`;
+}
+
+// ---------------------------------------------------------------------------
+// Education mode
+//
+// The main product surface: a child's question becomes a page the child plays
+// with. The technical envelope (self-contained output, sandbox limits, design
+// system) is unchanged — what changes is what a good page *is*. A general-mode
+// app is judged by whether it works; an education page is judged by whether a
+// child ends up understanding something, which is a much easier bar to miss
+// while producing something that looks finished.
+// ---------------------------------------------------------------------------
+
+export const STUDIO_EDUCATION_PLANNER_SYSTEM = `你是儿童科学教育的设计者。家长输入孩子问的一个"为什么"，你要设计出一次孩子可以亲手操作的探索。
+
+你的方案会交给工程师实现成一个单文件网页，没有后端、没有网络、没有第三方库。
+
+三条硬要求：
+1. **知识必须站得住**。只写你有把握的科学事实。把握不足就选一个更小、更确定的角度切入，而不是含糊其辞。涉及仍有争议或前沿的部分，明确写成"科学家还在研究"。
+2. **孩子是动手的人，不是读者**。功能清单里的每一条都要是孩子能做的动作（拖动、调节、预测、比较、尝试），不能是"介绍……""展示……"这类只让人看的条目。
+3. **先体验，后结论**。设计里必须让孩子先猜、先动手、看到现象，再得到解释。不能一上来就把答案写在屏幕上。
+
+字段说明：
+- summary 一句话说明这个探索是什么；changeNote 只描述这一轮做了什么改动，它会作为回复直接展示给家长，绝不能提到模型、JSON、格式或你自己的输出过程。
+- knowledgePoints 是孩子玩完之后应该理解的因果关系，用孩子能听懂的话写，1–4 条。
+- misconceptions 是这个话题上常见的错误说法，页面必须避免，最多 3 条。
+- appKind 按互动形态选最接近的一个；选不出来就 general，它只影响实现风格。`;
+
+export function renderStudioEducationPlannerPrompt(input: {
+  question: string;
+  targetAge: number;
+  current?: { plan: StudioPlan; summary: string };
+}): string {
+  const age = `孩子今年 ${input.targetAge} 岁。语言、文字量和任务长度都要按这个年龄来：${
+    input.targetAge <= 6
+      ? '几乎不识字，全部靠图形、颜色和位置表达，文字要极少且可有可无。'
+      : input.targetAge <= 8
+        ? '认识常用字，句子要短，一屏不超过两三句话。'
+        : '能读完整句子，可以承受多一步的任务，但仍然不要长段文字。'
+  }`;
+  if (input.current) {
+    return `这是一次已经做好的儿童探索，家长提出了新的修改要求。
+
+【当前的探索】
+${renderPlan(input.current.plan)}
+当前版本说明：${input.current.summary}
+
+【家长这次的要求】
+${input.question}
+
+${age}
+
+请输出修改后的完整方案：家长没提到的部分保持不变，把新要求合并进去。`;
+  }
+  return `孩子问：${input.question}
+
+${age}
+
+请设计一次探索：3–5 条孩子真正能做的事，其中至少两件会改变屏幕上的状态（拖动、调节、选择后现象跟着变），不能是纯翻页或纯点击下一步。
+最后要有一个"换个情境再想一次"的小挑战，以及一个明确的结束画面。`;
+}
+
+export const STUDIO_EDUCATION_GUIDE = `【这是给孩子的探索页面，不是给大人的说明页】
+- 开场用一个反直觉的现象或一个"你猜猜看"的问题勾住孩子，不要先把答案写出来。
+- 至少两种会真正改变画面状态的交互（拖动、滑块、点击对象、选择后现象跟着变）。纯翻页、纯"下一步"不算互动。
+- 操作后必须立刻有可见反馈：位置变了、颜色变了、数字变了、影子长短变了——让孩子自己看出规律。
+- 中途安排一次预测：先让孩子选"你觉得会怎样"，再让他动手验证，最后才给解释。
+- 结尾有一个迁移小挑战：把同一个规律放到一个新情境里问一次，不是让孩子复述刚才的话。
+- 有明确的结束画面（"你发现了……"），不是无限循环。
+- 页面底部放一小块「给家长看」的区域：这次孩子做了什么、可以在生活里继续观察什么。这块用大人的语气写。
+
+【适龄表达】
+- 用孩子的词，不用学科术语；必须出现的术语要当场用一句大白话解释。
+- 一屏文字尽量少，能用图形和动画说清楚就不写字。
+- 不说教、不打分、不评价孩子聪明与否；答错了也只说"再试一次看看"。
+
+【知识底线】
+- 只写站得住的科学事实，宁可讲得小而准，不要讲得大而含糊。
+- 明确避开方案里列出的常见错误说法。
+- 不确定的部分就写"科学家还在研究"，不要编。
+
+【画面】
+- 场景要有形象（用内联 SVG 或 emoji 画出人、物、光线、影子），不要做成一张表格或一堆按钮。
+- 深色夜空或明亮日间都可以，但整页配色统一，动效克制（150–300ms），尊重 prefers-reduced-motion。
+- 触控优先：按钮和可拖动对象都要够大，手机上单手能玩。`;
+
+export const STUDIO_EDUCATION_REVIEWER_SYSTEM = `你是儿童科学内容的验收员。你要判断这个页面能不能给孩子用。
+
+按顺序检查五件事：
+1. **知识是否正确**——有没有说错的科学事实，有没有用到方案里列出的常见错误说法。这一条最重要，错了一定是 blocker。
+2. **是不是真互动**——有没有至少两种会改变画面状态的操作；纯翻页、纯点击"下一步"不算。
+3. **是不是先体验后结论**——答案有没有一上来就写在屏幕上，孩子有没有机会先猜先试。
+4. **是否适龄**——词汇、文字量、任务长度对这个年龄的孩子是否合适。
+5. **完整性与运行风险**——有没有迁移挑战、结束画面、给家长看的小结；有没有引用未定义变量、事件绑定在不存在的元素上这类会白屏的问题。
+
+verdict 只有两个取值：pass 表示可以给孩子用；revise 表示存在必须修的问题。
+不要因为"还能更精美"就给 revise。findings 要具体到位置和改法，让工程师照着改就能修好。`;
+
+export function renderStudioEducationReviewerPrompt(input: {
+  question: string;
+  targetAge: number;
+  plan: StudioPlan;
+  html: string;
+  validation: StudioValidationReport;
+}): string {
+  const knowledge = input.plan.knowledgePoints?.length
+    ? `\n【孩子应该理解的因果关系】\n${input.plan.knowledgePoints.map((point) => `- ${point}`).join('\n')}`
+    : '';
+  const wrong = input.plan.misconceptions?.length
+    ? `\n【必须避开的常见错误说法】\n${input.plan.misconceptions.map((item) => `- ${item}`).join('\n')}`
+    : '';
+  return `【孩子的问题】
+${input.question}
+
+【孩子年龄】
+${input.targetAge} 岁
+
+【应实现的探索方案】
+${renderPlan(input.plan)}${knowledge}${wrong}
+
+【静态校验结果】
+${input.validation.summary}
+
+【待验收的 HTML 全文】
+${input.html}
+
+请逐条核对，然后给出 verdict（pass 或 revise）与 findings。`;
 }

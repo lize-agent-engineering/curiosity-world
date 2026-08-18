@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Monitor, RotateCcw, Smartphone } from 'lucide-react';
+import { AlertTriangle, Download, Monitor, RotateCcw, Smartphone } from 'lucide-react';
 
 import type { StudioRuntimeError } from '@/lib/studio/contracts';
 import type { StudioVersionView } from '@/lib/studio/client';
@@ -20,6 +20,8 @@ interface StudioPreviewPanelProps {
   html: string | null;
   loading: boolean;
   runtimeErrors: StudioRuntimeError[];
+  /** Used to name the downloaded file; the page is one self-contained document. */
+  downloadName: string;
   onSelectVersion: (versionId: string) => void;
   onRollback: (versionId: string) => void;
   onRuntimeErrors?: (errors: Array<Pick<StudioRuntimeError, 'errorKind' | 'message'>>) => void;
@@ -32,6 +34,7 @@ export function StudioPreviewPanel({
   html,
   loading,
   runtimeErrors,
+  downloadName,
   onSelectVersion,
   onRollback,
   onRuntimeErrors,
@@ -105,6 +108,26 @@ export function StudioPreviewPanel({
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#ffe08a]/50 px-3 text-xs font-black text-[#ffe08a] transition hover:bg-[#ffe08a]/10"
           >
             <RotateCcw className="size-3.5" aria-hidden="true" /> 回到这一版
+          </button>
+        )}
+
+        {html && (
+          <button
+            type="button"
+            onClick={() => {
+              // The host page is not sandboxed, so it can hand the file over —
+              // a download started by the previewed page itself would be blocked.
+              const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+              // `document` is shadowed in this component by the patched HTML.
+              const link = window.document.createElement('a');
+              link.href = url;
+              link.download = downloadName;
+              link.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/12 px-3 text-xs font-black text-[#c7dbe3] transition hover:border-[#ffe08a]/50 hover:text-[#fff4c7]"
+          >
+            <Download className="size-3.5" aria-hidden="true" /> 下载带走
           </button>
         )}
 

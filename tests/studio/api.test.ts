@@ -73,6 +73,51 @@ async function seedVersion(
   );
 }
 
+describe('the education surface', () => {
+  it('records the child age on the project and on the job', async () => {
+    const handler = createStudioProjectsPostHandler({ projectStore, jobStore, identityFactory });
+    const response = await handler(
+      post({ prompt: '为什么月亮看起来会跟着我们？', mode: 'education', targetAge: 8 }),
+    );
+    expect(response.status).toBe(202);
+    const snapshot = (await projectStore.read('prj_test1'))!;
+    expect(snapshot.project.mode).toBe('education');
+    expect(snapshot.project.targetAge).toBe(8);
+    expect((await jobStore.read('job_test1'))!.input).toMatchObject({
+      mode: 'education',
+      targetAge: 8,
+    });
+  });
+
+  it('refuses an education project with no child age', async () => {
+    const handler = createStudioProjectsPostHandler({ projectStore, jobStore, identityFactory });
+    const response = await handler(post({ prompt: '为什么天是蓝的？', mode: 'education' }));
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects an age outside the supported range instead of guessing', async () => {
+    const handler = createStudioProjectsPostHandler({ projectStore, jobStore, identityFactory });
+    const response = await handler(
+      post({ prompt: '为什么天是蓝的？', mode: 'education', targetAge: 30 }),
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('makes a follow-up turn inherit the surface and the age of its project', async () => {
+    const create = createStudioProjectsPostHandler({ projectStore, jobStore, identityFactory });
+    await create(post({ prompt: '为什么月亮看起来会跟着我们？', mode: 'education', targetAge: 8 }));
+    await seedVersion('prj_test1');
+    const handler = createStudioMessagePostHandler({ projectStore, jobStore, identityFactory });
+    await handler(post({ text: '再简单一点' }), {
+      params: Promise.resolve({ projectId: 'prj_test1' }),
+    });
+    expect((await jobStore.read('job_test2'))!.input).toMatchObject({
+      mode: 'education',
+      targetAge: 8,
+    });
+  });
+});
+
 describe('POST /api/studio/projects', () => {
   it('creates a project, records the request as the first message and queues a job', async () => {
     const body = await seedProject();
@@ -182,7 +227,11 @@ describe('POST a follow-up message', () => {
     );
     expect(body.jobId).toBe('job_test2');
     const job = (await jobStore.read('job_test2'))!;
-    expect(job.input).toEqual({ request: '加一个今日完成计数', parentVersionId: 'ver_one' });
+    expect(job.input).toEqual({
+      request: '加一个今日完成计数',
+      parentVersionId: 'ver_one',
+      mode: 'general',
+    });
     const snapshot = (await projectStore.read('prj_test1'))!;
     expect(snapshot.messages.at(-1)!.text).toBe('加一个今日完成计数');
   });

@@ -11,6 +11,7 @@ import { z } from 'zod';
 import {
   studioAppKindSchema,
   studioEditBlockRecordSchema,
+  studioModeSchema,
   studioMessageSchema,
   studioPlannerOutputSchema,
   studioProjectSchema,
@@ -59,6 +60,8 @@ export type StudioJobView = z.infer<typeof studioJobViewSchema>;
 export const studioProjectSummarySchema = z.object({
   id: z.string(),
   title: z.string(),
+  mode: studioModeSchema,
+  targetAge: z.number().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
   appKind: studioAppKindSchema.nullable(),
@@ -107,14 +110,14 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
 const jsonHeaders = { 'content-type': 'application/json' };
 
 export async function createStudioProject(
-  prompt: string,
+  input: { prompt: string; mode?: 'education' | 'general'; targetAge?: number },
   signal?: AbortSignal,
 ): Promise<{ projectId: string; jobId: string }> {
   const body = await readJson(
     await fetch('/api/studio/projects', {
       method: 'POST',
       headers: jsonHeaders,
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify(input),
       signal,
     }),
   );

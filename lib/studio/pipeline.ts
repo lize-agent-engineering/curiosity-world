@@ -22,6 +22,7 @@ import { z } from 'zod';
 import { parseCuriosityModelJson } from '@/lib/curiosity/model-json';
 import {
   parseStudioPlan,
+  studioEducationPlannerOutputSchema,
   studioPlannerOutputSchema,
   studioReviewSchema,
   type StudioAgentRole,
@@ -40,10 +41,14 @@ import {
 import {
   renderStudioCoderSystem,
   renderStudioCreatePrompt,
+  renderStudioEducationPlannerPrompt,
+  renderStudioEducationReviewerPrompt,
   renderStudioPatchPrompt,
   renderStudioPlannerPrompt,
   renderStudioReviewerPrompt,
   renderStudioRewritePrompt,
+  STUDIO_EDUCATION_PLANNER_SYSTEM,
+  STUDIO_EDUCATION_REVIEWER_SYSTEM,
   STUDIO_PLANNER_SYSTEM,
   STUDIO_REVIEWER_SYSTEM,
 } from './prompts';
@@ -80,6 +85,11 @@ export interface StudioPipelineCurrent {
 export interface StudioPipelineInput {
   request: string;
   current?: StudioPipelineCurrent;
+  /**
+   * Present for the education surface. It swaps the planner, the coder guide and
+   * the reviewer rubric — the engine underneath is identical.
+   */
+  education?: { targetAge: number };
 }
 
 export type StudioPipelineStage = 'planning' | 'coding' | 'reviewing';
@@ -182,22 +192,32 @@ export async function runStudioPipeline(
     await hooks.onEvent?.(event);
   };
 
+  const education = input.education;
+  const currentPlan = input.current
+    ? { plan: input.current.plan, summary: input.current.summary }
+    : undefined;
+
   await emit({ type: 'stage', stage: 'planning', attempt: 1 });
   let plan: StudioPlan;
   let planFallback = false;
   try {
     plan = await completeStructured(
       models['studio.planner'],
-      {
-        system: STUDIO_PLANNER_SYSTEM,
-        prompt: renderStudioPlannerPrompt({
-          request: input.request,
-          current: input.current
-            ? { plan: input.current.plan, summary: input.current.summary }
-            : undefined,
-        }),
-        schema: studioPlannerOutputSchema,
-      },
+      education
+        ? {
+            system: STUDIO_EDUCATION_PLANNER_SYSTEM,
+            prompt: renderStudioEducationPlannerPrompt({
+              question: input.request,
+              targetAge: education.targetAge,
+              current: currentPlan,
+            }),
+            schema: studioEducationPlannerOutputSchema,
+          }
+        : {
+            system: STUDIO_PLANNER_SYSTEM,
+            prompt: renderStudioPlannerPrompt({ request: input.request, current: currentPlan }),
+            schema: studioPlannerOutputSchema,
+          },
       (raw) => parseStudioPlan(parseCuriosityModelJson(raw, z.unknown())),
     );
   } catch (error) {
@@ -218,7 +238,7 @@ export async function runStudioPipeline(
   await emit({ type: 'plan', plan });
 
   const coder = models['studio.coder'];
-  const system = renderStudioCoderSystem(plan.appKind);
+  const system = renderStudioCoderSystem(plan.appKind, Boolean(education));
   const editBlockFailures: string[] = [];
   let patchResponseExcerpt: string | undefined;
   let codeAttempts = 0;
@@ -338,16 +358,28 @@ export async function runStudioPipeline(
     try {
       return await completeStructured(
         models['studio.reviewer'],
-        {
-          system: STUDIO_REVIEWER_SYSTEM,
-          prompt: renderStudioReviewerPrompt({
-            request: input.request,
-            plan,
-            html: round.html,
-            validation: round.validation,
-          }),
-          schema: studioReviewSchema,
-        },
+        education
+          ? {
+              system: STUDIO_EDUCATION_REVIEWER_SYSTEM,
+              prompt: renderStudioEducationReviewerPrompt({
+                question: input.request,
+                targetAge: education.targetAge,
+                plan,
+                html: round.html,
+                validation: round.validation,
+              }),
+              schema: studioReviewSchema,
+            }
+          : {
+              system: STUDIO_REVIEWER_SYSTEM,
+              prompt: renderStudioReviewerPrompt({
+                request: input.request,
+                plan,
+                html: round.html,
+                validation: round.validation,
+              }),
+              schema: studioReviewSchema,
+            },
         (raw) => studioReviewSchema.parse(parseCuriosityModelJson(raw, z.unknown())),
       );
     } catch {

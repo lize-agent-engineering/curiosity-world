@@ -16,6 +16,7 @@ import lockfile from 'proper-lockfile';
 
 import {
   parseStudioSnapshot,
+  type StudioMode,
   type StudioMessage,
   type StudioProject,
   type StudioRuntimeError,
@@ -46,12 +47,16 @@ export function createStudioSnapshot(input: {
   projectId: string;
   title: string;
   createdAt: string;
+  mode?: StudioMode;
+  targetAge?: number;
   firstMessage: { id: string; text: string; createdAt: string; jobId?: string };
 }): StudioSnapshot {
   return parseStudioSnapshot({
     project: {
       id: input.projectId,
       title: input.title,
+      mode: input.mode ?? 'general',
+      ...(input.targetAge === undefined ? {} : { targetAge: input.targetAge }),
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
       currentVersionId: null,

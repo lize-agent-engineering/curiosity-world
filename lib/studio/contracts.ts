@@ -33,6 +33,23 @@ export function normalizeStudioAppKind(value: unknown): StudioAppKind {
     : 'general';
 }
 
+/**
+ * The two product surfaces the same engine serves.
+ *
+ * `education` is the main flow: a child's question becomes a playable knowledge
+ * page, judged by whether a child learns from it. `general` is the same pipeline
+ * with the domain guidance removed — kept as the platform-extensibility entry,
+ * not as the product's front door.
+ */
+export const STUDIO_MODES = ['education', 'general'] as const;
+export type StudioMode = (typeof STUDIO_MODES)[number];
+export const studioModeSchema = z.enum(STUDIO_MODES);
+
+/** Free generation has no reason to inherit the old pipeline's hard 6–10 gate. */
+export const STUDIO_MIN_AGE = 4;
+export const STUDIO_MAX_AGE = 12;
+export const studioTargetAgeSchema = z.number().int().min(STUDIO_MIN_AGE).max(STUDIO_MAX_AGE);
+
 export const STUDIO_AGENT_ROLES = ['studio.planner', 'studio.coder', 'studio.reviewer'] as const;
 export type StudioAgentRole = (typeof STUDIO_AGENT_ROLES)[number];
 
@@ -59,8 +76,21 @@ export const studioPlannerOutputSchema = z.strictObject({
 });
 
 /** The stored plan: same shape, but an unknown `appKind` degrades to `general`. */
+/**
+ * The education planner answers a different question, so it owes two more
+ * fields: what causal relationship the child should end up understanding, and
+ * which common wrong explanations the page must not use. They are required
+ * here and optional on the stored plan, so a general-mode plan stays valid.
+ */
+export const studioEducationPlannerOutputSchema = studioPlannerOutputSchema.extend({
+  knowledgePoints: z.array(shortText).min(1).max(4),
+  misconceptions: z.array(shortText).max(3),
+});
+
 export const studioPlanSchema = studioPlannerOutputSchema.extend({
   appKind: z.unknown().transform(normalizeStudioAppKind),
+  knowledgePoints: z.array(shortText).max(4).optional(),
+  misconceptions: z.array(shortText).max(3).optional(),
 });
 
 export type StudioPlan = z.infer<typeof studioPlanSchema>;
@@ -106,6 +136,9 @@ export const studioEditBlockRecordSchema = z.strictObject({
 export const studioProjectSchema = z.strictObject({
   id: projectIdSchema,
   title: z.string().trim().min(1).max(80),
+  /** Defaulted so projects stored before the education surface still parse. */
+  mode: studioModeSchema.default('general'),
+  targetAge: studioTargetAgeSchema.optional(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   currentVersionId: versionIdSchema.nullable(),

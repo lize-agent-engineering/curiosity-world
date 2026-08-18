@@ -12,7 +12,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import lockfile from 'proper-lockfile';
 
-import type { StudioEditMode, StudioPlan, StudioReview } from './contracts';
+import type { StudioEditMode, StudioMode, StudioPlan, StudioReview } from './contracts';
 import type { StudioEditBlock } from './edit-blocks';
 
 export type StudioJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
@@ -25,7 +25,12 @@ export interface StudioGenerationJob {
   status: StudioJobStatus;
   stage: StudioJobStage;
   message: string;
-  input: { request: string; parentVersionId: string | null };
+  input: {
+    request: string;
+    parentVersionId: string | null;
+    mode?: StudioMode;
+    targetAge?: number;
+  };
   /** Everything the coder has emitted so far in this job's latest coding round. */
   code: string;
   createdAt: string;

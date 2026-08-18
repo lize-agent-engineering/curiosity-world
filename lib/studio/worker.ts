@@ -159,9 +159,15 @@ export async function runStudioWorkerOnce(input: StudioWorkerInput): Promise<boo
   };
 
   try {
+    const targetAge = job.input.targetAge ?? snapshot.project.targetAge;
+    const education =
+      (job.input.mode ?? snapshot.project.mode) === 'education' && targetAge !== undefined
+        ? { targetAge }
+        : undefined;
     const result = await runStudioPipeline(
       {
         request: job.input.request,
+        ...(education ? { education } : {}),
         current: parent
           ? {
               html: parent.html,

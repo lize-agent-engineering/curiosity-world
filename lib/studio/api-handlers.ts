@@ -10,7 +10,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import { studioRuntimeErrorSchema, type StudioSnapshot } from './contracts';
+import {
+  studioModeSchema,
+  studioRuntimeErrorSchema,
+  studioTargetAgeSchema,
+  type StudioSnapshot,
+} from './contracts';
 import { projectStudioJobForClient, type StudioJobStore } from './jobs';
 import {
   attachStudioRuntimeErrors,
@@ -29,7 +34,16 @@ export interface StudioIdentity {
 }
 
 const promptSchema = z.string().trim().min(1).max(2_000);
-const createSchema = z.strictObject({ prompt: promptSchema });
+const createSchema = z
+  .strictObject({
+    prompt: promptSchema,
+    mode: studioModeSchema.default('general'),
+    targetAge: studioTargetAgeSchema.optional(),
+  })
+  .refine((body) => body.mode !== 'education' || body.targetAge !== undefined, {
+    message: '教育模式必须提供孩子年龄。',
+    path: ['targetAge'],
+  });
 const messageSchema = z.strictObject({
   text: promptSchema,
   parentVersionId: z
@@ -80,6 +94,8 @@ export function createStudioProjectsPostHandler(deps: {
           projectId: identity.projectId,
           title: draftTitle(body.prompt),
           createdAt: identity.createdAt,
+          mode: body.mode,
+          ...(body.targetAge === undefined ? {} : { targetAge: body.targetAge }),
           firstMessage: {
             id: identity.messageId,
             text: body.prompt,
@@ -95,7 +111,12 @@ export function createStudioProjectsPostHandler(deps: {
         status: 'queued',
         stage: 'queued',
         message: '任务已排队，等待生成',
-        input: { request: body.prompt, parentVersionId: null },
+        input: {
+          request: body.prompt,
+          parentVersionId: null,
+          mode: body.mode,
+          ...(body.targetAge === undefined ? {} : { targetAge: body.targetAge }),
+        },
         code: '',
         createdAt: identity.createdAt,
         updatedAt: identity.createdAt,
@@ -131,6 +152,8 @@ export function createStudioProjectsGetHandler(deps: { projectStore: StudioStore
           return {
             id: project.id,
             title: project.title,
+            mode: project.mode,
+            targetAge: project.targetAge ?? null,
             updatedAt: project.updatedAt,
             createdAt: project.createdAt,
             appKind: version?.appKind ?? null,
@@ -225,7 +248,14 @@ export function createStudioMessagePostHandler(deps: {
         status: 'queued',
         stage: 'queued',
         message: '任务已排队，等待生成',
-        input: { request: body.text, parentVersionId: parentVersionId ?? null },
+        input: {
+          request: body.text,
+          parentVersionId: parentVersionId ?? null,
+          mode: snapshot.project.mode,
+          ...(snapshot.project.targetAge === undefined
+            ? {}
+            : { targetAge: snapshot.project.targetAge }),
+        },
         code: '',
         createdAt: identity.createdAt,
         updatedAt: identity.createdAt,

@@ -1,21 +1,23 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * The whole studio loop against the canned test models: describe an app, watch
- * it generate, modify it, then move between versions. No network, no real model.
+ * The main flow against the canned test models: a child's question becomes a
+ * playable page, gets modified, and its versions can be moved between. No
+ * network, no real model.
  */
-test('从一句话生成应用，再对话式修改并切换版本', async ({ page }) => {
+test('从孩子的问题生成探索，再对话式修改并切换版本', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('说出你想要的应用');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('把孩子的每一个');
 
   await page
-    .getByRole('button', { name: /番茄钟/ })
+    .getByRole('button', { name: /毛毛虫为什么会变成蝴蝶/ })
     .first()
     .click();
-  await expect(page.getByLabel('描述你想要的应用')).toHaveValue(/番茄钟/);
-  await page.getByRole('button', { name: /开始生成/ }).click();
+  await expect(page.getByLabel('孩子在好奇什么')).toHaveValue(/毛毛虫/);
+  await expect(page.getByLabel('孩子年龄')).toHaveValue('8');
+  await page.getByRole('button', { name: /开始这次探索/ }).click();
 
   await expect(page).toHaveURL(/\/studio\/prj_/, { timeout: 30_000 });
   await expect(page.getByRole('button', { name: /在预览里打开这一版/ })).toBeVisible({
@@ -31,7 +33,9 @@ test('从一句话生成应用，再对话式修改并切换版本', async ({ pa
   await expect(page.getByRole('button', { name: /planner 的中间产物/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /审查结论/ })).toBeVisible();
 
-  await page.getByLabel('继续修改这个应用').fill('加一个今日完成计数，刷新不丢');
+  await expect(page.getByRole('button', { name: /下载带走/ })).toBeVisible();
+
+  await page.getByLabel('继续修改这次探索').fill('再简单一点，加一个提示');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByRole('button', { name: '修改方式：定点修改' })).toBeVisible({
     timeout: 60_000,

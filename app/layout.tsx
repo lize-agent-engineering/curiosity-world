@@ -20,6 +20,9 @@ import { AccessCodeGuard } from '@/components/access-code-guard';
 // next/font's generated class.
 import '@fontsource-variable/inter';
 import '@fontsource/zcool-kuaile';
+// The width axis, not just weight: the bench sets Latin display type wide, and
+// the default `@fontsource-variable/archivo` entry ships the wght axis only.
+import '@fontsource-variable/archivo/wdth.css';
 
 export const metadata: Metadata = {
   title: 'Curiosity Studio · 智能体网页应用生成器',

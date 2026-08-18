@@ -27,6 +27,7 @@ const view: StudioProjectView = {
   project: {
     id: 'prj_one',
     title: '番茄钟',
+    mode: 'general' as const,
     createdAt: at,
     updatedAt: at,
     currentVersionId: 'ver_one',
@@ -294,22 +295,99 @@ describe('the edit diff', () => {
   });
 });
 
-describe('the studio home empty state', () => {
-  it('spells out the basic flow and points at the template for a first look', () => {
+describe('the studio home', () => {
+  const homeProps = {
+    mode: 'education' as const,
+    draft: '',
+    targetAge: 8,
+    busy: false,
+    error: null,
+    projects: [],
+    onModeChange: vi.fn(),
+    onDraftChange: vi.fn(),
+    onTargetAgeChange: vi.fn(),
+    onSubmit: vi.fn(),
+    onOpenProject: vi.fn(),
+  };
+
+  it('leads with the child question, not with an app description', () => {
+    const html = renderToStaticMarkup(<StudioHomeView {...homeProps} />);
+    expect(html).toContain('把孩子的每一个“为什么”');
+    expect(html).toContain('孩子在好奇什么？');
+    expect(html).toContain('孩子年龄');
+    expect(html).toContain('开始这次探索');
+  });
+
+  it('offers example questions from many domains, not just the three old families', () => {
+    const html = renderToStaticMarkup(<StudioHomeView {...homeProps} />);
+    expect(html).toContain('毛毛虫为什么会变成蝴蝶？');
+    expect(html).toContain('海水为什么是咸的？');
+    expect(html).toContain('彩虹是从哪里来的？');
+  });
+
+  it('spells out the basic flow when nothing has been made yet', () => {
+    const html = renderToStaticMarkup(<StudioHomeView {...homeProps} />);
+    expect(html).toContain('三步走完一次');
+  });
+
+  it('frames the general generator as an extension, not as the product', () => {
+    const html = renderToStaticMarkup(<StudioHomeView {...homeProps} />);
+    expect(html).toContain('延展能力');
+    expect(html).toContain('同一套智能体，也能生成任意网页应用');
+  });
+
+  it('switches the composer to app requests in general mode', () => {
+    const html = renderToStaticMarkup(<StudioHomeView {...homeProps} mode="general" />);
+    expect(html).toContain('描述你想要的应用');
+    expect(html).toContain('开始生成');
+    expect(html).not.toContain('孩子年龄');
+  });
+
+  it('labels an education project by the child age it was made for', () => {
     const html = renderToStaticMarkup(
       <StudioHomeView
-        draft=""
-        busy={false}
-        error={null}
-        projects={[]}
-        onDraftChange={vi.fn()}
-        onSubmit={vi.fn()}
-        onOpenProject={vi.fn()}
-        onOpenCuriosity={vi.fn()}
+        {...homeProps}
+        projects={[
+          {
+            id: 'prj_one',
+            title: '月亮为什么跟着我',
+            mode: 'education',
+            targetAge: 8,
+            revision: 2,
+            appKind: 'creative',
+            summary: '比较远近物体的视角变化。',
+            createdAt: at,
+            updatedAt: at,
+          },
+        ]}
       />,
     );
-    expect(html).toContain('三步就能跑完一次');
-    expect(html).toContain('「为什么世界」模板');
-    expect(html).toContain('为什么世界 · 儿童科普探索');
+    expect(html).toContain('8 岁');
+    expect(html).toContain('月亮为什么跟着我');
+  });
+});
+
+describe('taking the page away', () => {
+  it('offers a download of the previewed version from the host page', () => {
+    const html = render();
+    expect(html).toContain('下载带走');
+  });
+
+  it('does not offer a download before there is anything to download', () => {
+    expect(render({ html: null, selectedVersionId: null })).not.toContain('下载带走');
+  });
+});
+
+describe('the workbench in education mode', () => {
+  const educationView = {
+    ...view,
+    project: { ...view.project, mode: 'education' as const, targetAge: 8 },
+  };
+
+  it('speaks to a parent about the exploration, not to a builder about an app', () => {
+    const html = render({ view: educationView });
+    expect(html).toContain('为什么世界');
+    expect(html).toContain('8 岁');
+    expect(html).toContain('他只有 6 岁，再直观一点');
   });
 });
