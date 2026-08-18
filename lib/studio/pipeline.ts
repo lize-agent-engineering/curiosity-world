@@ -275,7 +275,7 @@ export async function runStudioPipeline(
           ? `${basePrompt}\n\n【上一次输出没有通过静态校验，必须修正】\n${validationHint}`
           : basePrompt;
         const html = extractStudioHtmlDocument(await writeCode(prompt));
-        const validation = validateStudioHtml(html);
+        const validation = validateStudioHtml(html, { education: Boolean(education) });
         if (validation.errors.length === 0) {
           await emit({ type: 'code-done', editMode: 'create' });
           return { html, editMode: 'create', validation };
@@ -312,7 +312,7 @@ export async function runStudioPipeline(
       patchResponseExcerpt = patchResponse.slice(0, 800);
     }
     if (patched) {
-      const validation = validateStudioHtml(patched.html);
+      const validation = validateStudioHtml(patched.html, { education: Boolean(education) });
       if (validation.errors.length === 0) {
         await emit({ type: 'code-done', editMode: 'patch' });
         return {
@@ -339,7 +339,7 @@ export async function runStudioPipeline(
         }),
       ),
     );
-    const validation = validateStudioHtml(rewritten);
+    const validation = validateStudioHtml(rewritten, { education: Boolean(education) });
     if (validation.errors.length > 0) {
       throw new StudioPipelineError(
         'PATCH_FAILED',

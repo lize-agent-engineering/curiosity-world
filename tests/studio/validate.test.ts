@@ -85,3 +85,24 @@ describe('validateStudioHtml', () => {
     expect(validateStudioHtml(page('<h1>a</h1>')).summary).toContain('通过');
   });
 });
+
+describe('narration in education mode', () => {
+  it('reports a page a child cannot hear', () => {
+    const report = validateStudioHtml(page('<h1>月亮</h1>'), { education: true });
+    expect(report.errors).toEqual([]);
+    expect(report.warnings.map((issue) => issue.code)).toContain('HTML_NO_NARRATION');
+  });
+
+  it('stays quiet when the page speaks', () => {
+    const report = validateStudioHtml(
+      page('<h1>月亮</h1><script>curiositySay("先猜猜看");</script>'),
+      { education: true },
+    );
+    expect(report.warnings.map((issue) => issue.code)).not.toContain('HTML_NO_NARRATION');
+  });
+
+  it('does not ask a general app to talk', () => {
+    const report = validateStudioHtml(page('<h1>番茄钟</h1>'));
+    expect(report.warnings.map((issue) => issue.code)).not.toContain('HTML_NO_NARRATION');
+  });
+});

@@ -398,3 +398,15 @@ describe('the workbench in education mode', () => {
     expect(html).toContain('他只有 6 岁，再直观一点');
   });
 });
+
+describe('narration in the preview', () => {
+  it('injects the narration bridge so the host voice can take over', () => {
+    const html = render();
+    expect(html).toContain('data-iframe-narration-shim');
+    expect(html).toContain('curiositySay');
+  });
+
+  it('offers a way to silence it', () => {
+    expect(render()).toContain('朗读中');
+  });
+});

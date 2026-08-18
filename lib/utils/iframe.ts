@@ -101,6 +101,51 @@ const ERROR_CAPTURE_SHIM = `<script data-iframe-error-shim>
 </script>`;
 
 /**
+ * Narration bridge.
+ *
+ * A generated page speaks by calling `window.curiositySay(text)` and defines its
+ * own `speechSynthesis` fallback guarded with `||`, so a page that has been
+ * downloaded and opened on its own still reads aloud. This shim is injected
+ * ahead of the page's scripts, so inside the studio preview the host's
+ * implementation wins the `||` and the line is spoken by the configured
+ * children's TTS voice instead of the OS one.
+ *
+ * If the host cannot produce audio it posts the line back and the page falls
+ * back to its own voice, rather than going silent because the better path
+ * failed.
+ */
+const NARRATION_SHIM = `<script data-iframe-narration-shim>
+(function () {
+  function local(text) {
+    try {
+      var utterance = new SpeechSynthesisUtterance(String(text));
+      utterance.lang = 'zh-CN';
+      utterance.rate = 0.95;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {}
+  }
+  window.__curiosityNarrationHost = true;
+  window.curiositySay = function (text) {
+    text = String(text == null ? '' : text).slice(0, 240);
+    if (!text) return;
+    try {
+      window.parent.postMessage(
+        { __curiosityInteractive: true, kind: 'narrate', text: text },
+        '*'
+      );
+    } catch (e) {
+      local(text);
+    }
+  };
+  window.addEventListener('message', function (e) {
+    var d = e && e.data;
+    if (d && d.__curiosityNarrationFallback === true && d.text) local(d.text);
+  });
+})();
+</script>`;
+
+/**
  * Patch embedded HTML to display correctly inside an iframe.
  *
  * Injects a runtime-error capture shim + a storage shim (so sandboxed pages that
@@ -124,7 +169,8 @@ export function patchHtmlForIframe(html: string): string {
   body { min-height: 100vh; }
 </style>`;
 
-  const injection = '\n' + ERROR_CAPTURE_SHIM + '\n' + STORAGE_SHIM + '\n' + iframeCss;
+  const injection =
+    '\n' + ERROR_CAPTURE_SHIM + '\n' + STORAGE_SHIM + '\n' + NARRATION_SHIM + '\n' + iframeCss;
 
   return injectIntoDocumentHead(html, injection);
 }

@@ -367,6 +367,15 @@ export const STUDIO_EDUCATION_GUIDE = `【这是给孩子的探索页面，不�
 - 有明确的结束画面（"你发现了……"），不是无限循环。
 - 页面底部放一小块「给家长看」的区域：这次孩子做了什么、可以在生活里继续观察什么。这块用大人的语气写。
 
+【念出来给孩子听】
+- 孩子可能还不识字，所以关键的话都要能读出来。需要说话的时候调用 window.curiositySay('这句话')：
+  开场的问题、每次操作后的反馈、迁移挑战的题目、结尾的小结，都要念。
+- 在页面脚本的最开头写好保底实现，一字不差地照抄这段：
+  window.curiositySay = window.curiositySay || function (t) { try { var u = new SpeechSynthesisUtterance(String(t)); u.lang = 'zh-CN'; u.rate = 0.95; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} };
+  （宿主环境会提前提供更好的童声实现，这个 || 保证页面被单独打开时也能读。）
+- 每句话不超过 40 个字，一次只念一句；孩子连续操作时先 cancel 再念新的。
+- 不要自动播放背景音乐，也不要一进页面就长篇朗读——第一句在孩子第一次操作之后再念。
+
 【适龄表达】
 - 用孩子的词，不用学科术语；必须出现的术语要当场用一句大白话解释。
 - 一屏文字尽量少，能用图形和动画说清楚就不写字。

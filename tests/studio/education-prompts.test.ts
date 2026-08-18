@@ -218,3 +218,17 @@ describe('the pipeline in education mode', () => {
     expect(coder.calls[0]!.system).not.toContain(STUDIO_EDUCATION_GUIDE);
   });
 });
+
+describe('narration', () => {
+  it('tells the coder how to speak and how to stay speakable when downloaded', () => {
+    expect(STUDIO_EDUCATION_GUIDE).toContain('curiositySay');
+    expect(STUDIO_EDUCATION_GUIDE).toContain('SpeechSynthesisUtterance');
+    // The `||` guard is what lets the host swap in the better voice.
+    expect(STUDIO_EDUCATION_GUIDE).toContain('window.curiositySay || function');
+  });
+
+  it('asks for short lines and no autoplay lecture', () => {
+    expect(STUDIO_EDUCATION_GUIDE).toContain('不超过 40 个字');
+    expect(STUDIO_EDUCATION_GUIDE).toContain('不要自动播放');
+  });
+});

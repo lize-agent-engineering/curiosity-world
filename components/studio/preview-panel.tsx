@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Download, Monitor, RotateCcw, Smartphone } from 'lucide-react';
+import {
+  AlertTriangle,
+  Download,
+  Monitor,
+  RotateCcw,
+  Smartphone,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 
 import type { StudioRuntimeError } from '@/lib/studio/contracts';
 import type { StudioVersionView } from '@/lib/studio/client';
@@ -41,7 +49,14 @@ export function StudioPreviewPanel({
 }: StudioPreviewPanelProps) {
   const [width, setWidth] = useState<'desktop' | 'mobile'>('desktop');
   const [showErrors, setShowErrors] = useState(false);
+  const [muted, setMuted] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Read inside the message listener, which stays subscribed across toggles.
+  const mutedRef = useRef(muted);
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
   const selected = versions.find((version) => version.id === selectedVersionId) ?? null;
   const document = useMemo(() => (html ? patchHtmlForIframe(html) : null), [html]);
 
@@ -53,9 +68,20 @@ export function StudioPreviewPanel({
     const seen = new Set<string>();
     const onMessage = (event: MessageEvent) => {
       const data = event.data as
-        | { __curiosityInteractive?: boolean; kind?: string; errorKind?: string; message?: string }
+        | {
+            __curiosityInteractive?: boolean;
+            kind?: string;
+            errorKind?: string;
+            message?: string;
+            text?: string;
+          }
         | undefined;
-      if (!data?.__curiosityInteractive || data.kind !== 'runtime-error') return;
+      if (!data?.__curiosityInteractive) return;
+      if (data.kind === 'narrate') {
+        void narrate(String(data.text ?? '').slice(0, 240));
+        return;
+      }
+      if (data.kind !== 'runtime-error') return;
       const errorKind = (data.errorKind ?? 'error') as StudioRuntimeError['errorKind'];
       const message = String(data.message ?? '').slice(0, 1200);
       if (!message) return;
@@ -64,6 +90,35 @@ export function StudioPreviewPanel({
       seen.add(key);
       onRuntimeErrors([{ errorKind, message }]);
     };
+    // The page asked for a line to be spoken. Use the configured children's
+    // voice; if that is unavailable, hand the line back so the page reads it in
+    // its own voice rather than going silent.
+    const narrate = async (text: string) => {
+      if (mutedRef.current) return;
+      const speakLocally = () =>
+        frameRef.current?.contentWindow?.postMessage(
+          { __curiosityNarrationFallback: true, text },
+          '*',
+        );
+      try {
+        const response = await fetch('/api/curiosity/narration', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        if (!response.ok) {
+          speakLocally();
+          return;
+        }
+        audioRef.current?.pause();
+        const audio = new Audio(URL.createObjectURL(await response.blob()));
+        audioRef.current = audio;
+        await audio.play().catch(() => speakLocally());
+      } catch {
+        speakLocally();
+      }
+    };
+
     window.addEventListener('message', onMessage);
     const replay = window.setTimeout(() => {
       frameRef.current?.contentWindow?.postMessage({ __curiosityErrorReplayRequest: true }, '*');
@@ -71,6 +126,7 @@ export function StudioPreviewPanel({
     return () => {
       window.removeEventListener('message', onMessage);
       window.clearTimeout(replay);
+      audioRef.current?.pause();
     };
   }, [onRuntimeErrors, selectedVersionId, document]);
 
@@ -130,6 +186,23 @@ export function StudioPreviewPanel({
             <Download className="size-3.5" aria-hidden="true" /> 下载带走
           </button>
         )}
+
+        <button
+          type="button"
+          aria-pressed={muted}
+          onClick={() => {
+            setMuted((value) => !value);
+            audioRef.current?.pause();
+          }}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-edge border border-rule px-3 text-xs font-black text-ink transition hover:bg-sheet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-spot"
+        >
+          {muted ? (
+            <VolumeX className="size-3.5" aria-hidden="true" />
+          ) : (
+            <Volume2 className="size-3.5" aria-hidden="true" />
+          )}
+          {muted ? '已静音' : '朗读中'}
+        </button>
 
         <div className="ml-auto flex items-center gap-1 rounded-edge border border-rule p-0.5">
           <button

@@ -20,7 +20,8 @@ export type StudioValidationCode =
   | 'HTML_TOO_LARGE'
   | 'HTML_MODAL_DIALOG'
   | 'HTML_NO_TITLE'
-  | 'HTML_OVER_TARGET_SIZE';
+  | 'HTML_OVER_TARGET_SIZE'
+  | 'HTML_NO_NARRATION';
 
 export interface StudioValidationIssue {
   code: StudioValidationCode;
@@ -120,7 +121,15 @@ function renderSummary(report: Omit<StudioValidationReport, 'summary'>): string 
   return `${lines.join('\n')}\n${size}`;
 }
 
-export function validateStudioHtml(html: string): StudioValidationReport {
+export interface StudioValidationOptions {
+  /** Education pages are read aloud, so a silent one is worth reporting. */
+  education?: boolean;
+}
+
+export function validateStudioHtml(
+  html: string,
+  options: StudioValidationOptions = {},
+): StudioValidationReport {
   const errors: StudioValidationIssue[] = [];
   const warnings: StudioValidationIssue[] = [];
   const sizeBytes = Buffer.byteLength(html, 'utf8');
@@ -164,6 +173,13 @@ export function validateStudioHtml(html: string): StudioValidationReport {
     warnings.push({
       code: 'HTML_MODAL_DIALOG',
       message: 'alert / confirm / prompt 在预览沙箱里被浏览器屏蔽，需要改成页面内的提示元素。',
+    });
+  }
+
+  if (options.education && !/curiositySay\s*\(/.test(scriptText)) {
+    warnings.push({
+      code: 'HTML_NO_NARRATION',
+      message: '页面没有调用 curiositySay()，孩子听不到任何解说。',
     });
   }
 
