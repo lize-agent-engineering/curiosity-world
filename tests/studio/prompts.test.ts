@@ -64,6 +64,14 @@ describe('app kind routing', () => {
     expect(STUDIO_APP_KIND_GUIDE.dashboard).toContain('SVG');
   });
 
+  it('demands a dashboard have data on screen at first paint', () => {
+    expect(STUDIO_APP_KIND_GUIDE.dashboard).toContain('首屏必须有数据');
+  });
+
+  it('pins the game canvas aspect ratio so the board is not stretched', () => {
+    expect(STUDIO_APP_KIND_GUIDE.game).toContain('aspect-ratio');
+  });
+
   it('composes the system prompt from the contract plus the kind guidance', () => {
     const system = renderStudioCoderSystem('game');
     expect(system).toContain(STUDIO_CODER_CONTRACT);

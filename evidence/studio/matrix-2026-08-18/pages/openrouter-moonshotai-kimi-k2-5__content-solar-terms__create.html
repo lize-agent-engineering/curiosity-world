@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>二十四节气图鉴</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --surface: #151b2b;
+      --surface-2: #1e2636;
+      --text: #f2f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #818cf8;
+      --border: #2a3447;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: linear-gradient(180deg, rgba(11,15,25,0.95) 0%, rgba(11,15,25,0.85) 100%);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 24px;
+    }
+    .title {
+      margin: 0 0 12px;
+      font-size: clamp(22px, 4vw, 28px);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .filters {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .filter-btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+    .filter-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .filter-btn.active {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Main content */
+    .main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      min-height: calc(100vh - 200px);
+    }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 1024px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px) { .grid { grid-template-columns: 1fr; gap: 16px; } }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(600px circle at var(--x,50%) var(--y,50%), rgba(56,189,248,0.12), transparent 40%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+    .card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: rgba(56,189,248,0.3); }
+    .card:hover::before { opacity: 1; }
+    .card-icon {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 12px;
+      color: var(--accent);
+      transition: transform 0.3s ease;
+    }
+    .card:hover .card-icon { transform: scale(1.1); }
+    .card-icon svg { width: 100%; height: 100%; display: block; }
+    .card-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .card-big-char {
+      font-size: 48px;
+      font-weight: 800;
+      line-height: 1;
+      margin: 8px 0;
+      background: linear-gradient(135deg, var(--text) 0%, var(--muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      opacity: 0.9;
+    }
+    .card-date {
+      font-size: 13px;
+      color: var(--accent);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    .card-desc {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--muted);
+      font-size: 16px;
+      grid-column: 1 / -1;
+    }
+
+    /* Detail Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .modal-backdrop.active { opacity: 1; visibility: visible; }
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 720px;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow);
+      transform: scale(0.96);
+      transition: transform 0.3s ease;
+    }
+    .modal-backdrop.active .modal-card { transform: scale(1); }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .modal-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .season-tag {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(56,189,248,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56,189,248,0.3);
+      font-weight: 600;
+    }
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .modal-close:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+    .modal-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .modal-body::-webkit-scrollbar { width: 8px; }
+    .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .modal-section { margin-bottom: 24px; }
+    .modal-section:last-child { margin-bottom: 0; }
+    .modal-section-title {
+      font-size: 14px;
+      color: var(--accent);
+      margin: 0 0 8px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .modal-text {
+      font-size: 16px;
+      line-height: 1.7;
+      color: var(--text);
+      margin: 0;
+    }
+    .modal-list {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--text);
+    }
+    .modal-list li { margin-bottom: 6px; line-height: 1.6; }
+    .poem {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--surface-2);
+      padding: 16px;
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--accent);
+      font-size: 15px;
+      color: var(--text);
+      margin: 0;
+      line-height: 1.8;
+    }
+    .modal-nav {
+      display: flex;
+      gap: 12px;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .nav-btn {
+      flex: 1;
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+    }
+    .nav-btn:hover { background: rgba(56,189,248,0.1); border-color: var(--accent); }
+    .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .nav-btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+    .nav-btn-primary:hover { background: #7dd3fc; }
+
+    /* Content switch animation */
+    .content-fade { transition: opacity 0.2s ease; }
+    .content-fade.switching { opacity: 0.5; }
+
+    /* Footer proverb */
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(0deg, rgba(11,15,25,0.95) 0%, rgba(11,15,25,0.7) 100%);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid var(--border);
+      padding: 16px 24px;
+      text-align: center;
+      font-size: 14px;
+      color: var(--muted);
+      z-index: 40;
+    }
+    .proverb-text { font-style: italic; }
+    .visit-info {
+      position: absolute;
+      right: 24px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      color: var(--muted);
+      opacity: 0.8;
+    }
+    @media (max-width: 640px) {
+      .footer { padding: 12px 16px; font-size: 13px; }
+      .visit-info { position: static; display: block; margin-top: 4px; transform: none; }
+    }
+
+    body.modal-open { overflow: hidden; }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <h1 class="title">二十四节气图鉴</h1>
+      <div class="filters" role="tablist" aria-label="季节筛选">
+        <button class="filter-btn" data-season="spring" role="tab" aria-selected="false">春</button>
+        <button class="filter-btn" data-season="summer" role="tab" aria-selected="false">夏</button>
+        <button class="filter-btn" data-season="autumn" role="tab" aria-selected="false">秋</button>
+        <button class="filter-btn" data-season="winter" role="tab" aria-selected="false">冬</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="grid" id="card-grid" role="list">
+      <!-- Cards injected by JS -->
+    </div>
+    <div id="empty-state" class="empty" style="display:none;">暂无数据</div>
+  </main>
+
+  <div class="modal-backdrop" id="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-title">
+          <span id="modal-term-name">节气名称</span>
+          <span class="season-tag" id="modal-season-tag">季节</span>
+        </h2>
+        <button class="modal-close" id="modal-close" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body content-fade" id="modal-body">
+        <div class="modal-section">
+          <div class="modal-section-title">公历日期</div>
+          <p class="modal-text" id="modal-date">日期范围</p>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">三候</div>
+          <ul class="modal-list" id="modal-sanhou"></ul>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">传统习俗</div>
+          <p class="modal-text" id="modal-customs"></p>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">养生建议</div>
+          <p class="modal-text" id="modal-health"></p>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">代表诗句</div>
+          <p class="poem" id="modal-poem"></p>
+        </div>
+      </div>
+      <div class="modal-nav">
+        <button class="nav-btn" id="btn-prev">← 上一个</button>
+        <button class="nav-btn nav-btn-primary" id="btn-next">下一个 →</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="proverb-text" id="proverb">正在加载谚语...</div>
+    <div class="visit-info" id="visit-info"></div>
+  </footer>
+
+  <script>
+    // 二十四节气的完整数据
+    const solarTerms = [
+      {
+        id: 'lichun', name: '立春', bigChar: '春', dateRange: '2月3日-5日',
+        season: 'spring', seasonName: '春',
+        description: '春季开始，万物复苏，阳气上升',
+        sanhou: ['一候东风解冻', '二候蛰虫始振', '三候鱼陟负冰'],
+        customs: '迎春、咬春（吃春饼、春卷）、打春牛',
+        health: '少酸多甘，养肝护阳，早睡早起，广步于庭',
+        poem: '律回岁晚冰霜少，春到人间草木知。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><path d="M50 85 Q50 45 20 35"/><path d="M50 85 Q50 45 80 35"/><circle cx="20" cy="35" r="4" fill="currentColor" stroke="none"/><circle cx="80" cy="35" r="4" fill="currentColor" stroke="none"/><path d="M50 55 L50 25" stroke-width="2"/></svg>'
+      },
+      {
+        id: 'yushui', name: '雨水', bigChar: '雨', dateRange: '2月18日-20日',
+        season: 'spring', seasonName: '春',
+        description: '降雨开始，雨量渐增，气温回升',
+        sanhou: ['一候獭祭鱼', '二候鸿雁来', '三候草木萌动'],
+        customs: '回娘家、接寿、拉保保',
+        health: '调养脾胃，祛湿保暖，省酸增甘',
+        poem: '好雨知时节，当春乃发生。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><path d="M30 40 Q30 20 50 20 Q70 20 70 40 Q85 40 85 55 Q85 70 70 70 L30 70 Q15 70 15 55 Q15 40 30 40"/><line x1="35" y1="75" x2="35" y2="85" stroke-width="2"/><line x1="50" y1="75" x2="50" y2="85" stroke-width="2"/><line x1="65" y1="75" x2="65" y2="85" stroke-width="2"/></svg>'
+      },
+      {
+        id: 'jingzhe', name: '惊蛰', bigChar: '蛰', dateRange: '3月5日-7日',
+        season: 'spring', seasonName: '春',
+        description: '春雷乍动，惊醒蛰伏越冬的昆虫',
+        sanhou: ['一候桃始华', '二候仓庚鸣', '三候鹰化为鸠'],
+        customs: '祭白虎、打小人、吃梨（寓意分离病害）',
+        health: '护肝养脾，多吃清淡食物，早睡早起',
+        poem: '微雨众卉新，一雷惊蛰始。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><path d="M45 25 L60 25 L50 50 L70 50 L40 85 L50 55 L30 55 Z" fill="currentColor" stroke="none" opacity="0.9"/><circle cx="25" cy="65" r="2" fill="currentColor"/><circle cx="75" cy="65" r="2" fill="currentColor"/></svg>'
+      },
+      {
+        id: 'chunfen', name: '春分', bigChar: '分', dateRange: '3月20日-22日',
+        season: 'spring', seasonName: '春',
+        description: '昼夜平分，春季九十日之半',
+        sanhou: ['一候玄鸟至', '二候雷乃发声', '三候始电'],
+        customs: '竖蛋、吃春菜、送春牛图、粘雀子嘴',
+        health: '阴阳平衡，多吃时令蔬菜，适度运动',
+        poem: '春分雨脚落声微，柳岸斜风带客归。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><line x1="20" y1="50" x2="80" y2="50"/><circle cx="50" cy="50" r="15"/><line x1="20" y1="30" x2="80" y2="30" opacity="0.4"/><line x1="20" y1="70" x2="80" y2="70" opacity="0.4"/></svg>'
+      },
+      {
+        id: 'qingming', name: '清明', bigChar: '清', dateRange: '4月4日-6日',
+        season: 'spring', seasonName: '春',
+        description: '气清景明，万物皆显，祭祖扫墓',
+        sanhou: ['一候桐始华', '二候田鼠化为鴽', '三候虹始见'],
+        customs: '扫墓祭祖、踏青、插柳、放风筝',
+        health: '养肝清目，多食青色蔬菜，防湿寒',
+        poem: '清明时节雨纷纷，路上行人欲断魂。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><path d="M50 85 Q50 55 20 45"/><path d="M50 85 Q50 55 80 45"/><ellipse cx="20" cy="45" rx="8" ry="4" fill="currentColor" stroke="none" transform="rotate(-30 20 45)"/><ellipse cx="80" cy="45" rx="8" ry="4" fill="currentColor" stroke="none" transform="rotate(30 80 45)"/><line x1="50" y1="85" x2="50" y2="95"/></svg>'
+      },
+      {
+        id: 'guyu', name: '谷雨', bigChar: '谷', dateRange: '4月19日-21日',
+        season: 'spring', seasonName: '春',
+        description: '雨生百谷，春季最后一个节气',
+        sanhou: ['一候萍始生', '二候鸣鸠拂其羽', '三候戴胜降于桑'],
+        customs: '走谷雨、品谷雨茶、食香椿、赏牡丹',
+        health: '健脾祛湿，防春火，早睡早起',
+        poem: '杨花落尽子规啼，闻道龙标过五溪。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><circle cx="50" cy="35" r="12"/><line x1="50" y1="47" x2="50" y2="85"/><line x1="35" y1="65" x2="65" y2="65" stroke-width="2"/><line x1="40" y1="75" x2="60" y2="75" stroke-width="2"/><line x1="30" y1="55" x2="30" y2="65" stroke-width="2"/><line x1="70" y1="55" x2="70" y2="65" stroke-width="2"/></svg>'
+      },
+      {
+        id: 'lixia', name: '立夏', bigChar: '夏', dateRange: '5月5日-7日',
+        season: 'summer', seasonName: '夏',
+        description: '夏季开始，万物生长，温度明显升高',
+        sanhou: ['一候蝼蝈鸣', '二候蚯蚓出', '三候王瓜生'],
+        customs: '迎夏仪式、称人、吃立夏饭、斗蛋',
+        health: '养心护阳，增酸减苦，午睡养心',
+        poem: '绿树阴浓夏日长，楼台倒影入池塘。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><circle cx="50" cy="50" r="20" fill="currentColor" stroke="none"/><line x1="50" y1="15" x2="50" y2="25"/><line x1="50" y1="75" x2="50" y2="85"/><line x1="15" y1="50" x2="25" y2="50"/><line x1="75" y1="50" x2="85" y2="50"/><line x1="25" y1="25" x2="32" y2="32"/><line x1="68" y1="68" x2="75" y2="75"/><line x1="75" y1="25" x2="68" y2="32"/><line x1="32" y1="68" x2="25" y2="75"/></svg>'
+      },
+      {
+        id: 'xiaoman', name: '小满', bigChar: '满', dateRange: '5月20日-22日',
+        season: 'summer', seasonName: '夏',
+        description: '夏熟作物籽粒开始饱满，但未成熟',
+        sanhou: ['一候苦菜秀', '二候靡草死', '三候麦秋至'],
+        customs: '祭车神、食苦菜、抢水、看麦梢黄',
+        health: '清热利湿，饮食清淡，避免贪凉',
+        poem: '夜莺啼绿柳，皓月醒长空。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><path d="M50 85 L50 25"/><ellipse cx="35" cy="35" rx="5" ry="8" fill="currentColor" stroke="none"/><ellipse cx="65" cy="35" rx="5" ry="8" fill="currentColor" stroke="none"/><ellipse cx="35" cy="55" rx="5" ry="8" fill="currentColor" stroke="none"/><ellipse cx="65" cy="55" rx="5" ry="8" fill="currentColor" stroke="none"/><ellipse cx="35" cy="75" rx="5" ry="8" fill="currentColor" stroke="none"/><ellipse cx="65" cy="75" rx="5" ry="8" fill="currentColor" stroke="none"/></svg>'
+      },
+      {
+        id: 'mangzhong', name: '芒种', bigChar: '芒', dateRange: '6月5日-7日',
+        season: 'summer', seasonName: '夏',
+        description: '麦类等有芒作物成熟，晚稻播种',
+        sanhou: ['一候螳螂生', '二候鵙始鸣', '三候反舌无声'],
+        customs: '送花神、煮青梅、安苗祭祀、打泥巴仗',
+        health: '清热解暑，午休补心，多饮水',
+        poem: '时雨及芒种，四野皆插秧。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><path d="M50 85 L50 15"/><path d="M30 30 Q50 40 70 30" stroke-width="2"/><path d="M30 50 Q50 60 70 50" stroke-width="2"/><path d="M30 70 Q50 80 70 70" stroke-width="2"/></svg>'
+      },
+      {
+        id: 'xiazhi', name: '夏至', bigChar: '至', dateRange: '6月21日-22日',
+        season: 'summer', seasonName: '夏',
+        description: '白昼最长，阳气至极，一阴初生',
+        sanhou: ['一候鹿角解', '二候蝉始鸣', '三候半夏生'],
+        customs: '祭神祀祖、吃夏至面、消夏避伏',
+        health: '养心安神，冬病夏治，适度出汗',
+        poem: '昼晷已云极，宵漏自此长。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="4"><circle cx="50" cy="50" r="22"/><line x1="50" y1="10" x2="50" y2="20"/><line x1="50" y1="80" x2="50" y2="90"/><line x1="10" y1="50" x2="20" y2="50"/><line x1="80" y1="50" x2="90" y2="50"/></svg>'
+      },
+      {
+        id: 'xiaoshu', name: '小暑', bigChar: '暑', dateRange: '7月6日-8日',
+        season: 'summer', seasonName: '夏',
+        description: '天气开始炎热，但未到最热',
+        sanhou: ['一候温风至', '二候蟋蟀居宇', '三候鹰始鸷'],
+        customs: '食新（尝新米）、晒书画衣物、吃藕',
+        health: '清热防暑，少动多静，补充水分',
+        poem: '荷风送香气，竹露滴清响。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><circle cx="50" cy="40" r="15" fill="currentColor" stroke="none"/><path d="M30 75 Q40 65 50 75 Q60 65 70 75" stroke-width="3"/><path d="M35 85 Q45 75 55 85 Q65 75 75 85" stroke-width="2" opacity="0.7"/></svg>'
+      },
+      {
+        id: 'dashu', name: '大暑', bigChar: '热', dateRange: '7月22日-24日',
+        season: 'summer', seasonName: '夏',
+        description: '一年中最热的时期，湿热交蒸',
+        sanhou: ['一候腐草为萤', '二候土润溽暑', '三候大雨时行'],
+        customs: '饮伏茶、晒伏姜、吃仙草、送大暑船',
+        health: '祛湿热，防中暑，心静自然凉',
+        poem: '赤日几时过，清风无处寻。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><circle cx="50" cy="35" r="15" fill="currentColor" stroke="none"/><path d="M25 70 Q35 60 45 70 Q55 60 65 70 Q75 60 85 70" stroke-width="3"/><path d="M30 80 Q40 70 50 80 Q60 70 70 80" stroke-width="2" opacity="0.6"/></svg>'
+      },
+      {
+        id: 'liqiu', name: '立秋', bigChar: '秋', dateRange: '8月7日-9日',
+        season: 'autumn', seasonName: '秋',
+        description: '秋季开始，暑去凉来，万物收敛',
+        sanhou: ['一候凉风至', '二候白露生', '三候寒蝉鸣'],
+        customs: '贴秋膘、咬秋（吃西瓜）、晒秋、秋社',
+        health: '养肺润燥，少辛增酸，早睡早起',
+        poem: '空山新雨后，天气晚来秋。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><path d="M50 85 Q50 55 30 35 Q50 45 50 25 Q50 45 70 35 Q50 55 50 85" fill="currentColor" stroke="none"/><line x1="50" y1="85" x2="50" y2="95" stroke-width="2"/></svg>'
+      },
+      {
+        id: 'chushu', name: '处暑', bigChar: '处', dateRange: '8月22日-24日',
+        season: 'autumn', seasonName: '秋',
+        description: '暑气至此而止，炎热即将过去',
+        sanhou: ['一候鹰乃祭鸟', '二候天地始肃', '三候禾乃登'],
+        customs: '吃鸭子、放河灯、开渔节、出游迎秋',
+        health: '防秋燥，润肺养胃，适度秋冻',
+        poem: '离离原上草，一岁一枯荣。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><circle cx="60" cy="40" r="15" fill="none"/><path d="M20 70 Q50 60 80 70" opacity="0.5"/></svg>'
+      },
+      {
+        id: 'bailu', name: '白露', bigChar: '露', dateRange: '9月7日-9日',
+        season: 'autumn', seasonName: '秋',
+        description: '天气转凉，露凝而白，昼夜温差大',
+        sanhou: ['一候鸿雁来', '二候玄鸟归', '三候群鸟养羞'],
+        customs: '收清露、饮白露茶、吃龙眼、祭禹王',
+        health: '养阴防燥，护胃养肺，早睡早起',
+        poem: '蒹葭苍苍，白露为霜。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><circle cx="35" cy="45" r="8" fill="none"/><circle cx="65" cy="45" r="8" fill="none"/><circle cx="50" cy="60" r="6" fill="currentColor" opacity="0.5"/></svg>'
+      },
+      {
+        id: 'qiufen', name: '秋分', bigChar: '分', dateRange: '9月22日-24日',
+        season: 'autumn', seasonName: '秋',
+        description: '昼夜平分，秋季九十日之半',
+        sanhou: ['一候雷始收声', '二候蛰虫坯户', '三候水始涸'],
+        customs: '祭月、竖蛋、吃秋菜、送秋牛图',
+        health: '阴阳平衡，防凉燥，胃部保暖',
+        poem: '自古逢秋悲寂寥，我言秋日胜春朝。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><line x1="20" y1="50" x2="80" y2="50"/><circle cx="50" cy="50" r="15"/><line x1="20" y1="30" x2="80" y2="70" opacity="0.4"/></svg>'
+      },
+      {
+        id: 'hanlu', name: '寒露', bigChar: '寒', dateRange: '10月8日-9日',
+        season: 'autumn', seasonName: '秋',
+        description: '露水已寒，将要结冰，气温骤降',
+        sanhou: ['一候鸿雁来宾', '二候雀入大水为蛤', '三候菊有黄华'],
+        customs: '赏菊、登高、饮菊花酒、吃芝麻',
+        health: '保暖防寒，养肺润肠，适度运动',
+        poem: '袅袅凉风动，凄凄寒露零。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2"><circle cx="30" cy="50" r="6" fill="currentColor" opacity="0.8"/><circle cx="50" cy="40" r="8" fill="currentColor" opacity="0.9"/><circle cx="70" cy="50" r="6" fill="currentColor" opacity="0.8"/><path d="M30 65 L70 65" stroke-dasharray="4 2" opacity="0.3"/></svg>'
+      },
+      {
+        id: 'shuangjiang', name: '霜降', bigChar: '霜', dateRange: '10月23日-24日',
+        season: 'autumn', seasonName: '秋',
+        description: '天气渐冷，初霜出现，秋季最后一个节气',
+        sanhou: ['一候豺乃祭兽', '二候草木黄落', '三候蛰虫咸俯'],
+        customs: '吃柿子、赏菊、登高、送芋鬼',
+        health: '防秋郁寒，平补为主，护关节',
+        poem: '停车坐爱枫林晚，霜叶红于二月花。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2" opacity="0.9"><path d="M50 20 L50 80 M20 50 L80 50 M35 35 L65 65 M65 35 L35 65"/></svg>'
+      },
+      {
+        id: 'lidong', name: '立冬', bigChar: '冬', dateRange: '11月7日-8日',
+        season: 'winter', seasonName: '冬',
+        description: '冬季开始，万物收藏，归避寒冷',
+        sanhou: ['一候水始冰', '二候地始冻', '三候雉入大水为蜃'],
+        customs: '补冬、吃饺子、酿黄酒、扫疥',
+        health: '养肾藏精，早睡晚起，温补为宜',
+        poem: '冻笔新诗懒写，寒炉美酒时温。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><path d="M50 20 L50 80 M20 50 L80 50 M35 35 L65 65 M65 35 L35 65"/></svg>'
+      },
+      {
+        id: 'xiaoxue', name: '小雪', bigChar: '雪', dateRange: '11月22日-23日',
+        season: 'winter', seasonName: '冬',
+        description: '气温下降，开始降雪，雪量小',
+        sanhou: ['一候虹藏不见', '二候天气上升地气下降', '三候闭塞而成冬'],
+        customs: '腌腊肉、吃糍粑、晒鱼干、酿酒',
+        health: '防寒保暖，早睡晚起，防内火',
+        poem: '晚来天欲雪，能饮一杯无？',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0"><circle cx="30" cy="30" r="3" fill="currentColor"/><circle cx="70" cy="30" r="3" fill="currentColor"/><circle cx="50" cy="50" r="4" fill="currentColor"/><circle cx="30" cy="70" r="3" fill="currentColor"/><circle cx="70" cy="70" r="3" fill="currentColor"/></svg>'
+      },
+      {
+        id: 'daxue', name: '大雪', bigChar: '凛', dateRange: '12月6日-8日',
+        season: 'winter', seasonName: '冬',
+        description: '雪量增大，地面可能积雪，严冬已至',
+        sanhou: ['一候鹖鴠不鸣', '二候虎始交', '三候荔挺出'],
+        customs: '腌肉、打雪仗、赏雪景、进补',
+        health: '温补避寒，护心脑血管，保湿防燥',
+        poem: '大雪满初晨，开门万象新。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="0"><circle cx="25" cy="25" r="4" fill="currentColor"/><circle cx="50" cy="40" r="5" fill="currentColor"/><circle cx="75" cy="25" r="4" fill="currentColor"/><circle cx="25" cy="60" r="4" fill="currentColor"/><circle cx="75" cy="60" r="4" fill="currentColor"/><circle cx="50" cy="75" r="4" fill="currentColor"/></svg>'
+      },
+      {
+        id: 'dongzhi', name: '冬至', bigChar: '至', dateRange: '12月21日-23日',
+        season: 'winter', seasonName: '冬',
+        description: '白昼最短，阳气始生，阴极之至',
+        sanhou: ['一候蚯蚓结', '二候麋角解', '三候水泉动'],
+        customs: '吃饺子/汤圆、祭祖、数九、赠鞋',
+        health: '藏阳护阴，进补最佳时节，防寒保暖',
+        poem: '天时人事日相催，冬至阳生春又来。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><circle cx="50" cy="60" r="12" fill="none"/><line x1="50" y1="35" x2="50" y2="45" stroke-width="2"/><line x1="25" y1="60" x2="35" y2="60" stroke-width="2"/><line x1="65" y1="60" x2="75" y2="60" stroke-width="2"/></svg>'
+      },
+      {
+        id: 'xiaohan', name: '小寒', bigChar: '寒', dateRange: '1月5日-7日',
+        season: 'winter', seasonName: '冬',
+        description: '气候开始寒冷，但未到极点',
+        sanhou: ['一候雁北乡', '二候鹊始巢', '三候雉始鸲'],
+        customs: '吃腊八粥、数九、冰戏、腊祭',
+        health: '防风防寒，养肾健脾，早卧晚起',
+        poem: '小寒连大吕，欢鹊垒新巢。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><rect x="30" y="30" width="40" height="40" rx="5" fill="none"/><line x1="30" y1="30" x2="70" y2="70" opacity="0.5"/><line x1="70" y1="30" x2="30" y2="70" opacity="0.5"/></svg>'
+      },
+      {
+        id: 'dahan', name: '大寒', bigChar: '冰', dateRange: '1月20日-21日',
+        season: 'winter', seasonName: '冬',
+        description: '一年中最冷的时候，寒气之逆极',
+        sanhou: ['一候鸡乳', '二候征鸟厉疾', '三候水泽腹坚'],
+        customs: '尾牙祭、除尘、糊窗、备年货',
+        health: '防风御寒，温固阳气，蓄势待发',
+        poem: '旧雪未及消，新雪又拥户。',
+        icon: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3"><rect x="35" y="35" width="30" height="30" rx="3" fill="none" stroke-width="2"/><path d="M35 50 L65 50" opacity="0.6"/><path d="M50 35 L50 65" opacity="0.6"/></svg>'
+      }
+    ];
+
+    const proverbs = [
+      '立春雨水到，早起晚睡觉。',
+      '春分秋分，昼夜平分。',
+      '清明前后，种瓜点豆。',
+      '谷雨麦挑旗，立夏麦头齐。',
+      '小满不满，芒种不管。',
+      '夏至不过不暖，冬至不过不寒。',
+      '小暑大暑，上蒸下煮。',
+      '立秋一场雨，夏衣高捆起。',
+      '白露白茫茫，谷子满田黄。',
+      '寒露种麦正当时，霜降种麦莫迟疑。',
+      '立冬补冬，补嘴空。',
+      '大雪小雪，煮饭不息。',
+      '冬至大如年，人间小团圆。',
+      '小寒大寒，杀猪过年。',
+      '春雨惊春清谷天，夏满芒夏暑相连。',
+      '秋处露秋寒霜降，冬雪雪冬小大寒。'
+    ];
+
+    const seasonMap = {
+      'spring': '春',
+      'summer': '夏',
+      'autumn': '秋',
+      'winter': '冬'
+    };
+
+    const state = {
+      currentSeason: null,
+      currentDetailIndex: 0,
+      filteredTerms: []
+    };
+
+    // LocalStorage operations
+    function getStorage(key, defaultVal) {
+      try {
+        const val = localStorage.getItem(key);
+        return val ? JSON.parse(val) : defaultVal;
+      } catch {
+        return defaultVal;
+      }
+    }
+    function setStorage(key, val) {
+      try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+    }
+
+    // Initialize visit count
+    let visitCount = parseInt(getStorage('visitCount', 0));
+    visitCount++;
+    setStorage('visitCount', visitCount);
+    const lastViewed = getStorage('lastViewedTerm', null);
+    document.getElementById('visit-info').textContent = 
+      `访问次数：${visitCount}${lastViewed ? ' · 上次浏览：' + lastViewed : ''}`;
+
+    // URL hash handling
+    function parseHash() {
+      const hash = location.hash;
+      const match = hash.match(/season=([\u4e00-\u9fa5])/);
+      if (match) {
+        const seasonChar = match[1];
+        const entry = Object.entries(seasonMap).find(([k,v]) => v === seasonChar);
+        return entry ? entry[0] : null;
+      }
+      return null;
+    }
+
+    function updateHash(season) {
+      if (season) {
+        const char = seasonMap[season];
+        location.hash = `#/season=${char}`;
+      } else {
+        history.pushState('', document.title, window.location.pathname + window.location.search);
+      }
+    }
+
+    // Render cards
+    function renderCards() {
+      const grid = document.getElementById('card-grid');
+      const empty = document.getElementById('empty-state');
+      
+      let terms = solarTerms;
+      if (state.currentSeason) {
+        terms = solarTerms.filter(t => t.season === state.currentSeason);
+      }
+      state.filteredTerms = terms;
+
+      if (terms.length === 0) {
+        grid.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      grid.innerHTML = terms.map((term, idx) => `
+        <article class="card" onclick="openDetail(${idx})" role="listitem" tabindex="0" 
+                 onkeydown="if(event.key==='Enter')openDetail(${idx})"
+                 aria-label="${term.name}，${term.dateRange}">
+          <div class="card-icon" aria-hidden="true">${term.icon}</div>
+          <div class="card-title">${term.name}</div>
+          <div class="card-big-char" aria-hidden="true">${term.bigChar}</div>
+          <div class="card-date">${term.dateRange}</div>
+          <div class="card-desc">${term.description}</div>
+        </article>
+      `).join('');
+
+      // Add mouse move effect for cards
+      document.querySelectorAll('.card').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          card.style.setProperty('--x', x + 'px');
+          card.style.setProperty('--y', y + 'px');
+        });
+      });
+    }
+
+    // Update filter buttons UI
+    function updateFilterButtons() {
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        const season = btn.dataset.season;
+        if (season === state.currentSeason) {
+          btn.classList.add('active');
+          btn.setAttribute('aria-selected', 'true');
+        } else {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-selected', 'false');
+        }
+      });
+    }
+
+    // Filter logic
+    function setFilter(season) {
+      if (state.currentSeason === season) {
+        state.currentSeason = null;
+        updateHash(null);
+      } else {
+        state.currentSeason = season;
+        updateHash(season);
+      }
+      updateFilterButtons();
+      renderCards();
+      updateRandomProverb();
+    }
+
+    // Proverb
+    function updateRandomProverb() {
+      const idx = Math.floor(Math.random() * proverbs.length);
+      document.getElementById('proverb').textContent = proverbs[idx];
+    }
+
+    // Detail modal
+    const modal = document.getElementById('detail-modal');
+    const modalBody = document.getElementById('modal-body');
+
+    function openDetail(index) {
+      state.currentDetailIndex = index;
+      renderDetail();
+      modal.classList.add('active');
+      document.body.classList.add('modal-open');
+      
+      const term = state.filteredTerms[index];
+      if (term) setStorage('lastViewedTerm', term.name);
+    }
+
+    function closeDetail() {
+      modal.classList.remove('active');
+      document.body.classList.remove('modal-open');
+    }
+
+    function renderDetail() {
+      const term = state.filteredTerms[state.currentDetailIndex];
+      if (!term) return;
+
+      document.getElementById('modal-term-name').textContent = term.name;
+      document.getElementById('modal-season-tag').textContent = term.seasonName;
+      document.getElementById('modal-date').textContent = term.dateRange;
+      document.getElementById('modal-sanhou').innerHTML = term.sanhou.map(s => `<li>${s}</li>`).join('');
+      document.getElementById('modal-customs').textContent = term.customs;
+      document.getElementById('modal-health').textContent = term.health;
+      document.getElementById('modal-poem').textContent = term.poem;
+    }
+
+    function switchDetail(direction) {
+      // direction: -1 for prev, 1 for next
+      modalBody.classList.add('switching');
+      setTimeout(() => {
+        const len = state.filteredTerms.length;
+        state.currentDetailIndex = (state.currentDetailIndex + direction + len) % len;
+        renderDetail();
+        modalBody.classList.remove('switching');
+      }, 150);
+    }
+
+    // Event listeners
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => setFilter(btn.dataset.season));
+    });
+
+    document.getElementById('modal-close').addEventListener('click', closeDetail);
+    document.getElementById('btn-prev').addEventListener('click', () => switchDetail(-1));
+    document.getElementById('btn-next').addEventListener('click', () => switchDetail(1));
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeDetail();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!modal.classList.contains('active')) return;
+      if (e.key === 'Escape') closeDetail();
+      if (e.key === 'ArrowLeft') switchDetail(-1);
+      if (e.key === 'ArrowRight') switchDetail(1);
+    });
+
+    window.addEventListener('hashchange', () => {
+      state.currentSeason = parseHash();
+      updateFilterButtons();
+      renderCards();
+    });
+
+    // Init
+    state.currentSeason = parseHash();
+    updateFilterButtons();
+    renderCards();
+    updateRandomProverb();
+  </script>
+</body>
+</html>
