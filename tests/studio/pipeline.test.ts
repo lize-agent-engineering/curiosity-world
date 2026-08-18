@@ -213,6 +213,16 @@ describe('modifying an app', () => {
     expect(named(bundle).coder.calls[1]!.prompt).toContain('完整');
   });
 
+  it('keeps an excerpt of the unusable coder response so the failure is diagnosable', async () => {
+    const bundle = models({
+      planner: [planJson()],
+      coder: ['<<<<<<< SEARCH\n<h1>x</h1>\n没有分隔行也没有结束行', page('<h1>专注钟</h1>')],
+    });
+    const result = await runStudioPipeline({ request: '改标题', current }, bundle);
+    expect(result.editBlockFailures).toEqual(['EDIT_BLOCK_MALFORMED']);
+    expect(result.patchResponseExcerpt).toContain('没有分隔行');
+  });
+
   it('reports the edit-block failure it fell back from', async () => {
     const bundle = models({
       planner: [planJson()],
@@ -292,5 +302,15 @@ describe('the reviewer', () => {
     await runStudioPipeline({ request: '做个番茄钟' }, bundle);
     expect(named(bundle).reviewer.calls[0]!.prompt).toContain('静态校验');
     expect(named(bundle).reviewer.calls[0]!.prompt).toContain('25 分钟倒计时');
+  });
+});
+
+describe('schema repair rounds', () => {
+  it('marks the repair instruction as a format note so it cannot become product copy', async () => {
+    const bundle = models({ planner: ['不是 JSON', planJson()], coder: [good] });
+    await runStudioPipeline({ request: '做个番茄钟' }, bundle);
+    const retryPrompt = (bundle['studio.planner'] as ReturnType<typeof scripted>).calls[1]!.prompt;
+    expect(retryPrompt).toContain('【格式提醒，不属于用户需求】');
+    expect(retryPrompt).toContain('不要提到 JSON、格式或这次重试');
   });
 });

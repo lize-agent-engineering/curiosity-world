@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>占卜土豆</title>
+  <style>
+    :root {
+      --bg: #1a1814;
+      --surface: #252420;
+      --text: #e8e3d8;
+      --muted: #9a9590;
+      --accent: #d4a84b;
+      --border: #3d3a35;
+      --danger: #c75a5a;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      color: var(--accent);
+      margin-bottom: 24px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .app-desc {
+      color: var(--muted);
+      font-size: 0.875rem;
+      text-align: center;
+      margin-bottom: 24px;
+      max-width: 360px;
+      line-height: 1.6;
+    }
+
+    .input-section {
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 32px;
+    }
+
+    .input-label {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .question-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 1rem;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+      font-family: inherit;
+    }
+
+    .question-input::placeholder {
+      color: var(--muted);
+    }
+
+    .question-input:hover {
+      border-color: #5a574f;
+    }
+
+    .question-input:focus-visible {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(212, 168, 75, 0.15);
+    }
+
+    .potato-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 32px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .potato-wrapper {
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 150ms ease;
+    }
+
+    .potato-wrapper:hover {
+      transform: scale(1.05);
+    }
+
+    .potato-wrapper:active {
+      transform: scale(0.96);
+    }
+
+    .potato-wrapper:focus-visible {
+      outline: none;
+      border-radius: 50%;
+      box-shadow: 0 0 0 3px rgba(212, 168, 75, 0.3);
+    }
+
+    .potato-wrapper.shaking {
+      animation: shake 0.5s ease;
+    }
+
+    .potato-wrapper.glowing {
+      animation: glow 0.5s ease;
+    }
+
+    .potato-wrapper divining {
+      pointer-events: none;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0) rotate(0deg); }
+      10% { transform: translateX(-4px) rotate(-3deg); }
+      20% { transform: translateX(4px) rotate(3deg); }
+      30% { transform: translateX(-6px) rotate(-4deg); }
+      40% { transform: translateX(6px) rotate(4deg); }
+      50% { transform: translateX(-4px) rotate(-2deg); }
+      60% { transform: translateX(4px) rotate(2deg); }
+      70% { transform: translateX(-2px) rotate(-1deg); }
+      80% { transform: translateX(2px) rotate(1deg); }
+      90% { transform: translateX(-1px) rotate(0deg); }
+    }
+
+    @keyframes glow {
+      0%, 100% { filter: drop-shadow(0 0 0px rgba(212, 168, 75, 0)); }
+      50% { filter: drop-shadow(0 0 20px rgba(212, 168, 75, 0.5)); }
+    }
+
+    .potato-hint {
+      color: var(--muted);
+      font-size: 0.8125rem;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .result-area {
+      margin-top: 20px;
+      min-height: 48px;
+      text-align: center;
+      width: 100%;
+    }
+
+    .result-text {
+      font-size: 1.125rem;
+      line-height: 1.6;
+      color: var(--text);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 400ms ease, transform 400ms ease;
+    }
+
+    .result-text.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .error-text {
+      color: var(--danger);
+      font-size: 0.9375rem;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 200ms ease, transform 200ms ease;
+    }
+
+    .error-text.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .history-section {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .history-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .clear-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      cursor: pointer;
+      transition: border-color 150ms, color 150ms, background 150ms;
+      font-family: inherit;
+    }
+
+    .clear-btn:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: rgba(199, 90, 90, 0.08);
+    }
+
+    .clear-btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(199, 90, 90, 0.2);
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .history-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      transition: border-color 150ms ease;
+    }
+
+    .history-item:hover {
+      border-color: #5a574f;
+    }
+
+    .history-question {
+      color: var(--text);
+      font-size: 0.9375rem;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .history-answer {
+      color: var(--accent);
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .history-time {
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.875rem;
+      padding: 32px 16px;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+    }
+
+    .divider {
+      width: 100%;
+      max-width: 400px;
+      height: 1px;
+      background: var(--border);
+      margin-bottom: 32px;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 12px;
+      }
+      
+      h1 {
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>占卜土豆</h1>
+  <p class="app-desc">心中默念一个问题，点击土豆获取神秘预言。土豆已经准备好了。</p>
+
+  <div class="input-section">
+    <label class="input-label" for="questionInput">你的问题</label>
+    <input
+      type="text"
+      id="questionInput"
+      class="question-input"
+      placeholder="请输入你想占卜的问题..."
+      maxlength="100"
+    >
+  </div>
+
+  <div class="potato-section">
+    <div class="potato-wrapper" id="potatoBtn" role="button" tabindex="0" aria-label="点击土豆进行占卜">
+      <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- 土豆主体，不规则椭圆 -->
+        <path d="M45 120 C25 100 20 70 35 45 C50 25 80 20 110 30 C135 40 145 65 135 95 C125 125 95 140 65 135 C50 132 40 125 45 120Z" fill="#C49A3C"/>
+        <path d="M45 120 C25 100 20 70 35 45 C50 25 80 20 110 30 C135 40 145 65 135 95 C125 125 95 140 65 135 C50 132 40 125 45 120Z" fill="url(#potatoGrad)"/>
+        <!-- 芽孔 -->
+        <ellipse cx="55" cy="55" rx="5" ry="7" fill="#A67C2E" transform="rotate(-20 55 55)"/>
+        <ellipse cx="90" cy="45" rx="4" ry="6" fill="#A67C2E" transform="rotate(10 90 45)"/>
+        <ellipse cx="115" cy="80" rx="4" ry="5" fill="#A67C2E" transform="rotate(-30 115 80)"/>
+        <ellipse cx="70" cy="110" rx="5" ry="6" fill="#A67C2E" transform="rotate(15 70 110)"/>
+        <!-- 小斑点 -->
+        <circle cx="75" cy="60" r="2" fill="#B08D35" opacity="0.6"/>
+        <circle cx="105" cy="65" r="1.5" fill="#B08D35" opacity="0.6"/>
+        <circle cx="60" cy="90" r="2" fill="#B08D35" opacity="0.6"/>
+        <circle cx="95" cy="110" r="1.5" fill="#B08D35" opacity="0.6"/>
+        <circle cx="125" cy="60" r="2" fill="#B08D35" opacity="0.6"/>
+        <!-- 眼睛 -->
+        <ellipse cx="65" cy="78" rx="8" ry="10" fill="#1a1814"/>
+        <ellipse cx="100" cy="78" rx="8" ry="10" fill="#1a1814"/>
+        <circle cx="62" cy="76" r="3" fill="#fff" opacity="0.9"/>
+        <circle cx="97" cy="76" r="3" fill="#fff" opacity="0.9"/>
+        <!-- 眉毛 -->
+        <path d="M52 64 Q65 58 78 66" stroke="#8B6F2E" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M87 66 Q100 58 113 64" stroke="#8B6F2E" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <!-- 嘴巴 -->
+        <path d="M72 98 Q82 108 92 98" stroke="#6B4E1E" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- 腮红 -->
+        <ellipse cx="55" cy="90" rx="7" ry="5" fill="#D4764B" opacity="0.25"/>
+        <ellipse cx="110" cy="90" rx="7" ry="5" fill="#D4764B" opacity="0.25"/>
+        <!-- 渐变 -->
+        <defs>
+          <radialGradient id="potatoGrad" cx="0.4" cy="0.3" r="0.7">
+            <stop offset="0%" stop-color="#D4A84B"/>
+            <stop offset="100%" stop-color="#B89030"/>
+          </radialGradient>
+        </defs>
+      </svg>
+    </div>
+    <p class="potato-hint">点击土豆，获取预言</p>
+
+    <div class="result-area" id="resultArea">
+      <div class="result-text" id="resultText"></div>
+      <div class="error-text" id="errorText">请先输入一个问题</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="history-section">
+    <div class="history-header">
+      <span class="history-title">占卜记录</span>
+      <button class="clear-btn" id="clearBtn">清空记录</button>
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="empty-state" id="emptyState">暂无占卜记录</div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      // 预言库
+      var predictions = [
+        "是的，毫无疑问。",
+        "现在还不行，再等一等。",
+        "结果会比你期待的更好。",
+        "换个角度想想，答案就在其中。",
+        "土豆不建议你现在行动。",
+        "去做吧，好运站在你这边。",
+        "这件事需要更多耐心。",
+        "答案就在你的心里，静下来听一听。",
+        "会有意想不到的帮助出现。",
+        "目前看来，时机不成熟。",
+        "一切都会顺利解决。",
+        "你需要先解决另一个问题。",
+        "保持乐观，好消息正在路上。",
+        "土豆感受到了一些阻碍。",
+        "这个方向是对的，继续前进。",
+        "会有小波折，但结果不错。",
+        "也许你应该休息一下再决定。",
+        "相信直觉，它不会骗你。",
+        "有人会在关键时刻帮助你。",
+        "这件事比表面看起来更复杂。",
+        "放下执念，答案会自己浮现。",
+        "土豆看到了光明的前景。",
+        "谨慎行事，步步为营。",
+        "你的努力终将得到回报。",
+        "现在放手一搏正是时候。"
+      ];
+
+      // DOM 元素
+      var questionInput = document.getElementById('questionInput');
+      var potatoBtn = document.getElementById('potatoBtn');
+      var resultText = document.getElementById('resultText');
+      var errorText = document.getElementById('errorText');
+      var historyList = document.getElementById('historyList');
+      var emptyState = document.getElementById('emptyState');
+      var clearBtn = document.getElementById('clearBtn');
+
+      var isDivining = false;
+      var STORAGE_KEY = 'potato-divination-history';
+
+      // 读取历史记录
+      function loadHistory() {
+        var stored = localStorage.getItem(STORAGE_KEY);
+        var list = [];
+        if (stored) {
+          try {
+            list = JSON.parse(stored);
+            if (!Array.isArray(list)) list = [];
+          } catch (e) {
+            list = [];
+          }
+        }
+        return list;
+      }
+
+      // 保存历史记录
+      function saveHistory(list) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        } catch (e) {
+          // 读写失败则静默处理
+        }
+      }
+
+      // 渲染历史列表
+      function renderHistory() {
+        var list = loadHistory();
+
+        if (list.length === 0) {
+          historyList.innerHTML = '';
+          historyList.appendChild(emptyState);
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        emptyState.style.display = 'none';
+        historyList.innerHTML = '';
+
+        for (var i = list.length - 1; i >= 0; i--) {
+          var item = list[i];
+          var el = document.createElement('div');
+          el.className = 'history-item';
+
+          var q = document.createElement('div');
+          q.className = 'history-question';
+          q.textContent = '问：' + item.question;
+
+          var a = document.createElement('div');
+          a.className = 'history-answer';
+          a.textContent = '答：' + item.answer;
+
+          var t = document.createElement('div');
+          t.className = 'history-time';
+          t.textContent = item.time;
+
+          el.appendChild(q);
+          el.appendChild(a);
+          el.appendChild(t);
+          historyList.appendChild(el);
+        }
+      }
+
+      // 添加一条记录
+      function addRecord(question, answer) {
+        var list = loadHistory();
+        var now = new Date();
+        var timeStr = now.getFullYear() + '-' +
+          String(now.getMonth() + 1).padStart(2, '0') + '-' +
+          String(now.getDate()).padStart(2, '0') + ' ' +
+          String(now.getHours()).padStart(2, '0') + ':' +
+          String(now.getMinutes()).padStart(2, '0');
+
+        list.push({
+          question: question,
+          answer: answer,
+          time: timeStr
+        });
+
+        // 最多保留 50 条
+        if (list.length > 50) {
+          list = list.slice(list.length - 50);
+        }
+
+        saveHistory(list);
+        renderHistory();
+      }
+
+      // 执行占卜
+      function doDivination() {
+        if (isDivining) return;
+
+        var question = questionInput.value.trim();
+
+        // 重置结果区
+        resultText.classList.remove('visible');
+        errorText.classList.remove('visible');
+
+        if (!question) {
+          // 显示错误提示
+          errorText.classList.add('visible');
+          questionInput.focus();
+          return;
+        }
+
+        isDivining = true;
+        potatoBtn.classList.add('divining');
+        potatoBtn.classList.add('shaking');
+
+        // 0.5 秒后动画结束，显示结果
+        setTimeout(function() {
+          potatoBtn.classList.remove('shaking');
+          potatoBtn.classList.add('glowing');
+
+          var answer = predictions[Math.floor(Math.random() * predictions.length)];
+
+          resultText.textContent = answer;
+          resultText.classList.add('visible');
+
+          addRecord(question, answer);
+
+          // 清除输入框
+          questionInput.value = '';
+
+          setTimeout(function() {
+            potatoBtn.classList.remove('glowing');
+            potatoBtn.classList.remove('divining');
+            isDivining = false;
+          }, 400);
+        }, 500);
+      }
+
+      // 点击土豆
+      if (potatoBtn) {
+        potatoBtn.addEventListener('click', doDivination);
+        potatoBtn.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            doDivination();
+          }
+        });
+      }
+
+      // 输入框回车
+      if (questionInput) {
+        questionInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            doDivination();
+          }
+        });
+      }
+
+      // 清空记录
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+          if (confirm) {
+            // 使用自定义确认界面，避免被屏蔽
+            if (window.confirm && typeof window.confirm === 'function') {
+              // 在某些沙箱中 confirm 会被拦截，用内联弹窗替代
+            }
+          }
+          
+          // 直接清空，不弹确认（避免沙箱拦截）
+          saveHistory([]);
+          renderHistory();
+        });
+      }
+
+      // 初始化渲染
+      renderHistory();
+    })();
+  </script>
+</body>
+</html>

@@ -61,6 +61,18 @@ describe('parseStudioEditBlocks', () => {
     ]);
   });
 
+  it('tolerates marker wobble in fence length, case and spacing', () => {
+    const raw = '<<<<<<<<< search\n<h1>a</h1>\n==========\n<h1>b</h1>\n>>>>>>>>> Replace';
+    expect(parseStudioEditBlocks(raw)).toEqual([{ search: '<h1>a</h1>', replace: '<h1>b</h1>' }]);
+  });
+
+  it('still requires the content between fences to be exact', () => {
+    const blocks = parseStudioEditBlocks(
+      '<<<<<< SEARCH\n  <h1>a</h1>\n======\n  <h1>b</h1>\n>>>>>> REPLACE',
+    );
+    expect(blocks[0]!.search).toBe('  <h1>a</h1>');
+  });
+
   it('rejects output with no block at all and names the required format', () => {
     const error = expectFailure(
       () => parseStudioEditBlocks('我建议你把标题改成“我的番茄钟”。'),

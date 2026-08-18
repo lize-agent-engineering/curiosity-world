@@ -108,6 +108,11 @@ export interface StudioPipelineResult {
   validation: StudioValidationReport;
   codeAttempts: number;
   editBlockFailures: string[];
+  /**
+   * The head of a coder response whose edit blocks could not be applied. Kept so
+   * a mismatch is diagnosable from the job afterwards instead of guessed at.
+   */
+  patchResponseExcerpt?: string;
 }
 
 export type StudioPipelineFailureCode = 'PLAN_INVALID' | 'CODE_INVALID' | 'PATCH_FAILED';
@@ -151,7 +156,10 @@ async function completeStructured<T>(
         prompt:
           attempt === 1
             ? input.prompt
-            : `${input.prompt}\n\n上一轮输出未通过校验：${validationSummary(lastError)}。请重新输出完整、合法的 JSON。`,
+            : // Marked as a format note: without it, models have folded the repair
+              // instruction into the content and returned a changeNote about
+              // fixing their own JSON, which then shipped as the user's reply.
+              `${input.prompt}\n\n【格式提醒，不属于用户需求】上一轮输出未通过校验：${validationSummary(lastError)}。请重新输出完整、合法的 JSON；各字段的内容仍然只描述上面那个应用，不要提到 JSON、格式或这次重试。`,
         schema: input.schema,
       });
       return parse(raw);
@@ -209,6 +217,7 @@ export async function runStudioPipeline(
   const coder = models['studio.coder'];
   const system = renderStudioCoderSystem(plan.appKind);
   const editBlockFailures: string[] = [];
+  let patchResponseExcerpt: string | undefined;
   let codeAttempts = 0;
 
   const writeCode = async (prompt: string): Promise<string> => {
@@ -276,6 +285,7 @@ export async function runStudioPipeline(
     } catch (error) {
       if (!(error instanceof StudioEditBlockError)) throw error;
       editBlockFailures.push(error.code);
+      patchResponseExcerpt = patchResponse.slice(0, 800);
     }
     if (patched) {
       const validation = validateStudioHtml(patched.html);
@@ -373,5 +383,6 @@ export async function runStudioPipeline(
     validation: round.validation,
     codeAttempts,
     editBlockFailures,
+    ...(patchResponseExcerpt ? { patchResponseExcerpt } : {}),
   };
 }

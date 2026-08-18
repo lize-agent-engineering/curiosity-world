@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>今日心情测色仪</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --border: #334155;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 10px 30px rgba(0,0,0,0.3);
+      --transition: 200ms ease;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    #app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: background-color 800ms ease;
+    }
+
+    header {
+      padding: 24px 16px 8px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: clamp(18px, 5vw, 24px);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stage {
+      width: 100%;
+      max-width: 480px;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 300ms ease, transform 300ms ease;
+      display: none;
+    }
+
+    .stage.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .question-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .progress {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .dot {
+      height: 4px;
+      flex: 1;
+      background: var(--border);
+      border-radius: 2px;
+      transition: background var(--transition);
+    }
+
+    .dot.filled { background: var(--accent); }
+
+    .question-title {
+      font-size: 18px;
+      font-weight: 500;
+      margin: 0 0 20px;
+      line-height: 1.5;
+    }
+
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .option-btn {
+      width: 100%;
+      padding: 16px;
+      font-size: 16px;
+      text-align: left;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      cursor: pointer;
+      transition: all var(--transition);
+      position: relative;
+    }
+
+    .option-btn:hover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    .option-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .option-btn:active {
+      transform: translateY(1px);
+    }
+
+    .result-card {
+      text-align: center;
+      color: inherit;
+    }
+
+    .color-display {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 20px;
+      border-radius: 50%;
+      background: var(--preview-color, var(--accent));
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4), inset 0 0 0 4px rgba(255,255,255,0.1);
+      transition: background-color 800ms ease;
+    }
+
+    .hex-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin: 0 0 8px;
+      user-select: all;
+    }
+
+    .mood-name {
+      font-size: 20px;
+      font-weight: 500;
+      margin: 0 0 24px;
+      opacity: 0.95;
+    }
+
+    .mood-desc {
+      font-size: 14px;
+      opacity: 0.8;
+      margin: 0 0 24px;
+      line-height: 1.6;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-primary {
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border-color: rgba(255,255,255,0.3);
+      color: inherit;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 2px;
+    }
+
+    footer {
+      padding: 16px;
+      flex-shrink: 0;
+    }
+
+    .history {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .history-label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+
+    .history-chip {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform var(--transition), border-color var(--transition);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .history-chip:hover {
+      transform: scale(1.1);
+      border-color: rgba(255,255,255,0.8);
+    }
+
+    .history-chip:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .tooltip {
+      position: absolute;
+      bottom: 44px;
+      left: 50%;
+      transform: translateX(-50%) translateY(6px);
+      background: var(--surface);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease, transform 200ms ease;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      z-index: 10;
+    }
+
+    .history-chip:hover .tooltip,
+    .history-chip:focus .tooltip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .empty-history {
+      font-size: 13px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--surface);
+      color: var(--text);
+      padding: 12px 20px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      opacity: 0;
+      transition: transform 300ms ease, opacity 300ms ease;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    @media (max-width: 480px) {
+      .question-card { padding: 20px; }
+      .hex-code { font-size: 28px; }
+      .color-display { width: 100px; height: 100px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <h1>今日心情测色仪</h1>
+    <p>通过三个小问题，找到代表此刻心情的颜色</p>
+  </header>
+
+  <main>
+    <!-- 问题 1 -->
+    <div class="stage active" id="stage-0">
+      <div class="question-card">
+        <div class="progress" aria-hidden="true">
+          <div class="dot filled"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+        <h2 class="question-title">此刻你的身体能量感觉如何？</h2>
+        <div class="options" role="radiogroup" aria-label="能量水平">
+          <button class="option-btn" data-value="low" tabindex="0">疲惫或放松，想休息</button>
+          <button class="option-btn" data-value="medium" tabindex="0">平稳，日常状态</button>
+          <button class="option-btn" data-value="high" tabindex="0">充满动力，精力充沛</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 问题 2 -->
+    <div class="stage" id="stage-1">
+      <div class="question-card">
+        <div class="progress" aria-hidden="true">
+          <div class="dot filled"></div>
+          <div class="dot filled"></div>
+          <div class="dot"></div>
+        </div>
+        <h2 class="question-title">当下的情绪倾向更接近？</h2>
+        <div class="options" role="radiogroup" aria-label="情绪倾向">
+          <button class="option-btn" data-value="warm" tabindex="0">温暖、积极、外向</button>
+          <button class="option-btn" data-value="neutral" tabindex="0">平和、中性、专注</button>
+          <button class="option-btn" data-value="cool" tabindex="0">冷静、内敛、沉思</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 问题 3 -->
+    <div class="stage" id="stage-2">
+      <div class="question-card">
+        <div class="progress" aria-hidden="true">
+          <div class="dot filled"></div>
+          <div class="dot filled"></div>
+          <div class="dot filled"></div>
+        </div>
+        <h2 class="question-title">内心情绪的强度如何？</h2>
+        <div class="options" role="radiogroup" aria-label="情绪强度">
+          <button class="option-btn" data-value="low" tabindex="0">淡淡的，几乎无感</button>
+          <button class="option-btn" data-value="medium" tabindex="0"> noticeable，有所察觉</button>
+          <button class="option-btn" data-value="high" tabindex="0">强烈的，占据主导</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 结果页 -->
+    <div class="stage" id="stage-result">
+      <div class="result-card">
+        <div class="color-display" id="colorDisplay" role="img" aria-label="心情颜色预览"></div>
+        <div class="hex-code" id="hexCode">#38BDF8</div>
+        <div class="mood-name" id="moodName">天空之境</div>
+        <div class="mood-desc" id="moodDesc">基于你的能量水平与情绪倾向计算出的专属色彩</div>
+        <div class="actions">
+          <button class="btn btn-primary" id="btnRestart">再测一次</button>
+          <button class="btn btn-secondary" id="btnCopy">复制色值</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="history" id="historyArea" aria-label="历史记录">
+      <span class="history-label">近期心情：</span>
+      <span class="empty-history" id="emptyHistory">暂无记录</span>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+  (function() {
+    'use strict';
+
+    // 状态
+    let currentStep = 0;
+    const answers = { energy: null, tendency: null, intensity: null };
+    let currentMood = null;
+
+    // DOM 元素
+    const app = document.getElementById('app');
+    const stages = [
+      document.getElementById('stage-0'),
+      document.getElementById('stage-1'),
+      document.getElementById('stage-2'),
+      document.getElementById('stage-result')
+    ];
+    const colorDisplay = document.getElementById('colorDisplay');
+    const hexCodeEl = document.getElementById('hexCode');
+    const moodNameEl = document.getElementById('moodName');
+    const moodDescEl = document.getElementById('moodDesc');
+    const historyArea = document.getElementById('historyArea');
+    const emptyHistory = document.getElementById('emptyHistory');
+    const toast = document.getElementById('toast');
+
+    // 初始化
+    function init() {
+      bindEvents();
+      renderHistory();
+    }
+
+    // 事件绑定
+    function bindEvents() {
+      // 选项点击
+      stages.forEach((stage, idx) => {
+        if (idx >= 3) return;
+        const buttons = stage.querySelectorAll('.option-btn');
+        buttons.forEach(btn => {
+          btn.addEventListener('click', () => handleOption(idx, btn.dataset.value));
+          btn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleOption(idx, btn.dataset.value);
+            }
+          });
+        });
+      });
+
+      // 重新测试
+      document.getElementById('btnRestart').addEventListener('click', resetTest);
+
+      // 复制色值
+      document.getElementById('btnCopy').addEventListener('click', copyColor);
+    }
+
+    // 处理选项选择
+    function handleOption(step, value) {
+      if (step === 0) answers.energy = value;
+      if (step === 1) answers.tendency = value;
+      if (step === 2) answers.intensity = value;
+
+      if (step < 2) {
+        transitionTo(step + 1);
+      } else {
+        calculateAndShow();
+      }
+    }
+
+    // 页面切换动画
+    function transitionTo(nextStep) {
+      const current = stages[currentStep];
+      const next = stages[nextStep];
+      
+      current.classList.remove('active');
+      
+      setTimeout(() => {
+        current.style.display = 'none';
+        next.style.display = 'block';
+        // 强制重排
+        void next.offsetWidth;
+        next.classList.add('active');
+        currentStep = nextStep;
+        
+        // 聚焦第一个选项以便键盘操作
+        if (nextStep < 3) {
+          const firstBtn = next.querySelector('.option-btn');
+          if (firstBtn) firstBtn.focus();
+        }
+      }, 300);
+    }
+
+    // 计算颜色并显示结果
+    function calculateAndShow() {
+      const hsl = calculateHSL(answers);
+      const hex = hslToHex(hsl.h, hsl.s, hsl.l);
+      const name = getMoodName(hsl);
+      
+      currentMood = {
+        timestamp: Date.now(),
+        hex: hex,
+        name: name,
+        hsl: hsl
+      };
+
+      // 保存到历史
+      saveHistory(currentMood);
+
+      // 更新 UI
+      hexCodeEl.textContent = hex.toUpperCase();
+      moodNameEl.textContent = name;
+      colorDisplay.style.setProperty('--preview-color', hex);
+      moodDescEl.textContent = `HSL(${Math.round(hsl.h)}, ${Math.round(hsl.s)}%, ${Math.round(hsl.l)}%) · 专属今日心情色`;
+
+      // 切换页面
+      transitionTo(3);
+
+      // 背景色过渡
+      setTimeout(() => {
+        app.style.backgroundColor = hex;
+        // 根据背景亮度调整文字颜色以确保对比度
+        const brightness = hsl.l;
+        if (brightness > 60) {
+          app.style.color = '#0f172a';
+          document.documentElement.style.setProperty('--text', '#0f172a');
+          document.documentElement.style.setProperty('--muted', '#475569');
+        } else {
+          app.style.color = '#f8fafc';
+          document.documentElement.style.setProperty('--text', '#f8fafc');
+          document.documentElement.style.setProperty('--muted', '#94a3b8');
+        }
+      }, 100);
+
+      // 更新历史显示
+      renderHistory();
+    }
+
+    // HSL 计算逻辑
+    function calculateHSL(ans) {
+      let h, s, l;
+
+      // Hue: 基于情绪倾向
+      if (ans.tendency === 'warm') {
+        h = randRange(0, 50); // 红橙黄
+      } else if (ans.tendency === 'cool') {
+        h = randRange(180, 260); // 青蓝紫
+      } else {
+        h = randRange(80, 160); // 绿
+      }
+
+      // Saturation: 基于情绪强度
+      if (ans.intensity === 'low') {
+        s = randRange(30, 55);
+      } else if (ans.intensity === 'high') {
+        s = randRange(75, 100);
+      } else {
+        s = randRange(60, 80);
+      }
+
+      // Lightness: 基于能量水平
+      if (ans.energy === 'low') {
+        l = randRange(20, 40);
+      } else if (ans.energy === 'high') {
+        l = randRange(60, 85);
+      } else {
+        l = randRange(45, 65);
+      }
+
+      return { h, s, l };
+    }
+
+    function randRange(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function hslToHex(h, s, l) {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    }
+
+    // 心情名称映射
+    function getMoodName(hsl) {
+      const { h, s, l } = hsl;
+      
+      if (l > 75 && s < 30) return '云雾晨光';
+      if (l < 25 && s < 40) return '静夜深海';
+      if (s < 20) return '灰度记忆';
+      
+      if (h >= 0 && h < 60) {
+        if (l > 60 && s > 70) return '活力晨曦';
+        if (l < 40) return '深秋落叶';
+        return '暖阳微风';
+      }
+      
+      if (h >= 60 && h < 180) {
+        if (s > 80 && l > 60) return '初春新芽';
+        if (l < 40) return '森夜静谧';
+        return '湖水宁静';
+      }
+      
+      if (h >= 180 && h < 260) {
+        if (l > 60 && s > 70) return '冰川极光';
+        if (l < 40) return '深海潜流';
+        return '薄暮天穹';
+      }
+      
+      if (h >= 260 && h <= 360) {
+        if (s > 70 && l > 50) return '霓虹幻梦';
+        if (l < 40) return '紫罗兰夜';
+        return '薰衣草田';
+      }
+      
+      return '今日专属';
+    }
+
+    // 重置测试
+    function resetTest() {
+      // 重置背景色
+      app.style.backgroundColor = '';
+      app.style.color = '';
+      document.documentElement.style.setProperty('--text', '#f8fafc');
+      document.documentElement.style.setProperty('--muted', '#94a3b8');
+
+      // 重置状态
+      currentStep = 0;
+      answers.energy = null;
+      answers.tendency = null;
+      answers.intensity = null;
+      currentMood = null;
+
+      // 切换回第一题
+      stages[3].classList.remove('active');
+      setTimeout(() => {
+        stages[3].style.display = 'none';
+        stages[0].style.display = 'block';
+        void stages[0].offsetWidth;
+        stages[0].classList.add('active');
+        const firstBtn = stages[0].querySelector('.option-btn');
+        if (firstBtn) firstBtn.focus();
+      }, 300);
+    }
+
+    // 历史记录管理
+    function saveHistory(record) {
+      try {
+        const key = 'moodColorHistory';
+        let history = [];
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          try {
+            history = JSON.parse(raw);
+            if (!Array.isArray(history)) history = [];
+          } catch (e) {
+            history = [];
+          }
+        }
+        history.unshift(record);
+        if (history.length > 5) history = history.slice(0, 5);
+        localStorage.setItem(key, JSON.stringify(history));
+      } catch (e) {
+        // 忽略存储错误
+      }
+    }
+
+    function getHistory() {
+      try {
+        const raw = localStorage.getItem('moodColorHistory');
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function renderHistory() {
+      const history = getHistory();
+      if (history.length === 0) {
+        emptyHistory.style.display = 'inline';
+        // 清除其他历史chip
+        const chips = historyArea.querySelectorAll('.history-chip');
+        chips.forEach(c => c.remove());
+        return;
+      }
+      
+      emptyHistory.style.display = 'none';
+      // 清除旧chip
+      const oldChips = historyArea.querySelectorAll('.history-chip');
+      oldChips.forEach(c => c.remove());
+
+      history.forEach((item, idx) => {
+        const chip = document.createElement('div');
+        chip.className = 'history-chip';
+        chip.style.backgroundColor = item.hex;
+        chip.setAttribute('tabindex', '0');
+        chip.setAttribute('role', 'button');
+        chip.setAttribute('aria-label', `${formatDate(item.timestamp)} ${item.name}`);
+        
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        tooltip.textContent = `${formatDate(item.timestamp)} · ${item.name}`;
+        chip.appendChild(tooltip);
+        
+        // 点击可恢复该颜色预览（仅视觉）
+        chip.addEventListener('click', () => {
+          showToast(`${item.name} ${item.hex}`);
+        });
+        
+        historyArea.appendChild(chip);
+      });
+    }
+
+    function formatDate(ts) {
+      const d = new Date(ts);
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      const timeStr = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+      if (isToday) return `今天 ${timeStr}`;
+      return `${d.getMonth()+1}/${d.getDate()} ${timeStr}`;
+    }
+
+    // 复制功能
+    async function copyColor() {
+      const text = hexCodeEl.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('已复制到剪贴板');
+      } catch (err) {
+        // 降级方案
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(hexCodeEl);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        showToast('已选中，请手动复制');
+      }
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2000);
+    }
+
+    // 启动
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+</script>
+
+</body>
+</html>

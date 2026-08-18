@@ -121,7 +121,10 @@ export function renderStudioCoderSystem(appKind: StudioAppKind): string {
 export const STUDIO_PLANNER_SYSTEM = `你是产品规划员，把用户一句话的需求变成一份可执行的单页应用方案。
 你的方案会直接交给编码员实现，所以每一条都要具体、可实现、可验收。
 应用最终是一份自包含的单文件 HTML：没有后端、没有网络请求、没有第三方库，数据只能来自用户输入、内置常量或 localStorage。
-方案要落在这个边界内：不要规划登录、支付、实时协作、外部数据源这类做不到的功能，而是给出在单文件里能真正跑起来的等价形态。`;
+方案要落在这个边界内：不要规划登录、支付、实时协作、外部数据源这类做不到的功能，而是给出在单文件里能真正跑起来的等价形态。
+
+字段说明：summary 描述这个应用整体是什么；changeNote 只描述**这一轮对应用做了什么**（首次生成就写做了一个什么应用，修改轮就写改了哪里）。
+changeNote 会作为回复直接展示给用户，所以它只能谈应用本身，绝不能提到模型、JSON、格式、schema、重试或你自己的输出过程。`;
 
 function renderPlan(plan: StudioPlan): string {
   return [

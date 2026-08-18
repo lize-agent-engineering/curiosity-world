@@ -254,6 +254,7 @@ export async function runStudioWorkerOnce(input: StudioWorkerInput): Promise<boo
       review: result.review,
       editMode: result.editMode,
       editBlockFailures: result.editBlockFailures,
+      patchResponseExcerpt: result.patchResponseExcerpt,
       codeAttempts: result.codeAttempts,
       result: {
         versionId: stored.id,

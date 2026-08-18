@@ -5,6 +5,7 @@ import { STUDIO_EDIT_BLOCK_FORMAT } from '@/lib/studio/edit-blocks';
 import {
   STUDIO_APP_KIND_GUIDE,
   STUDIO_CODER_CONTRACT,
+  STUDIO_PLANNER_SYSTEM,
   renderStudioCoderSystem,
   renderStudioCreatePrompt,
   renderStudioPatchPrompt,
@@ -93,6 +94,11 @@ describe('planner prompt', () => {
     const prompt = renderStudioPlannerPrompt({ request: '做一个会占卜的土豆' });
     expect(prompt).toContain('general');
     expect(prompt).not.toContain('拒绝');
+  });
+
+  it('defines changeNote as user-facing product copy, not model self-talk', () => {
+    expect(STUDIO_PLANNER_SYSTEM).toContain('changeNote');
+    expect(STUDIO_PLANNER_SYSTEM).toContain('绝不能提到模型、JSON、格式');
   });
 
   it('carries the existing app forward when the user is modifying it', () => {

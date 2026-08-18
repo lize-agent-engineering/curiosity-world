@@ -43,9 +43,14 @@ export class StudioEditBlockError extends Error {
   }
 }
 
-const SEARCH_MARKER = /^<{7} SEARCH\s*$/;
-const DIVIDER_MARKER = /^={7}\s*$/;
-const REPLACE_MARKER = /^>{7} REPLACE\s*$/;
+// Marker matching is deliberately tolerant of length, case and spacing wobble:
+// models drift on the fence itself far more often than on the content between
+// fences, and a mis-counted `=` should not cost a whole targeted edit. This is
+// not fuzzy matching — the SEARCH body is still matched against the document
+// byte for byte.
+const SEARCH_MARKER = /^<{5,}\s*SEARCH\b.*$/i;
+const DIVIDER_MARKER = /^={5,}\s*$/;
+const REPLACE_MARKER = /^>{5,}\s*REPLACE\b.*$/i;
 
 /** Line endings are normalized everywhere so a CRLF response still matches an LF document. */
 export function normalizeStudioText(value: string): string {

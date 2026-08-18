@@ -33,6 +33,8 @@ export interface StudioGenerationJob {
   review?: StudioReview;
   editMode?: StudioEditMode;
   editBlockFailures?: string[];
+  /** Head of a coder response whose edit blocks failed, for diagnosis. */
+  patchResponseExcerpt?: string;
   codeAttempts?: number;
   result?: { versionId: string; revision: number; summary: string };
   errorCode?: string;
