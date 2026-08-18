@@ -100,6 +100,15 @@ attempt, ≥60% of modifications applied as targeted patches, ≥80% of
 modifications succeeding at all, ≥80% of pages that actually speak, and a p95
 create under 4 minutes.
 
+## Documents
+
+- [`docs/submission.md`](docs/submission.md) — the submission note: approach and
+  trade-offs, what is and is not done, what comes next.
+- [`docs/verification/studio-gate.md`](docs/verification/studio-gate.md) — the
+  acceptance record: what was run, what was seen, what it caused to be fixed.
+- [`evidence/studio/education-2026-08-19/`](evidence/studio/education-2026-08-19/)
+  — generated pages and the measured report from the real-model run.
+
 ## Deployment
 
 ```bash

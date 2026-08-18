@@ -69,10 +69,15 @@ next-env.d.ts
 /data
 /logs
 
-# generated root documentation, except reviewed project specifications
+# Generated scratch documentation is ignored; the documents that are part of the
+# deliverable are not. The submission note and the acceptance records are things
+# a reader is meant to find in the repository.
 /docs/*
+!/docs/submission.md
 !/docs/superpowers/
 !/docs/superpowers/**
+!/docs/verification/
+!/docs/verification/**
 # e2e screenshot artifacts
 e2e/screenshots/
 /.playwright-mcp/

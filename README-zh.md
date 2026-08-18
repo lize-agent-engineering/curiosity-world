@@ -66,6 +66,12 @@ STUDIO_SPIKE_CODERS='openrouter:z-ai/glm-5.2' pnpm spike:studio:real
 
 6 个跨领域的儿童问题、覆盖 5–11 岁，每个都跑「创建 → 家长追加修改」两步，产物 HTML 与报告落在 `evidence/studio/`。GO 标准写死在 `lib/studio/spike.ts`：首次生成即通过静态校验 ≥80%、编辑块直接命中 ≥60%、修改步通过率 ≥80%、**页面会念出来 ≥80%**、单次创建 p95 ≤ 4 分钟。
 
+## 文档
+
+- [`docs/submission.md`](docs/submission.md) —— 提交说明：实现思路与取舍、完成程度、扩展优先级。
+- [`docs/verification/studio-gate.md`](docs/verification/studio-gate.md) —— 准出记录：跑过什么、看到什么、验收中改掉了什么。
+- [`evidence/studio/education-2026-08-19/`](evidence/studio/education-2026-08-19/) —— 真实模型的产物 HTML 与量化报告。
+
 ## 部署
 
 ```bash
