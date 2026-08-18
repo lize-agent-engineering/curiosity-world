@@ -226,6 +226,8 @@ export async function runStudioWorkerOnce(input: StudioWorkerInput): Promise<boo
       runtimeErrors: [],
       createdAt,
       plan: result.plan,
+      review: result.review,
+      editBlockFailures: result.editBlockFailures,
     };
     const message: StudioMessage = {
       id: ids.messageId,

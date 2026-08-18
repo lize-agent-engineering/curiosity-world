@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>极简番茄钟</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --surface-2: #232730;
+    --text: #f0f2f5;
+    --muted: #8b8f99;
+    --accent: #ff5c5c;
+    --accent-rest: #4ec9a8;
+    --border: #2d323c;
+    --radius-sm: 10px;
+    --radius-lg: 16px;
+    --shadow: 0 8px 32px rgba(0,0,0,0.25);
+    --phase-color: var(--accent);
+  }
+
+  [data-phase="rest"] {
+    --phase-color: var(--accent-rest);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+    transition: background-color 400ms ease;
+    background-image: radial-gradient(circle at 50% 30%, rgba(255,92,92,0.08), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  body[data-phase="rest"] {
+    background-image: radial-gradient(circle at 50% 30%, rgba(78,201,168,0.10), transparent 60%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+
+  .container {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .phase-tag {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--phase-color);
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    transition: color 200ms ease, background 200ms ease;
+  }
+
+  .today-count {
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+    transition: color 200ms ease;
+  }
+
+  .today-count.flash {
+    animation: todayFlash 1600ms ease;
+  }
+
+  @keyframes todayFlash {
+    0% { color: var(--phase-color); transform: scale(1); }
+    20% { color: var(--phase-color); transform: scale(1.25); }
+    100% { color: var(--muted); transform: scale(1); }
+  }
+
+  .timer-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(240px, 70vw, 320px);
+    aspect-ratio: 1;
+  }
+
+  .ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .ring-track {
+    fill: none;
+    stroke: var(--surface-2);
+    stroke-width: 8;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke: var(--phase-color);
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 200ms linear, stroke 200ms ease;
+  }
+
+  .time-display {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: clamp(48px, 16vw, 80px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--text);
+    z-index: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .status-hint {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    min-height: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .btn {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 0 24px;
+    height: 44px;
+    min-width: 88px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: background 150ms ease, border-color 150ms ease, transform 100ms ease, opacity 150ms ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    user-select: none;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: var(--surface-2);
+    border-color: var(--phase-color);
+  }
+
+  .btn:focus-visible {
+    outline: 2px solid var(--phase-color);
+    outline-offset: 2px;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--phase-color);
+    border-color: var(--phase-color);
+    color: #0f1115;
+    font-weight: 600;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.1);
+    background: var(--phase-color);
+    border-color: var(--phase-color);
+  }
+
+  .btn-primary:disabled {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--muted);
+  }
+
+  .btn-text {
+    background: transparent;
+    border-color: transparent;
+    color: var(--muted);
+  }
+
+  .btn-text:hover:not(:disabled) {
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .kbd-hint {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  .kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease, transform 200ms ease;
+    z-index: 100;
+    box-shadow: var(--shadow);
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @media (max-width: 360px) {
+    .btn { min-width: 72px; padding: 0 14px; font-size: 14px; }
+  }
+</style>
+</head>
+<body data-phase="focus">
+  <main class="container">
+    <div class="phase-tag" id="phaseTag">专注时间</div>
+    <div class="today-count" id="todayCount">今日完成：0 次</div>
+
+    <div class="timer-wrap">
+      <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="ring-track" cx="60" cy="60" r="54"></circle>
+        <circle class="ring-progress" id="ringProgress" cx="60" cy="60" r="54"></circle>
+      </svg>
+      <div class="time-display" id="timeDisplay">25:00</div>
+    </div>
+
+    <div class="status-hint" id="statusHint">已专注 0 个番茄</div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="startBtn">开始</button>
+      <button class="btn" id="pauseBtn" disabled>暂停</button>
+      <button class="btn btn-text" id="resetBtn">重置</button>
+    </div>
+
+    <div class="kbd-hint">
+      <span class="kbd">Space</span> 开始/暂停 &nbsp;·&nbsp; <span class="kbd">R</span> 重置
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // 常量
+      const FOCUS_MS = 25 * 60 * 1000;
+      const REST_MS = 5 * 60 * 1000;
+      const STORAGE_KEY = "minimal_pomodoro_state_v1";
+
+      // 元素引用
+      const phaseTag = document.getElementById("phaseTag");
+      const todayCountEl = document.getElementById("todayCount");
+      const timeDisplay = document.getElementById("timeDisplay");
+      const statusHint = document.getElementById("statusHint");
+      const startBtn = document.getElementById("startBtn");
+      const pauseBtn = document.getElementById("pauseBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const toast = document.getElementById("toast");
+      const ringProgress = document.getElementById("ringProgress");
+
+      // 圆环参数
+      const RADIUS = 54;
+      const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+      ringProgress.style.strokeDasharray = CIRCUMFERENCE + " " + CIRCUMFERENCE;
+      ringProgress.style.strokeDashoffset = "0";
+
+      // 应用状态
+      let state = {
+        phase: "focus",       // "focus" | "rest"
+        running: false,
+        remaining: FOCUS_MS,  // 剩余毫秒
+        completedPomos: 0,    // 已完成专注次数
+        todayCount: 0,        // 今日完成次数
+        todayDate: "",        // 当前日期 YYYY-MM-DD
+        lastTick: 0           // 上次记录的时间戳（运行中）
+      };
+
+      let rafId = null;
+      let lastTickAt = 0;
+
+      // ---------- 工具 ----------
+      function pad(n) { return String(n).padStart(2, "0"); }
+
+      function getTodayStr() {
+        const d = new Date();
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+      }
+
+      function formatTime(ms) {
+        const total = Math.max(0, Math.ceil(ms / 1000));
+        const m = Math.floor(total / 60);
+        const s = total % 60;
+        return pad(m) + ":" + pad(s);
+      }
+
+      function getPhaseLabel(phase) {
+        return phase === "rest" ? "休息时间" : "专注时间";
+      }
+
+      function getPhaseDuration(phase) {
+        return phase === "rest" ? REST_MS : FOCUS_MS;
+      }
+
+      function flashToday() {
+        todayCountEl.classList.remove("flash");
+        void todayCountEl.offsetWidth;
+        todayCountEl.classList.add("flash");
+      }
+
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add("show");
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(function () {
+          toast.classList.remove("show");
+        }, 2200);
+      }
+
+      // ---------- 渲染 ----------
+      function render() {
+        timeDisplay.textContent = formatTime(state.remaining);
+        phaseTag.textContent = getPhaseLabel(state.phase);
+        todayCountEl.textContent = "今日完成：" + state.todayCount + " 次";
+        document.body.setAttribute("data-phase", state.phase);
+
+        // 圆环进度：剩余 / 总时长
+        const total = getPhaseDuration(state.phase);
+        const ratio = Math.max(0, Math.min(1, state.remaining / total));
+        ringProgress.style.strokeDashoffset = String(CIRCUMFERENCE * (1 - ratio));
+
+        // 按钮可用性
+        if (state.running) {
+          startBtn.disabled = true;
+          pauseBtn.disabled = false;
+          startBtn.textContent = "运行中";
+        } else {
+          startBtn.disabled = false;
+          pauseBtn.disabled = true;
+          startBtn.textContent = state.remaining < getPhaseDuration(state.phase) && state.remaining > 0 ? "继续" : "开始";
+        }
+
+        statusHint.textContent =
+          "已专注 " + state.completedPomos + " 个番茄 · " +
+          (state.running ? "正在运行" : "已暂停");
+      }
+
+      // ---------- 持久化 ----------
+      function save() {
+        try {
+          const payload = {
+            phase: state.phase,
+            running: state.running,
+            remaining: state.remaining,
+            completedPomos: state.completedPomos,
+            todayCount: state.todayCount,
+            todayDate: state.todayDate,
+            savedAt: Date.now()
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        } catch (e) {
+          // 静默失败
+        }
+      }
+
+      function load() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return;
+          let data;
+          try { data = JSON.parse(raw); }
+          catch (e) { return; }
+
+          if (!data || typeof data !== "object") return;
+          if (data.phase !== "focus" && data.phase !== "rest") return;
+          if (typeof data.remaining !== "number" || !isFinite(data.remaining) || data.remaining < 0) return;
+          if (typeof data.completedPomos !== "number" || !isFinite(data.completedPomos) || data.completedPomos < 0) return;
+
+          // 日期检查：跨天则重置今日完成次数
+          const today = getTodayStr();
+          if (typeof data.todayDate === "string" && data.todayDate === today) {
+            state.todayCount = (typeof data.todayCount === "number" && isFinite(data.todayCount) && data.todayCount >= 0)
+              ? Math.floor(data.todayCount) : 0;
+          } else {
+            state.todayCount = 0;
+          }
+          state.todayDate = today;
+
+          state.phase = data.phase;
+          state.remaining = Math.min(data.remaining, getPhaseDuration(data.phase));
+          state.completedPomos = Math.floor(data.completedPomos);
+
+          // 若刷新前处于运行状态，扣除流逝的时间
+          if (data.running && typeof data.savedAt === "number") {
+            const elapsed = Date.now() - data.savedAt;
+            if (elapsed > 0) {
+              state.remaining = state.remaining - elapsed;
+              // 跨阶段扣减
+              while (state.remaining <= 0) {
+                if (state.phase === "focus") {
+                  state.completedPomos += 1;
+                  state.todayCount += 1;
+                  state.phase = "rest";
+                  state.remaining += REST_MS;
+                } else {
+                  state.phase = "focus";
+                  state.remaining += FOCUS_MS;
+                }
+              }
+              state.running = true;
+              lastTickAt = Date.now();
+              startLoop();
+            } else {
+              state.running = true;
+              lastTickAt = Date.now();
+              startLoop();
+            }
+          } else {
+            state.running = false;
+          }
+        } catch (e) {
+          // 静默失败，使用默认状态
+        }
+      }
+
+      // ---------- 计时循环 ----------
+      function tick() {
+        const now = Date.now();
+        const delta = now - lastTickAt;
+        lastTickAt = now;
+        state.remaining -= delta;
+
+        if (state.remaining <= 0) {
+          // 处理阶段切换（可能跨多个阶段）
+          while (state.remaining <= 0) {
+            if (state.phase === "focus") {
+              state.completedPomos += 1;
+              state.todayCount += 1;
+              flashToday();
+              state.phase = "rest";
+              state.remaining += REST_MS;
+            } else {
+              state.phase = "focus";
+              state.remaining += FOCUS_MS;
+            }
+          }
+          showToast(state.phase === "rest" ? "专注完成，休息一下" : "休息结束，开始专注");
+        }
+
+        render();
+        save();
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function startLoop() {
+        if (rafId !== null) return;
+        lastTickAt = Date.now();
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function stopLoop() {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      }
+
+      // ---------- 控制操作 ----------
+      function start() {
+        if (state.running) return;
+        if (state.remaining <= 0) {
+          state.remaining = getPhaseDuration(state.phase);
+        }
+        state.running = true;
+        lastTickAt = Date.now();
+        startLoop();
+        render();
+        save();
+      }
+
+      function pause() {
+        if (!state.running) return;
+        state.running = false;
+        stopLoop();
+        render();
+        save();
+      }
+
+      function reset() {
+        // 重置为当前阶段初始时长，并停止
+        state.running = false;
+        state.remaining = getPhaseDuration(state.phase);
+        stopLoop();
+        render();
+        save();
+        showToast("已重置至 " + getPhaseLabel(state.phase) + " 初始时长");
+      }
+
+      function toggleRun() {
+        if (state.running) pause(); else start();
+      }
+
+      // ---------- 事件 ----------
+      startBtn.addEventListener("click", start);
+      pauseBtn.addEventListener("click", pause);
+      resetBtn.addEventListener("click", reset);
+
+      document.addEventListener("keydown", function (e) {
+        // 忽略在输入框中的按键
+        const tag = (e.target && e.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+        if (e.code === "Space" || e.key === " ") {
+          e.preventDefault();
+          toggleRun();
+        } else if (e.key === "r" || e.key === "R") {
+          e.preventDefault();
+          reset();
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          // 回车触发主操作
+          if (!startBtn.disabled) start();
+          else if (!pauseBtn.disabled) pause();
+        }
+      });
+
+      // 页面可见性变化时同步（防止后台节流导致计时不准）
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden) return;
+        if (state.running) {
+          const now = Date.now();
+          const delta = now - lastTickAt;
+          if (delta > 1000) {
+            state.remaining -= delta;
+            if (state.remaining <= 0) {
+              while (state.remaining <= 0) {
+                if (state.phase === "focus") {
+                  state.completedPomos += 1;
+                  state.todayCount += 1;
+                  flashToday();
+                  state.phase = "rest";
+                  state.remaining += REST_MS;
+                } else {
+                  state.phase = "focus";
+                  state.remaining += FOCUS_MS;
+                }
+              }
+              showToast(state.phase === "rest" ? "专注完成，休息一下" : "休息结束，开始专注");
+            }
+            render();
+            save();
+          }
+          lastTickAt = now;
+        }
+      });
+
+      // 初始化
+      load();
+      if (!state.todayDate) state.todayDate = getTodayStr();
+      render();
+    })();
+  </script>
+</body>
+</html>

@@ -121,7 +121,14 @@ export const studioVersionSchema = z.strictObject({
   jobId: jobIdSchema,
   runtimeErrors: z.array(studioRuntimeErrorSchema).max(20),
   createdAt: z.iso.datetime(),
+  /**
+   * The intermediate products of the round that produced this version. They are
+   * stored rather than left on the job so the conversation card can still show
+   * how this version was made after a reload.
+   */
   plan: studioPlannerOutputSchema.optional(),
+  review: studioReviewSchema.optional(),
+  editBlockFailures: z.array(z.string().max(64)).max(8).optional(),
 });
 
 export type StudioVersion = z.infer<typeof studioVersionSchema>;

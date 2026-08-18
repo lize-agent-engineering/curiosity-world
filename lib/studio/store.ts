@@ -46,7 +46,7 @@ export function createStudioSnapshot(input: {
   projectId: string;
   title: string;
   createdAt: string;
-  firstMessage: { id: string; text: string; createdAt: string };
+  firstMessage: { id: string; text: string; createdAt: string; jobId?: string };
 }): StudioSnapshot {
   return parseStudioSnapshot({
     project: {
@@ -64,6 +64,7 @@ export function createStudioSnapshot(input: {
         projectId: input.projectId,
         role: 'user',
         text: input.firstMessage.text,
+        ...(input.firstMessage.jobId ? { jobId: input.firstMessage.jobId } : {}),
         createdAt: input.firstMessage.createdAt,
       },
     ],

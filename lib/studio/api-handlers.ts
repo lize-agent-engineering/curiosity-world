@@ -83,6 +83,7 @@ export function createStudioProjectsPostHandler(deps: {
           firstMessage: {
             id: identity.messageId,
             text: body.prompt,
+            jobId: identity.jobId,
             createdAt: identity.createdAt,
           },
         }),

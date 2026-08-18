@@ -22,8 +22,9 @@ import '@fontsource-variable/inter';
 import '@fontsource/zcool-kuaile';
 
 export const metadata: Metadata = {
-  title: '为什么世界 · Curiosity World',
-  description: '把孩子真实的为什么，变成可以亲手探索的互动知识世界。',
+  title: 'Curiosity Studio · 智能体网页应用生成器',
+  description:
+    '一句话描述需求，规划、编码、审查三个智能体接力生成可运行的单文件网页应用，并支持对话式增量修改与版本回滚。',
 };
 
 export default function RootLayout({

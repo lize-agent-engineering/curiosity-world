@@ -48,7 +48,10 @@ export function isCuriosityPublicPath(pathname: string): boolean {
     pathname === '/icon.svg' ||
     pathname === '/api/health' ||
     pathname === '/api/access-code/status' ||
+    pathname === '/curiosity' ||
+    pathname.startsWith('/studio') ||
     pathname.startsWith('/experience/') ||
+    pathname.startsWith('/api/studio/') ||
     pathname.startsWith('/api/curiosity/')
   );
 }

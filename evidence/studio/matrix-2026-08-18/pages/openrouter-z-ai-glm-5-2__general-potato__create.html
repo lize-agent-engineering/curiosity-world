@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>会占卜的土豆</title>
+<style>
+:root {
+  --bg: #0f0a1e;
+  --surface: #1a1430;
+  --surface-2: #241a3e;
+  --text: #f0e8d8;
+  --muted: #9b8cba;
+  --accent: #e8b94d;
+  --accent-soft: #c89a3a;
+  --border: #2d2348;
+  --danger: #d65a6a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100vh; }
+body {
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background:
+    radial-gradient(ellipse 60% 50% at 30% 20%, rgba(232,185,77,0.06), transparent 70%),
+    radial-gradient(ellipse 70% 60% at 70% 80%, rgba(120,80,200,0.10), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 24px 16px 48px;
+  transition: background 400ms ease;
+  overflow-x: hidden;
+}
+body.ritual {
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 45%, rgba(232,185,77,0.14), transparent 65%),
+    radial-gradient(ellipse 60% 50% at 30% 20%, rgba(120,80,200,0.16), transparent 70%),
+    #06040d;
+}
+.wrap { max-width: 720px; margin: 0 auto; }
+header { text-align: center; margin-bottom: 24px; }
+h1 {
+  font-size: clamp(26px, 6vw, 38px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+.subtitle { color: var(--muted); font-size: 14px; letter-spacing: 1px; }
+
+.modes {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  margin-bottom: 24px;
+}
+.mode-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 180ms ease;
+  min-height: 38px;
+}
+.mode-btn:hover { color: var(--text); border-color: var(--accent-soft); }
+.mode-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mode-btn:active { transform: translateY(1px); }
+.mode-btn.active {
+  background: var(--accent);
+  color: #1a1430;
+  border-color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(232,185,77,0.3);
+}
+
+.stage {
+  position: relative;
+  height: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+.bubble {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  max-width: 92%;
+  background: var(--surface-2);
+  border: 1px solid var(--accent-soft);
+  border-radius: 16px;
+  padding: 14px 18px;
+  font-size: 15px;
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease, transform 300ms ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 3;
+  text-align: center;
+}
+.bubble.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 9px solid var(--surface-2);
+}
+.bubble.empty {
+  border-style: dashed;
+  color: var(--muted);
+  border-color: var(--border);
+}
+.bubble.empty::after { display: none; }
+
+.potato-wrap {
+  position: relative;
+  width: 160px;
+  height: 130px;
+  margin-bottom: 8px;
+  z-index: 2;
+}
+.potato {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 35% 30%, #b8945a 0%, #8b6f3e 40%, #6b4f25 80%, #4a3517 100%);
+  border-radius: 50% 45% 55% 45% / 55% 50% 50% 50%;
+  box-shadow:
+    inset -8px -12px 24px rgba(0,0,0,0.4),
+    inset 8px 6px 18px rgba(255,220,160,0.18),
+    0 12px 30px rgba(0,0,0,0.5);
+  animation: idle 4s ease-in-out infinite;
+  transform-origin: center center;
+}
+.potato .eye {
+  position: absolute;
+  width: 6px; height: 5px;
+  background: #3a2a14;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255,220,160,0.15);
+}
+.eye:nth-child(1) { top: 30%; left: 28%; }
+.eye:nth-child(2) { top: 45%; left: 62%; }
+.eye:nth-child(3) { top: 58%; left: 35%; }
+.eye:nth-child(4) { top: 25%; left: 55%; }
+.eye:nth-child(5) { top: 70%; left: 52%; }
+
+@keyframes idle {
+  0%, 100% { transform: translateY(0) rotate(-2deg) scale(1); }
+  25% { transform: translateY(-6px) rotate(1deg) scale(1.01); }
+  50% { transform: translateY(-3px) rotate(2deg) scale(1); }
+  75% { transform: translateY(-7px) rotate(-1deg) scale(1.01); }
+}
+.potato-wrap:hover .potato { animation-duration: 1.2s; }
+.potato.shaking { animation: shake 0.18s ease-in-out infinite; }
+@keyframes shake {
+  0% { transform: translate(-6px, 2px) rotate(-6deg) scale(1.05); }
+  25% { transform: translate(6px, -2px) rotate(6deg) scale(1.08); }
+  50% { transform: translate(-5px, 3px) rotate(-5deg) scale(1.06); }
+  75% { transform: translate(5px, -3px) rotate(5deg) scale(1.08); }
+  100% { transform: translate(-6px, 2px) rotate(-6deg) scale(1.05); }
+}
+
+.particles { position: absolute; inset: 0; pointer-events: none; }
+.particle {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  opacity: 0;
+  animation: burst 1.2s ease-out forwards;
+}
+@keyframes burst {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0); opacity: 0; }
+}
+
+.ask {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+input[type="text"] {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  transition: border-color 180ms ease;
+  margin-bottom: 8px;
+}
+input[type="text"]:focus-visible { outline: none; border-color: var(--accent); }
+input[type="text"]::placeholder { color: var(--muted); }
+input[type="text"]:disabled { opacity: 0.5; cursor: not-allowed; }
+.char-count {
+  font-size: 12px; color: var(--muted); text-align: right;
+  margin-bottom: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.ask-btn {
+  width: 100%;
+  background: var(--accent);
+  color: #1a1430;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  transition: all 180ms ease;
+}
+.ask-btn:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 4px 16px rgba(232,185,77,0.3); }
+.ask-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.ask-btn:active:not(:disabled) { transform: translateY(1px); }
+.ask-btn:disabled {
+  background: var(--surface-2); color: var(--muted); cursor: not-allowed;
+}
+
+.progress {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  margin-top: 12px;
+}
+.progress.active { opacity: 1; }
+.progress-bar {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent-soft), var(--accent));
+  border-radius: 2px;
+}
+
+.history-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+}
+.history-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.history-head h2 { font-size: 16px; font-weight: 600; }
+.clear-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 180ms ease;
+  min-height: 32px;
+}
+.clear-btn:hover { color: var(--danger); border-color: var(--danger); }
+.clear-btn:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
+.clear-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.history-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.history-item {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-left: 3px solid var(--accent-soft);
+}
+.history-item .meta {
+  display: flex; justify-content: space-between;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.history-item .tag { color: var(--accent); font-weight: 600; }
+.history-item .q { color: var(--text); margin-bottom: 4px; }
+.history-item .a { color: var(--muted); font-style: italic; }
+.empty-state {
+  text-align: center; padding: 24px 16px;
+  color: var(--muted); font-size: 13px;
+}
+
+.toast {
+  position: fixed;
+  top: 16px; left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 200ms ease;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.warn { border-color: var(--accent-soft); color: var(--accent); }
+
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 200ms ease;
+  z-index: 200;
+  padding: 16px;
+}
+.modal-backdrop.show { opacity: 1; pointer-events: auto; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  transform: scale(0.96);
+  transition: transform 200ms ease;
+}
+.modal-backdrop.show .modal { transform: scale(1); }
+.modal h3 { font-size: 18px; margin-bottom: 8px; }
+.modal p { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+.modal-actions { display: flex; gap: 8px; justify-content: center; }
+.modal-btn {
+  padding: 8px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  min-height: 40px;
+  transition: all 180ms ease;
+}
+.modal-btn:hover { border-color: var(--muted); }
+.modal-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.modal-btn.danger { background: var(--danger); border-color: var(--danger); color: white; }
+.modal-btn.danger:hover { filter: brightness(1.1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .potato { animation: none; }
+  .particle { animation: none; }
+  * { transition: none !important; }
+}
+@media (max-width: 480px) {
+  .stage { height: 240px; }
+  .potato-wrap { width: 130px; height: 105px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🥔 会占卜的土豆</h1>
+    <p class="subtitle">选个分类，问个问题，让土豆替你拨开迷雾</p>
+  </header>
+
+  <div class="modes" role="tablist">
+    <button class="mode-btn active" data-mode="luck">今日运势</button>
+    <button class="mode-btn" data-mode="yesno">是与不是</button>
+    <button class="mode-btn" data-mode="love">爱情</button>
+    <button class="mode-btn" data-mode="career">事业</button>
+  </div>
+
+  <div class="stage">
+    <div class="bubble empty" id="bubble">土豆在等你发问…</div>
+    <div class="potato-wrap" id="potatoWrap" aria-label="占卜土豆">
+      <div class="particles" id="particles"></div>
+      <div class="potato" id="potato">
+        <span class="eye"></span><span class="eye"></span><span class="eye"></span><span class="eye"></span><span class="eye"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ask">
+    <input type="text" id="question" maxlength="50" placeholder="把你想问的写在这里（最多 50 字）" aria-label="你的问题">
+    <div class="char-count"><span id="charCount">0</span>/50</div>
+    <button class="ask-btn" id="askBtn" disabled>占卜吧</button>
+    <div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+  </div>
+
+  <div class="history-section">
+    <div class="history-head">
+      <h2>历史预言</h2>
+      <button class="clear-btn" id="clearBtn" disabled>清除历史</button>
+    </div>
+    <ul class="history-list" id="historyList"></ul>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h3>清除全部历史？</h3>
+    <p>所有占卜过的预言都将从本机消失，土豆也记不住了。</p>
+    <div class="modal-actions">
+      <button class="modal-btn" id="modalCancel">再想想</button>
+      <button class="modal-btn danger" id="modalConfirm">清除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SAYINGS = {
+  luck: [
+    "今日宜发呆，忌思考人生。",
+    "风会从西边来，带来一颗别处的种子。",
+    "中午前别照镜子，否则你会看见自己。",
+    "把口袋翻出来，会找到三个月前丢的念头。",
+    "别和戴帽子的人争论，他们听得见你听不见的声音。",
+    "今天的云有四个角，注意脚下。",
+    "遇红色物体绕开三步，除非它先开口。",
+    "黄昏时分会有一次心跳加速，那是宇宙在打嗝。",
+    "今晚的月亮比平时重三两，早点睡。",
+    "喝水时数到七，第八口会有好事等你。",
+    "别接陌生电话，尤其是你自己打来的。",
+    "今天你的影子比身高长一寸，留意门槛。",
+    "宜低头走路，会捡到一个没有主人的秘密。",
+    "下午三点有人会叫错你的名字，那是另一个你在打招呼。",
+    "别把伞收起来，即使不下雨。",
+    "今日幸运物是一块忘了味道的糖。",
+    "把抽屉打开关上三次，会平衡一天的运气。",
+    "遇见猫让它先走，遇见狗让它先笑。",
+    "鞋带松了别系，那是在替你挡一桩小事。",
+    "睡前把最想忘记的事写在纸上，然后吃掉那张纸。"
+  ],
+  yesno: [
+    "是。但需要你先承认一件不愿承认的事。",
+    "不是。然而不是之中藏着一个被忽视的是。",
+    "土豆说：现在还不是时候。",
+    "是的，前提是你不再问第二遍。",
+    "不是，但比你想象的更接近。",
+    "土豆沉默良久，吐出三个字：再说吧。",
+    "是。代价是一个你不知道的代价。",
+    "不是。这是土豆今天的第七个不是。",
+    "是，但你得自己想办法让它成真。",
+    "不是，但今晚过后答案会翻转。",
+    "土豆翻了个身，露出一个勉强的「是」。",
+    "不是，这件事从来没有真正发生过。",
+    "是，但请以反向理解。",
+    "土豆拒绝回答，它说它头疼。",
+    "不是。不是。绝对不是。土豆三次确认。",
+    "是的，如果「是」对你来说意味着好事。",
+    "不是，但你的孙辈会觉得是的。",
+    "是，不过这是土豆的看法，不构成投资建议。",
+    "不是，这次问错土豆了。",
+    "土豆凑近你的耳朵：是。但只有你自己知道是不是。"
+  ],
+  love: [
+    "你心里那个人，今晚也会在某个瞬间想起你，但他不会承认。",
+    "土豆看见一段迟到的告白，正在某个路口排队。",
+    "别等了，那个人已经把你的号码写在一张忘了扔的纸条上。",
+    "你们之间隔着一杯没喝完的茶，凉了就要重来。",
+    "爱情？土豆笑了一下，没说话，意思你自己懂。",
+    "你会先心动，对方会先开口，但顺序记反了。",
+    "三个月内不会有人表白，但有人会默默多买一双备用筷子。",
+    "土豆翻了个面：另一面是你。",
+    "把那句话咽回去，对方其实已经听见了。",
+    "不必主动联系，但记得把头像换成你最近最开心的样子。",
+    "你念念不忘的那个人，最近开始听你以前推荐过的歌。",
+    "谁先让步并不重要，重要的是你愿意让这一次。",
+    "别在凌晨两点给对方发消息，那时土豆也在睡觉。",
+    "下次见面会有一阵尴尬，撑过去就好了。",
+    "你们之间缺一次认真的对视，别总是低头看菜单。",
+    "暧昧会有结果，但不是你以为的那种结果。",
+    "你现在的样子，正是某个人一直在找的样子。",
+    "把那双鞋洗了，下周有人会注意到你的脚。",
+    "你会在不经意的场合，被一个不经意的人认真看着。",
+    "土豆睡着了，醒来后说：他没忘，只是忙。别多想。"
+  ],
+  career: [
+    "下周会有一次让你心跳的小机会，别因为熟悉就错过。",
+    "土豆看见你桌上多了一封没拆的邮件，拆它。",
+    "你最近想换的那件事，可以换，但要在月底前开口。",
+    "升职不会从你想的那条路来，会绕个弯。",
+    "别和那位同事走得太近，他背后站着一个你不想见的人。",
+    "你正在做的那个项目，会在第 47 天出现转折，熬住。",
+    "土豆说：把简历再改一遍，但别立刻投出去。",
+    "有人会在你背后说一个看似不好的词，其实那是夸。",
+    "这个月不适合跳，下个月也不适合，等土豆叫你。",
+    "你最近的一个小想法，值得写下来，三个月后用得上。",
+    "别担心被看见，该看见你的人已经看见了。",
+    "把那张乱糟糟的桌面收拾一下，下周一有客人。",
+    "土豆嗅到了一笔不大不小的钱，正在路上。",
+    "你低估了自己的耐心，它比你想的更值钱。",
+    "那份迟迟没回的回复，会在你不再惦记的那天到来。",
+    "别接太多活，挑两个，剩下的会让出两个更好的。",
+    "你以为的瓶颈，其实是你自己设的天花板。",
+    "下次开会坐靠窗的位置，会有一个不经意的灵感。",
+    "把「我不想」换成「我先试试」，下个月你会回来谢土豆。",
+    "你比想象中更接近，再坚持一周。"
+  ]
+};
+const MODE_LABEL = { luck:'今日运势', yesno:'是与不是', love:'爱情', career:'事业' };
+
+const $ = id => document.getElementById(id);
+const bubble = $('bubble');
+const potato = $('potato');
+const particles = $('particles');
+const questionInput = $('question');
+const askBtn = $('askBtn');
+const charCount = $('charCount');
+const progressBar = $('progressBar');
+const progress = $('progress');
+const historyList = $('historyList');
+const clearBtn = $('clearBtn');
+const toast = $('toast');
+const modal = $('modal');
+const modalCancel = $('modalCancel');
+const modalConfirm = $('modalConfirm');
+const modeBtns = document.querySelectorAll('.mode-btn');
+
+let currentMode = 'luck';
+let busy = false;
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem('potato_history');
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch(e) { return []; }
+}
+function saveHistory(arr) {
+  try { localStorage.setItem('potato_history', JSON.stringify(arr)); } catch(e) {}
+}
+function loadLastIdx() {
+  try {
+    const raw = localStorage.getItem('potato_last_idx');
+    if (!raw) return {};
+    const o = JSON.parse(raw);
+    return o && typeof o === 'object' ? o : {};
+  } catch(e) { return {}; }
+}
+function saveLastIdx(o) {
+  try { localStorage.setItem('potato_last_idx', JSON.stringify(o)); } catch(e) {}
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function renderHistory() {
+  const list = loadHistory();
+  historyList.innerHTML = '';
+  clearBtn.disabled = list.length === 0;
+  if (list.length === 0) {
+    historyList.innerHTML = '<div class="empty-state">还没有占卜记录，问土豆一个问题吧。</div>';
+    return;
+  }
+  const recent = list.slice(-10).reverse();
+  recent.forEach(item => {
+    const li = document.createElement('li');
+    li.className = 'history-item';
+    li.innerHTML =
+      '<div class="meta"><span class="tag">['+escapeHtml(item.mode)+']</span><span>'+escapeHtml(item.time)+'</span></div>'+
+      '<div class="q">问：'+escapeHtml(item.question)+'</div>'+
+      '<div class="a">土豆说：'+escapeHtml(item.result)+'</div>';
+    historyList.appendChild(li);
+  });
+}
+
+let toastTimer;
+function showToast(msg, warn) {
+  toast.textContent = msg;
+  toast.classList.toggle('warn', !!warn);
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+function resetBubble() {
+  bubble.classList.add('empty');
+  bubble.textContent = '土豆在等你发问…';
+  bubble.classList.remove('show');
+}
+
+modeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (busy) return;
+    modeBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    resetBubble();
+  });
+});
+
+questionInput.addEventListener('input', () => {
+  charCount.textContent = questionInput.value.length;
+  if (!busy) askBtn.disabled = questionInput.value.trim().length === 0;
+});
+questionInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !askBtn.disabled) askBtn.click();
+});
+
+function spawnParticles() {
+  const count = 8 + Math.floor(Math.random() * 5);
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
+    const dist = 80 + Math.random() * 70;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+    p.style.animationDelay = (Math.random() * 0.3).toFixed(2) + 's';
+    p.style.background = Math.random() > 0.45 ? 'var(--accent)' : '#ffe9a8';
+    p.style.boxShadow = '0 0 8px currentColor';
+    particles.appendChild(p);
+    setTimeout(() => p.remove(), 1600);
+  }
+}
+
+askBtn.addEventListener('click', () => {
+  if (busy) return;
+  const q = questionInput.value.trim();
+  if (!q) { showToast('先把问题写出来吧', true); return; }
+  busy = true;
+  askBtn.disabled = true;
+  questionInput.disabled = true;
+  modeBtns.forEach(b => { b.disabled = true; b.style.opacity = '0.5'; });
+  bubble.classList.remove('show');
+  bubble.classList.add('empty');
+  bubble.textContent = '土豆正在聆听…';
+  requestAnimationFrame(() => bubble.classList.add('show'));
+
+  potato.classList.add('shaking');
+  document.body.classList.add('ritual');
+  progress.classList.add('active');
+  progressBar.style.width = '0%';
+  spawnParticles();
+
+  const duration = 2000;
+  const startTime = performance.now();
+  let lastTick = startTime;
+  function tick(now) {
+    const t = Math.min(1, (now - startTime) / duration);
+    progressBar.style.width = (t * 100) + '%';
+    if (now - lastTick > 100) {
+      lastTick = now;
+      if (Math.random() > 0.6) spawnParticles();
+    }
+    if (t < 1) requestAnimationFrame(tick);
+    else finishDivination(q);
+  }
+  requestAnimationFrame(tick);
+});
+
+function finishDivination(q) {
+  const arr = SAYINGS[currentMode];
+  const lastIdx = loadLastIdx();
+  let idx = Math.floor(Math.random() * arr.length);
+  if (arr.length > 1) {
+    let safety = 0;
+    while (lastIdx[currentMode] === idx && safety < 20) {
+      idx = Math.floor(Math.random() * arr.length);
+      safety++;
+    }
+  }
+  lastIdx[currentMode] = idx;
+  saveLastIdx(lastIdx);
+  const result = arr[idx];
+
+  bubble.classList.remove('empty');
+  bubble.textContent = result;
+  bubble.classList.remove('show');
+  requestAnimationFrame(() => bubble.classList.add('show'));
+
+  const list = loadHistory();
+  const now = new Date();
+  const time = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
+  list.push({ time, mode: MODE_LABEL[currentMode], question: q, result });
+  if (list.length > 50) list.splice(0, list.length - 50);
+  saveHistory(list);
+  renderHistory();
+
+  setTimeout(() => {
+    potato.classList.remove('shaking');
+    document.body.classList.remove('ritual');
+    progress.classList.remove('active');
+    progressBar.style.width = '0%';
+    busy = false;
+    questionInput.disabled = false;
+    modeBtns.forEach(b => { b.disabled = false; b.style.opacity = ''; });
+    askBtn.disabled = questionInput.value.trim().length === 0;
+  }, 500);
+}
+
+clearBtn.addEventListener('click', () => {
+  if (loadHistory().length === 0) { showToast('历史已经是空的了'); return; }
+  modal.classList.add('show');
+});
+modalCancel.addEventListener('click', () => modal.classList.remove('show'));
+modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('show'); });
+modalConfirm.addEventListener('click', () => {
+  localStorage.removeItem('potato_history');
+  localStorage.removeItem('potato_last_idx');
+  renderHistory();
+  resetBubble();
+  modal.classList.remove('show');
+  showToast('历史已清除，土豆也忘了');
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && modal.classList.contains('show')) modal.classList.remove('show');
+});
+
+renderHistory();
+charCount.textContent = '0';
+</script>
+</body>
+</html>

@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>今日心情色</title>
+<style>
+  :root{
+    --bg:#0f1226;
+    --surface:#1b1f3a;
+    --text:#f3f4ff;
+    --muted:#a7accd;
+    --accent:#ffd166;
+    --border:rgba(255,255,255,.12);
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  button{font-family:inherit}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* 全屏容器 & 屏幕 */
+  #app{position:relative;min-height:100dvh;overflow:hidden;
+    background:linear-gradient(160deg,var(--bg),#1a1f3f);
+    transition:background 600ms ease}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;
+    padding:24px;min-height:100dvh}
+  .screen.active{display:flex}
+
+  /* 进度条 */
+  #progress-wrap{position:absolute;top:0;left:0;right:0;height:6px;
+    background:rgba(255,255,255,.08);display:none;z-index:5}
+  #progress-wrap.show{display:block}
+  #progress-bar{height:100%;width:0;background:var(--accent);
+    transition:width 300ms ease;border-radius:0 4px 4px 0}
+  #progress-label{position:absolute;top:10px;right:16px;font-size:12px;color:var(--muted);
+    font-variant-numeric:tabular-nums}
+
+  /* 开始页 */
+  #start-screen{align-items:center;justify-content:center;text-align:center}
+  .logo-dot{width:120px;height:120px;border-radius:50%;
+    background:conic-gradient(from 0deg,#ff7a7a,#ffd166,#7ae582,#5ac8ff,#b07aff,#ff7a7a);
+    margin:0 auto 24px;box-shadow:var(--shadow);animation:spin 16s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.logo-dot{animation:none}}
+  h1.title{font-size:clamp(36px,8vw,64px);font-weight:800;letter-spacing:-.02em;margin:0 0 12px}
+  p.subtitle{font-size:16px;color:var(--muted);margin:0 0 32px;max-width:420px}
+  .btn-primary{appearance:none;border:none;cursor:pointer;
+    background:var(--accent);color:#1a1300;font-weight:700;font-size:18px;
+    padding:16px 40px;border-radius:16px;min-height:44px;
+    box-shadow:0 8px 24px rgba(255,209,102,.35);transition:transform 180ms ease,box-shadow 180ms}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(255,209,102,.45)}
+  .btn-primary:active{transform:translateY(0)}
+  .btn-primary:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  .hint{margin-top:16px;font-size:12px;color:var(--muted)}
+
+  /* 答题页 */
+  #quiz-screen{padding-top:56px}
+  .quiz-inner{flex:1;display:flex;flex-direction:column;justify-content:center;
+    max-width:640px;width:100%;margin:0 auto}
+  .q-index{font-size:13px;color:var(--muted);margin-bottom:8px;font-variant-numeric:tabular-nums}
+  .q-text{font-size:clamp(22px,5vw,30px);font-weight:700;line-height:1.4;margin:0 0 28px}
+  .options{display:flex;flex-direction:column;gap:12px}
+  .option{display:flex;align-items:center;gap:16px;text-align:left;
+    background:rgba(255,255,255,.06);border:1px solid var(--border);
+    color:var(--text);cursor:pointer;padding:16px 18px;border-radius:16px;
+    transition:background 180ms,transform 180ms,border-color 180ms;min-height:44px}
+  .option:hover{background:rgba(255,255,255,.12);transform:translateX(4px)}
+  .option:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .option:active{transform:translateX(2px) scale(.99)}
+  .opt-swatch{width:24px;height:24px;border-radius:8px;flex-shrink:0;border:1px solid rgba(255,255,255,.2)}
+  .opt-text{font-size:16px;flex:1}
+
+  /* 结果页 */
+  #result-screen{padding:0}
+  .color-block{height:60dvh;width:100%;display:flex;align-items:flex-end;
+    justify-content:center;padding-bottom:24px;transition:background 500ms ease}
+  .color-hex-on-block{font-size:14px;color:rgba(0,0,0,.55);background:rgba(255,255,255,.65);
+    padding:4px 10px;border-radius:999px;backdrop-filter:blur(4px)}
+  .result-body{flex:1;padding:24px;max-width:640px;width:100%;margin:0 auto;
+    display:flex;flex-direction:column;gap:16px;overflow:auto}
+  .hex-row{display:flex;align-items:baseline;gap:12px}
+  .hex-value{font-size:36px;font-weight:800;letter-spacing:.04em}
+  .hex-copy{appearance:none;background:transparent;color:var(--muted);border:1px solid var(--border);
+    padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;transition:color 180ms,border-color 180ms}
+  .hex-copy:hover{color:var(--text);border-color:var(--text)}
+  .hex-copy:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .interp{font-size:17px;line-height:1.6;color:var(--text);
+    background:var(--surface);padding:16px;border-radius:12px;border:1px solid var(--border)}
+  .interp-label{font-size:12px;color:var(--muted);margin-bottom:6px;letter-spacing:.1em;text-transform:uppercase}
+  .actions{display:flex;gap:12px;flex-wrap:wrap}
+  .btn-ghost{flex:1;min-width:120px;appearance:none;background:transparent;color:var(--text);
+    border:1px solid var(--border);padding:12px 16px;border-radius:10px;cursor:pointer;
+    font-size:15px;transition:background 180ms,border-color 180ms;min-height:44px}
+  .btn-ghost:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3)}
+  .btn-ghost:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn-ghost.primary{background:var(--accent);color:#1a1300;border-color:transparent;font-weight:700}
+  .btn-ghost.primary:hover{background:#ffe091}
+  .btn-ghost[disabled]{opacity:.45;cursor:not-allowed}
+  .btn-ghost[disabled]:hover{background:transparent;border-color:var(--border)}
+
+  /* 历史 */
+  .history{margin-top:8px}
+  .history-head{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .history-clear{appearance:none;background:transparent;border:none;color:var(--muted);
+    cursor:pointer;font-size:12px;padding:4px 8px;border-radius:6px}
+  .history-clear:hover{color:var(--text);background:rgba(255,255,255,.06)}
+  .history-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .hist-item{display:flex;align-items:center;gap:8px;background:var(--surface);
+    padding:6px 10px;border-radius:10px;border:1px solid var(--border);cursor:default}
+  .hist-swatch{width:24px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.15)}
+  .hist-date{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .history-empty{font-size:13px;color:var(--muted);padding:12px 0}
+
+  /* toast */
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+    background:var(--surface);color:var(--text);padding:10px 16px;border-radius:10px;
+    border:1px solid var(--border);box-shadow:var(--shadow);font-size:14px;
+    opacity:0;pointer-events:none;transition:opacity 200ms,transform 200ms;z-index:50;max-width:90vw}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* 确认卡片 */
+  .confirm-card{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;
+    align-items:center;justify-content:center;z-index:60;padding:16px}
+  .confirm-card.show{display:flex}
+  .confirm-inner{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+    padding:24px;max-width:340px;width:100%;box-shadow:var(--shadow)}
+  .confirm-inner h3{margin:0 0 8px;font-size:18px}
+  .confirm-inner p{margin:0 0 20px;color:var(--muted);font-size:14px;line-height:1.6}
+  .confirm-actions{display:flex;gap:8px;justify-content:flex-end}
+  .confirm-actions .btn-ghost{flex:0 1 auto;min-width:80px}
+
+  @media (max-width:480px){
+    .screen{padding:16px}
+    #quiz-screen{padding-top:52px}
+    .result-body{padding:16px}
+    .hex-value{font-size:28px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="progress-wrap">
+    <div id="progress-bar"></div>
+    <div id="progress-label"></div>
+  </div>
+
+  <!-- 开始页 -->
+  <section id="start-screen" class="screen active" aria-label="开始页">
+    <div class="logo-dot" aria-hidden="true"></div>
+    <h1 class="title">今日心情色</h1>
+    <p class="subtitle">5 道题，几秒答完。把此刻的情绪调成一种颜色，留给自己看。</p>
+    <button id="start-btn" class="btn-primary" type="button">开始测试</button>
+    <div class="hint">回车也可以开始</div>
+  </section>
+
+  <!-- 答题页 -->
+  <section id="quiz-screen" class="screen" aria-label="答题页">
+    <div class="quiz-inner">
+      <div class="q-index" id="q-index">第 1 / 5 题</div>
+      <h2 class="q-text" id="q-text">题目</h2>
+      <div class="options" id="options" role="group"></div>
+    </div>
+  </section>
+
+  <!-- 结果页 -->
+  <section id="result-screen" class="screen" aria-label="结果页">
+    <div class="color-block" id="color-block">
+      <div class="color-hex-on-block mono" id="hex-on-block">#000000</div>
+    </div>
+    <div class="result-body">
+      <div class="hex-row">
+        <div class="hex-value mono" id="hex-value">#000000</div>
+        <button class="hex-copy" id="copy-hex" type="button">复制 HEX</button>
+      </div>
+      <div class="interp">
+        <div class="interp-label">解读</div>
+        <div id="interp-text"></div>
+      </div>
+      <div class="actions">
+        <button class="btn-ghost" id="retry-btn" type="button">再测一次</button>
+        <button class="btn-ghost primary" id="save-btn" type="button">保存这次</button>
+      </div>
+      <div class="history">
+        <div class="history-head">
+          <span>历史心情（最近 10 条）</span>
+          <button class="history-clear" id="clear-hist" type="button" hidden>清空历史</button>
+        </div>
+        <div class="history-list" id="history-list"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="confirm-card" id="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+  <div class="confirm-inner">
+    <h3 id="confirm-title">清空历史？</h3>
+    <p id="confirm-desc">将删除全部已保存的心情记录，无法撤销。</p>
+    <div class="confirm-actions">
+      <button class="btn-ghost" id="confirm-cancel" type="button">取消 Esc</button>
+      <button class="btn-ghost primary" id="confirm-ok" type="button">清空</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- 数据 ----------
+  const QUESTIONS = [
+    {
+      q:"此刻你最想待在哪种光线下？",
+      options:[
+        {text:"正午的阳光，亮堂堂", rgb:[255,196,80]},
+        {text:"黄昏的暖光，橘红漫开", rgb:[255,128,80]},
+        {text:"雨后傍晚，蓝灰蒙蒙", rgb:[120,150,210]},
+        {text:"深夜一盏台灯，温柔昏黄", rgb:[170,110,70]},
+      ]
+    },
+    {
+      q:"如果今天是一段节奏，它更像什么？",
+      options:[
+        {text:"轻快的鼓点，跳跃向前", rgb:[255,170,90]},
+        {text:"舒缓的长音，慢慢铺开", rgb:[120,200,170]},
+        {text:"断续的杂音，有点乱", rgb:[200,120,120]},
+        {text:"近乎无声，沉得下去", rgb:[90,110,160]},
+      ]
+    },
+    {
+      q:"此刻身体感觉最接近哪一种？",
+      options:[
+        {text:"轻盈，像要飘起来", rgb:[255,220,140]},
+        {text:"稳实，脚踩在地上", rgb:[150,180,120]},
+        {text:"发紧，肩膀有点重", rgb:[210,110,110]},
+        {text:"软塌，没什么力气", rgb:[130,140,180]},
+      ]
+    },
+    {
+      q:"今天最想要的颜色是？",
+      options:[
+        {text:"亮黄或橘色", rgb:[255,170,60]},
+        {text:"青绿或薄荷", rgb:[100,200,170]},
+        {text:"深蓝或墨紫", rgb:[80,100,180]},
+        {text:"暖棕或砖红", rgb:[200,120,80]},
+      ]
+    },
+    {
+      q:"今晚临睡前最想留一句话给自己？",
+      options:[
+        {text:"今天，值了。", rgb:[255,200,100]},
+        {text:"平静地过去，就好。", rgb:[140,190,170]},
+        {text:"有些累，但我撑住了。", rgb:[190,130,140]},
+        {text:"明天再说吧。", rgb:[120,130,180]},
+      ]
+    }
+  ];
+
+  const INTERPS = {
+    R:"主色偏红：今天心里有一团火。无论是热情、冲动，还是莫名的烦躁，你都把情绪写在脸上。给自己留几分钟安静，让这团火慢慢烧成暖意。",
+    G:"主色偏绿：今天的状态像草木，缓慢生长。你可能没做什么惊天动地的事，但内在是稳的、是松弛的。把这种节奏记下来。",
+    B:"主色偏蓝：今天是冷色调的，偏向沉思与收拢。你的心在向内走，可能在消化什么，也可能只是想安静地待着。不必急着热闹。",
+    even:"三色几乎均等：今天是平衡的一天。不焦不躁，不冷不热。像一杯温水，没什么戏，但胜在稳妥。"
+  };
+
+  const STORAGE_KEY = "mood_history";
+
+  // ---------- 工具 ----------
+  const $ = id => document.getElementById(id);
+  const screens = {
+    start:$("start-screen"),
+    quiz:$("quiz-screen"),
+    result:$("result-screen")
+  };
+  const progressWrap = $("progress-wrap");
+  const progressBar = $("progress-bar");
+  const progressLabel = $("progress-label");
+  const qIndex = $("q-index");
+  const qText = $("q-text");
+  const optionsEl = $("options");
+  const colorBlock = $("color-block");
+  const hexValue = $("hex-value");
+  const hexOnBlock = $("hex-on-block");
+  const interpText = $("interp-text");
+  const saveBtn = $("save-btn");
+  const retryBtn = $("retry-btn");
+  const historyList = $("history-list");
+  const clearHistBtn = $("clear-hist");
+  const toast = $("toast");
+  const confirmCard = $("confirm-card");
+  const confirmOk = $("confirm-ok");
+  const confirmCancel = $("confirm-cancel");
+
+  function toHex(n){ const h=Math.max(0,Math.min(255,Math.round(n))).toString(16); return h.length===1?"0"+h:h; }
+  function rgbToHex(r,g,b){ return ("#"+toHex(r)+toHex(g)+toHex(b)).toUpperCase(); }
+  function avg(arrays){
+    let r=0,g=0,b=0;
+    arrays.forEach(a=>{r+=a[0];g+=a[1];b+=a[2];});
+    const n=arrays.length||1;
+    return [Math.round(r/n),Math.round(g/n),Math.round(b/n)];
+  }
+  function dominant(r,g,b){
+    if(r===g&&g===b) return "even";
+    if(r>=g&&r>=b) return "R";
+    if(g>=r&&g>=b) return "G";
+    return "B";
+  }
+
+  let toastTimer=null;
+  function showToast(msg){
+    toast.textContent=msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>toast.classList.remove("show"),1800);
+  }
+
+  function setBackground(rgb){
+    const [r,g,b]=rgb;
+    // 较深一些的渐变背景，保证正文可读
+    const c1=`rgb(${Math.round(r*0.35+20)},${Math.round(g*0.35+20)},${Math.round(b*0.35+30)})`;
+    const c2=`rgb(${Math.round(r*0.18+15)},${Math.round(g*0.18+15)},${Math.round(b*0.18+25)})`;
+    $("app").style.background=`linear-gradient(160deg,${c1},${c2})`;
+  }
+
+  function setProgress(cur,total){
+    const pct=Math.round((cur/total)*100);
+    progressBar.style.width=pct+"%";
+    progressLabel.textContent=cur+" / "+total;
+  }
+
+  function showScreen(name){
+    Object.entries(screens).forEach(([k,el])=>{
+      el.classList.toggle("active",k===name);
+    });
+    progressWrap.classList.toggle("show",name==="quiz");
+    if(name==="start"){
+      setBackground([40,50,80]);
+      progressLabel.textContent="";
+      progressBar.style.width="0%";
+    }
+  }
+
+  // ---------- 状态 ----------
+  let currentQuestion=0;
+  let picks=[]; // 每题选中的 rgb
+  let currentResult=null; // {hex,rgb,interp,date}
+
+  function renderQuestion(){
+    const q=QUESTIONS[currentQuestion];
+    qIndex.textContent="第 "+(currentQuestion+1)+" / "+QUESTIONS.length+" 题";
+    qText.textContent=q.q;
+    optionsEl.innerHTML="";
+    q.options.forEach((opt,i)=>{
+      const btn=document.createElement("button");
+      btn.type="button";
+      btn.className="option";
+      btn.innerHTML='<span class="opt-swatch" style="background:rgb('+opt.rgb.join(",")+')" aria-hidden="true"></span>'+
+                    '<span class="opt-text">'+opt.text+'</span>';
+      btn.addEventListener("click",()=>chooseOption(opt));
+      optionsEl.appendChild(btn);
+    });
+    setProgress(currentQuestion+1,QUESTIONS.length);
+  }
+
+  function chooseOption(opt){
+    picks.push(opt.rgb);
+    // 实时背景 = 已选累计平均
+    setBackground(avg(picks));
+    if(currentQuestion<QUESTIONS.length-1){
+      currentQuestion++;
+      renderQuestion();
+    }else{
+      showResult();
+    }
+  }
+
+  function showResult(){
+    const [r,g,b]=avg(picks);
+    const hex=rgbToHex(r,g,b);
+    const dom=dominant(r,g,b);
+    const interp=INTERPS[dom]||INTERPS.even;
+    currentResult={hex,rgb:[r,g,b],interp};
+
+    colorBlock.style.background="rgb("+r+","+g+","+b+")";
+    hexValue.textContent=hex;
+    hexOnBlock.textContent=hex;
+    interpText.textContent=interp;
+
+    // 重置保存按钮：允许保存本次新结果
+    saveBtn.disabled=false;
+    saveBtn.textContent="保存这次";
+
+    setBackground([r,g,b]);
+    showScreen("result");
+    renderHistory();
+  }
+
+  function resetTest(){
+    currentQuestion=0;
+    picks=[];
+    currentResult=null;
+    renderQuestion();
+  }
+
+  // ---------- 历史 ----------
+  function loadHistory(){
+    try{
+      const raw=localStorage.getItem(STORAGE_KEY);
+      if(!raw) return [];
+      const arr=JSON.parse(raw);
+      return Array.isArray(arr)?arr:[];
+    }catch(e){ return []; }
+  }
+  function saveHistory(arr){
+    try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(arr)); }catch(e){}
+  }
+
+  function renderHistory(){
+    const hist=loadHistory();
+    historyList.innerHTML="";
+    if(hist.length===0){
+      const empty=document.createElement("div");
+      empty.className="history-empty";
+      empty.textContent="还没有记录。测完后点「保存这次」就会出现在这里。";
+      historyList.appendChild(empty);
+      clearHistBtn.hidden=true;
+      return;
+    }
+    clearHistBtn.hidden=false;
+    hist.forEach(item=>{
+      const row=document.createElement("div");
+      row.className="hist-item";
+      const sw=document.createElement("span");
+      sw.className="hist-swatch";
+      sw.style.background=item.hex;
+      sw.title=item.hex;
+      const dt=document.createElement("span");
+      dt.className="hist-date";
+      dt.textContent=item.date;
+      row.appendChild(sw);
+      row.appendChild(dt);
+      row.title=item.hex+" · "+item.interp;
+      historyList.appendChild(row);
+    });
+  }
+
+  function saveCurrent(){
+    if(!currentResult) return;
+    const hist=loadHistory();
+    const now=new Date();
+    const pad=n=>n<10?"0"+n:n;
+    const date=now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate())+" "+pad(now.getHours())+":"+pad(now.getMinutes());
+    const entry={date,hex:currentResult.hex,interp:currentResult.interp};
+    hist.unshift(entry);
+    if(hist.length>10) hist.length=10;
+    saveHistory(hist);
+    saveBtn.disabled=true;
+    saveBtn.textContent="已保存 ✓";
+    renderHistory();
+    showToast("已保存到历史记录");
+  }
+
+  // ---------- 复制 ----------
+  function copyHex(){
+    const text=hexValue.textContent;
+    if(!text) return;
+    const fallback=()=>{
+      const range=document.createRange();
+      range.selectNodeContents(hexValue);
+      const sel=window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      showToast("已选中，请手动复制");
+    };
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(
+        ()=>showToast("HEX 已复制"),
+        ()=>fallback()
+      );
+    }else{ fallback(); }
+  }
+
+  // ---------- 确认卡片 ----------
+  let confirmCallback=null;
+  function openConfirm(title,desc,onOk){
+    $("confirm-title").textContent=title;
+    $("confirm-desc").textContent=desc;
+    confirmCallback=onOk;
+    confirmCard.classList.add("show");
+    setTimeout(()=>confirmOk.focus(),0);
+  }
+  function closeConfirm(){
+    confirmCard.classList.remove("show");
+    confirmCallback=null;
+  }
+
+  // ---------- 事件绑定 ----------
+  $("start-btn").addEventListener("click",()=>{
+    resetTest();
+    showScreen("quiz");
+  });
+  retryBtn.addEventListener("click",()=>{
+    resetTest();
+    showScreen("quiz");
+  });
+  saveBtn.addEventListener("click",saveCurrent);
+  $("copy-hex").addEventListener("click",copyHex);
+  clearHistBtn.addEventListener("click",()=>{
+    openConfirm("清空历史？","将删除全部已保存的心情记录，无法撤销。",()=>{
+      saveHistory([]);
+      renderHistory();
+      showToast("已清空历史记录");
+    });
+  });
+  confirmCancel.addEventListener("click",closeConfirm);
+  confirmOk.addEventListener("click",()=>{
+    const cb=confirmCallback;
+    closeConfirm();
+    if(typeof cb==="function") cb();
+  });
+  confirmCard.addEventListener("click",(e)=>{
+    if(e.target===confirmCard) closeConfirm();
+  });
+
+  // 全局键盘
+  document.addEventListener("keydown",(e)=>{
+    if(confirmCard.classList.contains("show")){
+      if(e.key==="Escape"){ e.preventDefault(); closeConfirm(); }
+      else if(e.key==="Enter"){ e.preventDefault(); confirmOk.click(); }
+      return;
+    }
+    if(e.key==="Escape" && screens.result.classList.contains("active")){
+      retryBtn.click();
+    }
+    if(e.key==="Enter" && screens.start.classList.contains("active")){
+      e.preventDefault();
+      $("start-btn").click();
+    }
+  });
+
+  // ---------- 初始化 ----------
+  renderHistory();
+  setBackground([40,50,80]);
+})();
+</script>
+</body>
+</html>
