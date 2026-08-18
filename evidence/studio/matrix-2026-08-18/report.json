@@ -1,0 +1,278 @@
+{
+  "generatedAt": "2026-08-18T14:51:50.741Z",
+  "interrupted": true,
+  "runs": [
+    {
+      "caseId": "game-snake",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "create",
+      "ok": true,
+      "durationMs": 192000,
+      "sizeBytes": 17408,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "game-snake",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 22000,
+      "sizeBytes": 18432,
+      "editMode": "patch",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "tool-pomodoro",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "create",
+      "ok": true,
+      "durationMs": 77000,
+      "sizeBytes": 15360,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "tool-pomodoro",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 178000,
+      "sizeBytes": 17408,
+      "editMode": "patch",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "dashboard-spending",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "create",
+      "ok": true,
+      "durationMs": 195000,
+      "sizeBytes": 22528,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "form-signup",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "create",
+      "ok": true,
+      "durationMs": 93000,
+      "sizeBytes": 22528,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "content-solar-terms",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "create",
+      "ok": true,
+      "durationMs": 123000,
+      "sizeBytes": 21504,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "content-solar-terms",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 77000,
+      "sizeBytes": 24576,
+      "editMode": "rewrite",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "creative-pixel",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "create",
+      "ok": true,
+      "durationMs": 138000,
+      "sizeBytes": 16384,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "creative-pixel",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 9000,
+      "sizeBytes": 16384,
+      "editMode": "patch",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "general-mood-color",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "create",
+      "ok": true,
+      "durationMs": 85000,
+      "sizeBytes": 21504,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "general-mood-color",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 78000,
+      "sizeBytes": 23552,
+      "editMode": "patch",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "tool-pomodoro",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "create",
+      "ok": true,
+      "durationMs": 154000,
+      "sizeBytes": 12288,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "general-potato",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "create",
+      "ok": true,
+      "durationMs": 264000,
+      "sizeBytes": 25600,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "general-potato",
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 77000,
+      "sizeBytes": 26624,
+      "editMode": "patch",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "game-snake",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "create",
+      "ok": true,
+      "durationMs": 356000,
+      "sizeBytes": 16384,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "game-snake",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 100000,
+      "sizeBytes": 16384,
+      "editMode": "patch",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "form-signup",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "create",
+      "ok": true,
+      "durationMs": 158000,
+      "sizeBytes": 32768,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "form-signup",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 240000,
+      "sizeBytes": 34816,
+      "editMode": "patch",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "dashboard-spending",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "create",
+      "ok": true,
+      "durationMs": 255000,
+      "sizeBytes": 24576,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "dashboard-spending",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 932000,
+      "sizeBytes": 30720,
+      "editMode": "patch",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "creative-pixel",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "create",
+      "ok": true,
+      "durationMs": 418000,
+      "sizeBytes": 21504,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "content-solar-terms",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "create",
+      "ok": true,
+      "durationMs": 389000,
+      "sizeBytes": 38912,
+      "editMode": "create",
+      "codeAttempts": 1
+    },
+    {
+      "caseId": "content-solar-terms",
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "step": "patch",
+      "ok": true,
+      "durationMs": 984000,
+      "sizeBytes": 44032,
+      "editMode": "rewrite",
+      "codeAttempts": 1
+    }
+  ],
+  "reports": [
+    {
+      "coderModel": "openrouter:z-ai/glm-5.2",
+      "createSamples": 8,
+      "createPassRate": 1,
+      "firstAttemptRate": 1,
+      "patchSamples": 6,
+      "patchHitRate": 0.8333333333333334,
+      "patchPassRate": 1,
+      "createP95Ms": 264000,
+      "medianSizeBytes": 21504,
+      "verdict": "NO-GO",
+      "failedCriteria": [
+        "createP95Ms 264s > 240s"
+      ]
+    },
+    {
+      "coderModel": "openrouter:moonshotai/kimi-k2.5",
+      "createSamples": 6,
+      "createPassRate": 1,
+      "firstAttemptRate": 1,
+      "patchSamples": 4,
+      "patchHitRate": 0.75,
+      "patchPassRate": 1,
+      "createP95Ms": 418000,
+      "medianSizeBytes": 21504,
+      "verdict": "NO-GO",
+      "failedCriteria": [
+        "createP95Ms 418s > 240s"
+      ]
+    }
+  ]
+}
