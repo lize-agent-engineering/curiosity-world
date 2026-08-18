@@ -12,4 +12,4 @@ out/
 *.md
 *.yml
 *.yaml
-evidence/**/pages/
+evidence/
