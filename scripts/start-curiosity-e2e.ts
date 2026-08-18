@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 
 const environment = {
   ...process.env,
-  PORT: '3002',
+  PORT: process.env.CURIOSITY_E2E_PORT ?? '3002',
   CURIOSITY_TEST_MODEL: 'true',
   STUDIO_TEST_MODEL: 'true',
   PLAYWRIGHT_TEST: 'true',

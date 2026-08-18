@@ -5,7 +5,8 @@ const forbiddenProductTerms = /课程|教师|同学|幻灯片|白板|课堂 TTS|
 test('从问题生成到儿童探索与家长复盘', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
-  await page.goto('/');
+  // The Curiosity flow now lives behind a template card on the studio home.
+  await page.goto('/curiosity');
   await expect(page.getByText('把孩子的“为什么”')).toBeVisible();
   await expect(page.getByRole('button', { name: '模型设置' })).toHaveCount(0);
   await page.getByRole('button', { name: '为什么月亮看起来会跟着我们？' }).click();

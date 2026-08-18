@@ -5,6 +5,10 @@ import { isCuriosityPublicPath } from '@/proxy';
 describe('Curiosity public surface', () => {
   it.each([
     '/',
+    '/curiosity',
+    '/studio/prj_demo',
+    '/api/studio/projects',
+    '/api/studio/jobs/job_demo',
     '/experience/cur_moon',
     '/api/curiosity/generations',
     '/api/curiosity/narration',

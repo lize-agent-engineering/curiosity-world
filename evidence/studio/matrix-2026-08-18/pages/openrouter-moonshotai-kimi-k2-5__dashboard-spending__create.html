@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人记账看板</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-hover: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #0f766e;
+      --accent-hover: #115e59;
+      --border: #334155;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 16px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .form-section {
+      background-color: var(--surface);
+      padding: 20px;
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 120px;
+    }
+
+    .form-group.amount {
+      flex: 1.5;
+    }
+
+    label {
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    input, select {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background-color: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      height: 44px;
+      transition: border-color 150ms, box-shadow 150ms;
+    }
+
+    input:focus-visible, select:focus-visible {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.2);
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 150ms;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-danger {
+      background-color: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      padding: 6px 12px;
+      height: 32px;
+      font-size: 13px;
+    }
+
+    .btn-danger:hover {
+      background-color: var(--danger);
+      color: white;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background-color: var(--surface);
+      padding: 20px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border-left: 4px solid var(--accent);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .charts-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .charts-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card {
+      background-color: var(--surface);
+      padding: 20px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .chart-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .chart-container {
+      position: relative;
+      min-height: 280px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .donut-chart {
+      width: 200px;
+      height: 200px;
+      transform: rotate(-90deg);
+    }
+
+    .donut-hole {
+      fill: var(--surface);
+    }
+
+    .donut-segment {
+      fill: none;
+      stroke-width: 40;
+      transition: stroke-width 150ms;
+      cursor: pointer;
+    }
+
+    .donut-segment:hover {
+      stroke-width: 44;
+    }
+
+    .legend {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .legend-text {
+      flex: 1;
+      color: var(--text);
+    }
+
+    .legend-amount {
+      color: var(--muted);
+      font-family: ui-monospace, monospace;
+    }
+
+    .legend-percent {
+      color: var(--muted);
+      font-size: 13px;
+      margin-left: 4px;
+    }
+
+    .bar-chart {
+      width: 100%;
+      height: 240px;
+    }
+
+    .bar-group {
+      cursor: pointer;
+    }
+
+    .bar-group:hover rect {
+      opacity: 0.8;
+    }
+
+    .empty-state {
+      color: var(--muted);
+      text-align: center;
+      padding: 40px;
+      font-size: 14px;
+    }
+
+    .records-section {
+      background-color: var(--surface);
+      padding: 20px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .records-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .records-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .records-count {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .record-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      transition: background-color 150ms;
+    }
+
+    .record-item:last-child {
+      border-bottom: none;
+    }
+
+    .record-item:hover {
+      background-color: var(--surface-hover);
+      border-radius: var(--radius-sm);
+    }
+
+    .record-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .record-date {
+      width: 90px;
+      font-size: 14px;
+      color: var(--muted);
+      font-family: ui-monospace, monospace;
+    }
+
+    .record-category {
+      flex: 1;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .record-amount {
+      width: 80px;
+      text-align: right;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: ui-monospace, monospace;
+      color: var(--text);
+    }
+
+    .tooltip {
+      position: absolute;
+      background-color: rgba(0,0,0,0.9);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 150ms;
+      z-index: 100;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 200ms;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      background-color: var(--surface);
+      padding: 24px;
+      border-radius: var(--radius);
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+      transform: scale(0.95);
+      transition: transform 200ms;
+    }
+
+    .modal-overlay.active .modal {
+      transform: scale(1);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .modal-text {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .btn-secondary {
+      background-color: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--border);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background-color: var(--accent);
+      color: white;
+      padding: 12px 24px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transition: all 300ms;
+      z-index: 2000;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .category-select-color {
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>个人记账看板</h1>
+      <div class="subtitle" id="currentMonth">加载中...</div>
+    </header>
+
+    <section class="form-section">
+      <form id="expenseForm" class="form-row">
+        <div class="form-group amount">
+          <label for="amount">金额（元）</label>
+          <input type="number" id="amount" step="0.01" min="0.01" placeholder="0.00" required>
+        </div>
+        <div class="form-group">
+          <label for="category">分类</label>
+          <select id="category" required>
+            <option value="餐饮" class="category-select-color">餐饮</option>
+            <option value="交通" class="category-select-color">交通</option>
+            <option value="购物" class="category-select-color">购物</option>
+            <option value="娱乐" class="category-select-color">娱乐</option>
+            <option value="居住" class="category-select-color">居住</option>
+            <option value="医疗" class="category-select-color">医疗</option>
+            <option value="其他" class="category-select-color">其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="date">日期</label>
+          <input type="date" id="date" required>
+        </div>
+        <button type="submit" class="btn-primary">添加支出</button>
+      </form>
+    </section>
+
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">本月总支出</div>
+        <div class="stat-value" id="totalAmount">¥0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">本月记录笔数</div>
+        <div class="stat-value" id="recordCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">本月日均支出</div>
+        <div class="stat-value" id="dailyAverage">¥0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">今日已支出</div>
+        <div class="stat-value" id="todayAmount">¥0.00</div>
+      </div>
+    </section>
+
+    <section class="charts-section">
+      <div class="chart-card">
+        <div class="chart-title">本月各类支出占比</div>
+        <div class="chart-container" id="donutContainer">
+          <div class="empty-state">本月暂无记录</div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">最近 7 天支出趋势</div>
+        <div class="chart-container" id="barContainer">
+          <svg class="bar-chart" id="barChart"></svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="records-section">
+      <div class="records-header">
+        <div class="records-title">最近记录</div>
+        <div class="records-count" id="recordsCount">共 0 条</div>
+      </div>
+      <div id="recordsList"></div>
+    </section>
+  </div>
+
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+      <div class="modal-title">确认删除</div>
+      <div class="modal-text">确定要删除这条记录吗？此操作无法撤销。</div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn-danger" onclick="confirmDelete()">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const CATEGORIES = {
+      '餐饮': '#ef4444',
+      '交通': '#f59e0b',
+      '购物': '#3b82f6',
+      '娱乐': '#8b5cf6',
+      '居住': '#10b981',
+      '医疗': '#ec4899',
+      '其他': '#6b7280'
+    };
+
+    const STORAGE_KEY = 'ledger_records';
+    let deleteId = null;
+
+    function getToday() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function getCurrentMonth() {
+      const d = new Date();
+      return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+    }
+
+    function generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    function getRecords() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (!data) return [];
+        const parsed = JSON.parse(data);
+        if (!Array.isArray(parsed)) return [];
+        return parsed;
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveRecords(records) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+
+    function initSampleData() {
+      const records = getRecords();
+      if (records.length === 0) {
+        const categories = Object.keys(CATEGORIES);
+        const sampleData = [];
+        const count = 8 + Math.floor(Math.random() * 5);
+        
+        for (let i = 0; i < count; i++) {
+          const daysAgo = Math.floor(Math.random() * 7);
+          const date = new Date();
+          date.setDate(date.getDate() - daysAgo);
+          const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          
+          sampleData.push({
+            id: generateId(),
+            amount: Math.floor(Math.random() * 180) + 20 + Math.floor(Math.random() * 100) / 100,
+            category: categories[Math.floor(Math.random() * categories.length)],
+            date: dateStr,
+            timestamp: date.getTime()
+          });
+        }
+        
+        sampleData.sort((a, b) => b.timestamp - a.timestamp);
+        saveRecords(sampleData);
+        showToast('已生成示例数据');
+      }
+    }
+
+    function addRecord(amount, category, date) {
+      const records = getRecords();
+      records.unshift({
+        id: generateId(),
+        amount: parseFloat(amount),
+        category,
+        date,
+        timestamp: new Date(date).getTime()
+      });
+      saveRecords(records);
+    }
+
+    function deleteRecord(id) {
+      const records = getRecords();
+      const filtered = records.filter(r => r.id !== id);
+      saveRecords(filtered);
+      renderAll();
+      showToast('记录已删除');
+    }
+
+    function calculateStats() {
+      const records = getRecords();
+      const today = getToday();
+      const currentMonth = today.substring(0, 7);
+      const dayOfMonth = parseInt(today.substring(8, 10));
+      
+      let monthTotal = 0;
+      let monthCount = 0;
+      let todayTotal = 0;
+      
+      records.forEach(r => {
+        if (r.date.startsWith(currentMonth)) {
+          monthTotal += r.amount;
+          monthCount++;
+        }
+        if (r.date === today) {
+          todayTotal += r.amount;
+        }
+      });
+      
+      const dailyAvg = monthCount > 0 ? monthTotal / dayOfMonth : 0;
+      
+      return {
+        monthTotal,
+        monthCount,
+        dailyAvg,
+        todayTotal
+      };
+    }
+
+    function formatMoney(amount) {
+      return '¥' + amount.toFixed(2);
+    }
+
+    function renderStats() {
+      const stats = calculateStats();
+      document.getElementById('totalAmount').textContent = formatMoney(stats.monthTotal);
+      document.getElementById('recordCount').textContent = stats.monthCount;
+      document.getElementById('dailyAverage').textContent = formatMoney(stats.dailyAvg);
+      document.getElementById('todayAmount').textContent = formatMoney(stats.todayTotal);
+    }
+
+    function renderDonutChart() {
+      const container = document.getElementById('donutContainer');
+      const records = getRecords();
+      const currentMonth = getToday().substring(0, 7);
+      const monthRecords = records.filter(r => r.date.startsWith(currentMonth));
+      
+      if (monthRecords.length === 0) {
+        container.innerHTML = '<div class="empty-state">本月暂无记录</div>';
+        return;
+      }
+      
+      const categoryTotals = {};
+      let total = 0;
+      
+      monthRecords.forEach(r => {
+        categoryTotals[r.category] = (categoryTotals[r.category] || 0) + r.amount;
+        total += r.amount;
+      });
+      
+      const data = Object.entries(categoryTotals).map(([cat, amount]) => ({
+        category: cat,
+        amount,
+        percent: amount / total,
+        color: CATEGORIES[cat]
+      })).sort((a, b) => b.amount - a.amount);
+      
+      const radius = 80;
+      const circumference = 2 * Math.PI * radius;
+      let currentOffset = 0;
+      
+      let svgHTML = `<svg class="donut-chart" viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="${radius}" class="donut-hole" fill="var(--surface)"/>
+        <circle cx="100" cy="100" r="${radius}" fill="none" stroke="#334155" stroke-width="40"/>`;
+      
+      data.forEach(item => {
+        const dashArray = item.percent * circumference;
+        const dashOffset = -currentOffset;
+        svgHTML += `<circle cx="100" cy="100" r="${radius}" fill="none" 
+          stroke="${item.color}" 
+          stroke-width="40"
+          stroke-dasharray="${dashArray} ${circumference}"
+          stroke-dashoffset="${dashOffset}"
+          class="donut-segment"
+          style="cursor: pointer;">
+          <title>${item.category}: ${formatMoney(item.amount)} (${(item.percent * 100).toFixed(1)}%)</title>
+        </circle>`;
+        currentOffset += dashArray;
+      });
+      
+      svgHTML += '</svg>';
+      
+      let legendHTML = '<div class="legend">';
+      data.forEach(item => {
+        legendHTML += `
+          <div class="legend-item">
+            <div class="legend-dot" style="background-color: ${item.color}"></div>
+            <div class="legend-text">${item.category}</div>
+            <div class="legend-amount">${formatMoney(item.amount)}</div>
+            <div class="legend-percent">${(item.percent * 100).toFixed(1)}%</div>
+          </div>
+        `;
+      });
+      legendHTML += '</div>';
+      
+      container.innerHTML = svgHTML + legendHTML;
+    }
+
+    function renderBarChart() {
+      const svg = document.getElementById('barChart');
+      const records = getRecords();
+      
+      const days = [];
+      const today = new Date();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        days.push({
+          date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+          label: `${d.getMonth() + 1}/${d.getDate()}`
+        });
+      }
+      
+      const dayTotals = days.map(day => {
+        const total = records.filter(r => r.date === day.date)
+          .reduce((sum, r) => sum + r.amount, 0);
+        return { ...day, total };
+      });
+      
+      const maxTotal = Math.max(...dayTotals.map(d => d.total), 100);
+      const chartHeight = 200;
+      const chartWidth = 100;
+      const barWidth = 10;
+      const gap = (100 - (barWidth * 7)) / 8;
+      
+      let svgHTML = `<svg viewBox="0 0 100 240" preserveAspectRatio="none" style="width: 100%; height: 100%;">
+        <line x1="0" y1="200" x2="100" y2="200" stroke="var(--border)" stroke-width="0.5"/>`;
+      
+      dayTotals.forEach((day, index) => {
+        const x = gap + index * (barWidth + gap);
+        const height = (day.total / maxTotal) * chartHeight;
+        const y = chartHeight - height;
+        const color = day.total > 0 ? 'var(--accent)' : 'var(--surface-hover)';
+        
+        svgHTML += `
+          <g class="bar-group">
+            <rect x="${x}" y="${y}" width="${barWidth}" height="${height}" 
+              fill="${color}" rx="1">
+              <title>${day.date}: ${formatMoney(day.total)}</title>
+            </rect>
+            <text x="${x + barWidth/2}" y="220" 
+              text-anchor="middle" 
+              fill="var(--muted)" 
+              font-size="8">${day.label}</text>
+          </g>
+        `;
+      });
+      
+      svgHTML += '</svg>';
+      svg.innerHTML = svgHTML;
+    }
+
+    function renderRecordsList() {
+      const container = document.getElementById('recordsList');
+      const records = getRecords().slice(0, 20);
+      
+      document.getElementById('recordsCount').textContent = `共 ${records.length} 条`;
+      
+      if (records.length === 0) {
+        container.innerHTML = '<div class="empty-state">暂无记录</div>';
+        return;
+      }
+      
+      let html = '';
+      records.forEach(record => {
+        const color = CATEGORIES[record.category] || '#6b7280';
+        html += `
+          <div class="record-item">
+            <div class="record-dot" style="background-color: ${color}"></div>
+            <div class="record-date">${record.date.substring(5)}</div>
+            <div class="record-category">${record.category}</div>
+            <div class="record-amount">${formatMoney(record.amount)}</div>
+            <button class="btn-danger" onclick="openDeleteModal('${record.id}')">删除</button>
+          </div>
+        `;
+      });
+      
+      container.innerHTML = html;
+    }
+
+    function renderAll() {
+      renderStats();
+      renderDonutChart();
+      renderBarChart();
+      renderRecordsList();
+    }
+
+    function openDeleteModal(id) {
+      deleteId = id;
+      document.getElementById('confirmModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('confirmModal').classList.remove('active');
+      deleteId = null;
+    }
+
+    function confirmDelete() {
+      if (deleteId) {
+        deleteRecord(deleteId);
+        closeModal();
+      }
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    document.getElementById('expenseForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const amount = parseFloat(document.getElementById('amount').value);
+      const category = document.getElementById('category').value;
+      const date = document.getElementById('date').value;
+      
+      if (!amount || amount <= 0) {
+        showToast('请输入有效的金额');
+        return;
+      }
+      
+      addRecord(amount, category, date);
+      renderAll();
+      
+      document.getElementById('amount').value = '';
+      document.getElementById('amount').focus();
+      showToast('记录已添加');
+    });
+
+    document.getElementById('date').value = getToday();
+    document.getElementById('currentMonth').textContent = getCurrentMonth();
+
+    document.addEventListener('DOMContentLoaded', function() {
+      initSampleData();
+      renderAll();
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    });
+
+    document.getElementById('confirmModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
+  </script>
+</body>
+</html>
