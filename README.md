@@ -1,63 +1,58 @@
-# Curiosity Studio — an agent-driven web app generator
+# Curiosity World
 
-Describe the app you want in one sentence and three agents build it: **planner**
-writes the spec, **coder** writes the code, **reviewer** signs it off. The output
-is a self-contained single-file HTML app, previewed instantly in an isolated
-sandbox. Keep talking to modify it — every round becomes a version you can roll
-back to, or branch from.
+A parent types in a question their child asked — "why does the moon follow us?"
+— plus the child's age. Three agents plan, **write the code for**, and review a
+page the child can actually play with: guess first, try it, then understand why.
+Keep talking to change it; every round becomes a version you can roll back to,
+branch from, or download and keep.
 
-"Curiosity World" (science exploration for children aged 6–10) is kept as a
-template card on the home page, running its own dedicated pipeline unchanged.
+What changed from the first version: **questions are no longer limited to three
+preset knowledge families, and the page is genuinely generated code** rather
+than configuration poured into a fixed scene renderer.
 
 ## The loop
 
-1. Write a request on the home page (or pick an example) and start.
-2. The workbench shows the conversation on the left — three named stages and the
-   code as it is being written — and an iframe preview on the right.
-3. Once the first version lands, say what to change next: "add a daily counter
-   that survives a refresh".
-4. The version dropdown switches the preview to any earlier version; rolling
-   back moves the pointer without discarding anything.
+1. Write the child's question (or pick an example), set the age, and start.
+2. The workbench shows plan / code / review as three named stages with the code
+   being written line by line, and an iframe preview beside it.
+3. Say what to change next: "he's only 6, make it more visual".
+4. Switch between versions, roll back, or download the page to keep.
 
 ## How it works
 
 | Role | Output | Shape |
 | --- | --- | --- |
-| `studio.planner` | `{appName, appKind, summary, changeNote, features[], layout, interactions[], persistence}` | strict JSON |
+| `studio.planner` | the exploration, the causal points the child should end up understanding, and the common wrong explanations to avoid | strict JSON |
 | `studio.coder` | create → a whole HTML document; modify → search/replace edit blocks | streamed text |
-| `studio.reviewer` | `{verdict, findings[]}` | strict JSON |
-
-**Classification routes; it never gates.** The planner picks an `appKind` from
-`tool / game / dashboard / content / form / creative / general`, which selects
-the craft notes the coder receives. Anything unrecognized lands on `general`, so
-a misclassification costs a less specific prompt — never a refusal.
+| `studio.reviewer` | `{verdict, findings[]}`, checking scientific correctness first | strict JSON |
 
 **Quality is designed in four layers**, not hoped for:
 
-1. **Kind-routed prompts** — a universal contract plus 10–20 lines of concrete
-   guidance per kind (a game gets rAF loops, delta time, touch controls and
-   `preventDefault`; a dashboard gets hand-drawn inline SVG charts, axes and
-   empty states).
-2. **A design system inside the prompt** — `:root` colour tokens, a 4px spacing
-   scale, hover/focus-visible/active states, the system-ui stack, dark by
-   default, plus the sandbox's real constraints: modals are blocked, page-driven
-   downloads are blocked, there is no network.
-3. **A reviewer with teeth** — it receives the HTML, the static validation report
-   and the plan's feature list; its findings are injected into the retry round.
-4. **Runtime errors fed back** — errors the previewed page actually threw
-   (including the ones thrown while srcDoc parses, recovered via a replay
-   handshake) are stored on the version and travel into the next round.
+1. **Domain prompts.** The coder is told what a children's exploration is: at
+   least two interactions that change the state of the screen (page turning does
+   not count), prediction before explanation, a transfer challenge, an ending,
+   and a short note for the parent. The age sets the language budget — a 4-year
+   old gets almost no text, a 12-year old can read full sentences.
+2. **A design system and the sandbox's real constraints inside the prompt** —
+   colour tokens, a 4px scale, interaction states, touch-first sizing, plus:
+   modals are blocked, page-driven downloads are blocked, there is no network.
+3. **A reviewer with teeth.** Wrong science is a blocker. It also checks whether
+   the interaction is real, whether the answer was given away up front, and
+   whether the language fits the age; findings are injected into the retry.
+4. **Runtime errors fed back** from the previewed page into the next round.
 
-**Modification prefers targeted edits.** The coder emits search/replace blocks
-that must match exactly once, may not overlap and must change something; there
-is no fuzzy matching. A mismatch falls back to one full rewrite before it is
-called a failure, and the path taken is recorded as `Version.editMode`
-(create/patch/rewrite) and shown in the UI.
+**Modification prefers targeted edits.** Search/replace blocks must match
+exactly once, may not overlap, and must change something; a mismatch falls back
+to one full rewrite before it is called a failure, and the path taken is shown
+with the diff.
 
-**Trust boundary**: the client sends a request string and at most a version id to
-branch from. The current HTML is always read from the store by the worker; the
-model only returns edit blocks. The preview iframe is `sandbox="allow-scripts"`
-and deliberately never `allow-same-origin`.
+**Trust boundary**: the client sends the question and at most a version id. The
+current HTML is always read from the store by the worker. The preview iframe is
+`sandbox="allow-scripts"` and deliberately never `allow-same-origin`.
+
+**Extension**: the same engine with the domain guidance removed is a general app
+generator (timers, dashboards, small games). It is kept as an entry on the home
+page to show the pipeline is not welded to one scenario.
 
 ## Run locally
 
@@ -92,8 +87,8 @@ The real-model gate:
 STUDIO_SPIKE_CODERS='openrouter:z-ai/glm-5.2' pnpm spike:studio:real
 ```
 
-One sample per app kind plus two deliberately odd requests, each run through
-create → modify. Pages and a report land in `evidence/studio/`. The GO
+Samples across app kinds, each run through create → modify. Pages and a report
+land in `evidence/studio/`. The GO
 thresholds are fixed in `lib/studio/spike.ts`: ≥80% valid on the first coding
 attempt, ≥60% of modifications applied as targeted patches, ≥80% of
 modifications succeeding at all, and a p95 create under 4 minutes.
