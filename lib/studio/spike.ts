@@ -10,59 +10,57 @@ import type { StudioAppKind, StudioEditMode } from './contracts';
 
 export interface StudioSpikeCase {
   id: string;
-  expectedKind: StudioAppKind;
+  /** The child's question, as a parent would type it. */
   create: string;
+  targetAge: number;
+  /** The follow-up a parent would actually ask for next. */
   patch: string;
 }
 
+/**
+ * The matrix exercises the product's main flow: a child's question at a real
+ * age, then the kind of change a parent asks for next. The questions
+ * deliberately span domains no hand-built scene renderer covered — that breadth
+ * is the thing the current pipeline claims and the previous one could not do —
+ * and the ages span the range, because a five-year-old and an eleven-year-old
+ * are different briefs for the same question.
+ */
 export const STUDIO_SPIKE_CASES: readonly StudioSpikeCase[] = [
   {
-    id: 'tool-pomodoro',
-    expectedKind: 'tool',
-    create: '做一个番茄钟，25 分钟专注、5 分钟休息，可以开始、暂停和重置。',
-    patch: '加一个今日完成次数统计，刷新之后不能丢。',
+    id: 'moon-follows',
+    create: '为什么月亮看起来会跟着我们？',
+    targetAge: 8,
+    patch: '他只有 6 岁，再直观一点，字少一些。',
   },
   {
-    id: 'game-snake',
-    expectedKind: 'game',
-    create: '做一个贪吃蛇小游戏，键盘和手机都要能玩。',
-    patch: '加一个最高分记录，刷新之后还在。',
+    id: 'caterpillar',
+    create: '毛毛虫为什么会变成蝴蝶？',
+    targetAge: 6,
+    patch: '加一个小挑战，让他把四个阶段排出顺序。',
   },
   {
-    id: 'dashboard-spending',
-    expectedKind: 'dashboard',
-    create: '做一个个人记账看板，展示本月各类支出占比和最近 7 天的趋势。',
-    patch: '把趋势图改成柱状图，并加上与上月的对比。',
+    id: 'salty-sea',
+    create: '海水为什么是咸的？',
+    targetAge: 9,
+    patch: '加一个可以在家做的小实验的说明。',
   },
   {
-    id: 'content-solar-terms',
-    expectedKind: 'content',
-    create: '做一个介绍二十四节气的图文页面，可以按季节筛选。',
-    patch: '加一个搜索框，可以按名字过滤节气。',
+    id: 'shadow-length',
+    create: '影子为什么会变长又变短？',
+    targetAge: 7,
+    patch: '让他可以自己拖太阳的位置。',
   },
   {
-    id: 'form-signup',
-    expectedKind: 'form',
-    create: '做一个活动报名表单，包含姓名、手机号、场次选择和饮食忌口，提交后显示确认信息。',
-    patch: '加一个人数上限提示：每场限 20 人，报满就不能提交。',
+    id: 'rainbow',
+    create: '彩虹是从哪里来的？',
+    targetAge: 5,
+    patch: '他还不认字，多用图形和声音。',
   },
   {
-    id: 'creative-pixel',
-    expectedKind: 'creative',
-    create: '做一个像素画板，16×16 的格子，可以选颜色画画。',
-    patch: '加一个撤销按钮，可以撤销最近 10 步。',
-  },
-  {
-    id: 'general-potato',
-    expectedKind: 'general',
-    create: '做一个会占卜的土豆。',
-    patch: '加一个历史记录，能看到之前占卜过的结果。',
-  },
-  {
-    id: 'general-mood-color',
-    expectedKind: 'general',
-    create: '帮我做一个能测出我今天心情颜色的东西。',
-    patch: '加一个分享文案，把今天的颜色变成一句话显示出来。',
+    id: 'plane-lift',
+    create: '飞机那么重，为什么能飞起来？',
+    targetAge: 11,
+    patch: '再加一层：让他试试改变机翼角度会怎样。',
   },
 ] as const;
 
@@ -80,6 +78,8 @@ export interface StudioSpikeRun {
   reviewRetryCount?: number;
   reviewSkipped?: boolean;
   planFallback?: boolean;
+  /** Whether the generated page actually speaks — a page a child cannot hear. */
+  narrates?: boolean;
   editBlockFailures?: string[];
   warnings?: string[];
   error?: string;
@@ -96,6 +96,8 @@ export interface StudioSpikeModelReport {
   /** Share of patch runs where the edit blocks applied directly (no rewrite). */
   patchHitRate: number;
   patchPassRate: number;
+  /** Share of create runs whose page calls curiositySay at all. */
+  narrationRate: number;
   createP95Ms: number;
   medianSizeBytes: number;
   verdict: 'GO' | 'NO-GO';
@@ -114,6 +116,8 @@ export const STUDIO_SPIKE_GATE = {
   minFirstAttemptRate: 0.8,
   minPatchHitRate: 0.6,
   minPatchPassRate: 0.8,
+  /** A page a young child cannot hear does not do this product's job. */
+  minNarrationRate: 0.8,
   maxCreateP95Ms: 4 * 60_000,
 } as const;
 
@@ -141,6 +145,10 @@ export function evaluateStudioSpike(runs: StudioSpikeRun[]): StudioSpikeModelRep
       patches.filter((run) => run.ok),
       patches.length,
     );
+    const narrationRate = share(
+      creates.filter((run) => run.ok && run.narrates),
+      creates.length,
+    );
     const createP95Ms = quantile(
       creates.filter((run) => run.ok).map((run) => run.durationMs),
       0.95,
@@ -165,6 +173,11 @@ export function evaluateStudioSpike(runs: StudioSpikeRun[]): StudioSpikeModelRep
         `patchPassRate ${(patchPassRate * 100).toFixed(0)}% < ${STUDIO_SPIKE_GATE.minPatchPassRate * 100}%`,
       );
     }
+    if (narrationRate < STUDIO_SPIKE_GATE.minNarrationRate) {
+      failedCriteria.push(
+        `narrationRate ${(narrationRate * 100).toFixed(0)}% < ${STUDIO_SPIKE_GATE.minNarrationRate * 100}%`,
+      );
+    }
     if (createP95Ms > STUDIO_SPIKE_GATE.maxCreateP95Ms) {
       failedCriteria.push(`createP95Ms ${Math.round(createP95Ms / 1000)}s > 240s`);
     }
@@ -176,6 +189,7 @@ export function evaluateStudioSpike(runs: StudioSpikeRun[]): StudioSpikeModelRep
       patchSamples: patches.length,
       patchHitRate,
       patchPassRate,
+      narrationRate,
       createP95Ms,
       medianSizeBytes,
       verdict: failedCriteria.length === 0 ? 'GO' : 'NO-GO',

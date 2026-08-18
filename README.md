@@ -50,9 +50,14 @@ with the diff.
 current HTML is always read from the store by the worker. The preview iframe is
 `sandbox="allow-scripts"` and deliberately never `allow-same-origin`.
 
+**Narration**: a page speaks by calling `window.curiositySay('…')` and carries
+its own `speechSynthesis` fallback. Inside the studio a shim takes that function
+over and speaks the line in the configured children's voice; if that fails the
+line is handed back and the page reads it itself. A downloaded page still talks.
+
 **Extension**: the same engine with the domain guidance removed is a general app
-generator (timers, dashboards, small games). It is kept as an entry on the home
-page to show the pipeline is not welded to one scenario.
+generator (`mode: 'general'`, wired through the API and the prompts). The home
+page does not offer it — there is one main flow.
 
 ## Run locally
 
@@ -87,11 +92,13 @@ The real-model gate:
 STUDIO_SPIKE_CODERS='openrouter:z-ai/glm-5.2' pnpm spike:studio:real
 ```
 
-Samples across app kinds, each run through create → modify. Pages and a report
-land in `evidence/studio/`. The GO
+Six child questions across domains and ages 5–11, each run through create →
+the follow-up a parent would actually ask. Pages and a report land in
+`evidence/studio/`. The GO
 thresholds are fixed in `lib/studio/spike.ts`: ≥80% valid on the first coding
 attempt, ≥60% of modifications applied as targeted patches, ≥80% of
-modifications succeeding at all, and a p95 create under 4 minutes.
+modifications succeeding at all, ≥80% of pages that actually speak, and a p95
+create under 4 minutes.
 
 ## Deployment
 

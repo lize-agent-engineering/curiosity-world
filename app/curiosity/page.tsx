@@ -141,14 +141,30 @@ export default function HomePage() {
   };
 
   return (
-    <CuriosityHomeView
-      values={values}
-      status={status}
-      recent={recent}
-      error={error}
-      onChange={(field, value) => setValues((current) => ({ ...current, [field]: value }))}
-      onSubmit={handleSubmit}
-      onOpenExperience={(id) => router.push(`/experience/${id}`)}
-    />
+    <>
+      {/*
+       * This is the v1 pipeline: the model filled a structured spec and three
+       * hand-built React scenes rendered it. It is kept reachable, with its
+       * tests, as the record of what the current approach replaced — not as a
+       * second product. The banner exists so nobody who lands here by URL
+       * mistakes it for the main flow.
+       */}
+      <div className="bg-[#1b1206] px-4 py-2.5 text-center text-xs leading-5 text-[#ffdc72]">
+        这是第一版的受约束管线：只支持三类预设场景，产物由固定组件渲染。主线已经换成自由代码生成，
+        <a href="/" className="font-bold underline underline-offset-4">
+          回到「为什么世界」
+        </a>
+        。
+      </div>
+      <CuriosityHomeView
+        values={values}
+        status={status}
+        recent={recent}
+        error={error}
+        onChange={(field, value) => setValues((current) => ({ ...current, [field]: value }))}
+        onSubmit={handleSubmit}
+        onOpenExperience={(id) => router.push(`/experience/${id}`)}
+      />
+    </>
   );
 }

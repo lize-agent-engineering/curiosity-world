@@ -69,8 +69,11 @@ async function runCase(sample: StudioSpikeCase, coderModel: string): Promise<Stu
   const started = Date.now();
   let created;
   try {
-    created = await runStudioPipeline({ request: sample.create }, models);
-    const validation = validateStudioHtml(created.html);
+    created = await runStudioPipeline(
+      { request: sample.create, education: { targetAge: sample.targetAge } },
+      models,
+    );
+    const validation = validateStudioHtml(created.html, { education: true });
     runs.push({
       caseId: sample.id,
       coderModel,
@@ -85,6 +88,7 @@ async function runCase(sample: StudioSpikeCase, coderModel: string): Promise<Stu
       reviewRetryCount: created.reviewRetryCount,
       reviewSkipped: created.reviewSkipped,
       planFallback: created.planFallback,
+      narrates: /curiositySay\s*\(/.test(created.html),
       warnings: validation.warnings.map((issue) => issue.code),
     });
     await writeFile(
@@ -109,6 +113,7 @@ async function runCase(sample: StudioSpikeCase, coderModel: string): Promise<Stu
     const patched = await runStudioPipeline(
       {
         request: sample.patch,
+        education: { targetAge: sample.targetAge },
         current: {
           html: created.html,
           plan: created.plan,
@@ -118,7 +123,7 @@ async function runCase(sample: StudioSpikeCase, coderModel: string): Promise<Stu
       },
       models,
     );
-    const validation = validateStudioHtml(patched.html);
+    const validation = validateStudioHtml(patched.html, { education: true });
     runs.push({
       caseId: sample.id,
       coderModel,
@@ -133,6 +138,7 @@ async function runCase(sample: StudioSpikeCase, coderModel: string): Promise<Stu
       reviewRetryCount: patched.reviewRetryCount,
       reviewSkipped: patched.reviewSkipped,
       planFallback: patched.planFallback,
+      narrates: /curiositySay\s*\(/.test(patched.html),
       editBlockFailures: patched.editBlockFailures,
       warnings: validation.warnings.map((issue) => issue.code),
     });
@@ -208,7 +214,7 @@ async function main() {
   console.log(`\n${path.join(outputDir, 'report.json')}`);
   for (const entry of reports) {
     console.log(
-      `${entry.verdict.padEnd(6)} ${entry.coderModel}  first-attempt ${(entry.firstAttemptRate * 100).toFixed(0)}%  patch-hit ${(entry.patchHitRate * 100).toFixed(0)}%  patch-pass ${(entry.patchPassRate * 100).toFixed(0)}%  p95 ${Math.round(entry.createP95Ms / 1000)}s  median ${Math.round(entry.medianSizeBytes / 1024)}KB`,
+      `${entry.verdict.padEnd(6)} ${entry.coderModel}  first-attempt ${(entry.firstAttemptRate * 100).toFixed(0)}%  narration ${(entry.narrationRate * 100).toFixed(0)}%  patch-hit ${(entry.patchHitRate * 100).toFixed(0)}%  patch-pass ${(entry.patchPassRate * 100).toFixed(0)}%  p95 ${Math.round(entry.createP95Ms / 1000)}s  median ${Math.round(entry.medianSizeBytes / 1024)}KB`,
     );
     for (const failure of entry.failedCriteria) console.log(`       ${failure}`);
   }

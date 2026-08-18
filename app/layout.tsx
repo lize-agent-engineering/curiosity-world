@@ -25,9 +25,9 @@ import '@fontsource/zcool-kuaile';
 import '@fontsource-variable/archivo/wdth.css';
 
 export const metadata: Metadata = {
-  title: 'Curiosity Studio · 智能体网页应用生成器',
+  title: '为什么世界 · 把孩子的为什么变成能玩的知识世界',
   description:
-    '一句话描述需求，规划、编码、审查三个智能体接力生成可运行的单文件网页应用，并支持对话式增量修改与版本回滚。',
+    '输入孩子问的一个“为什么”和他的年龄，规划、编码、审查三个智能体现场写出一个他能亲手操作的探索网页；做完之后接着对话就能改，每一轮留一个版本，也可以整页下载带走。',
 };
 
 export default function RootLayout({
