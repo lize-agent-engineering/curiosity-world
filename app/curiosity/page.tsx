@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 
@@ -151,9 +152,9 @@ export default function HomePage() {
        */}
       <div className="bg-[#1b1206] px-4 py-2.5 text-center text-xs leading-5 text-[#ffdc72]">
         这是第一版的受约束管线：只支持三类预设场景，产物由固定组件渲染。主线已经换成自由代码生成，
-        <a href="/" className="font-bold underline underline-offset-4">
+        <Link href="/" className="font-bold underline underline-offset-4">
           回到「为什么世界」
-        </a>
+        </Link>
         。
       </div>
       <CuriosityHomeView
