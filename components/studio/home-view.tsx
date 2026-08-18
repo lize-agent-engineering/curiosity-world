@@ -36,7 +36,6 @@ export interface StudioHomeViewProps {
   busy: boolean;
   error: string | null;
   projects: StudioProjectSummary[];
-  onModeChange: (mode: StudioMode) => void;
   onDraftChange: (value: string) => void;
   onTargetAgeChange: (value: number) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -50,7 +49,6 @@ export function StudioHomeView({
   busy,
   error,
   projects,
-  onModeChange,
   onDraftChange,
   onTargetAgeChange,
   onSubmit,
@@ -213,17 +211,15 @@ export function StudioHomeView({
           )}
         </section>
 
-        <footer className="mt-16 flex flex-wrap items-center justify-between gap-3 border-t border-night-rule pt-5">
+        <footer className="mt-16 border-t border-night-rule pt-5">
           <p className="text-xs text-star-faint">
             生成的页面是一份自包含的单文件网页，在隔离沙箱里预览，可以整页下载带走。
           </p>
-          <button
-            type="button"
-            onClick={() => onModeChange(education ? 'general' : 'education')}
-            className="rounded text-xs font-bold text-star-faint underline-offset-4 transition hover:text-star hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moon"
-          >
-            {education ? '也可以生成任意网页应用 →' : '← 回到孩子的问题'}
-          </button>
+          {/*
+           * The general-mode entry is hidden for now. The mode itself is intact —
+           * the API, the prompts and the tests still cover it — so bringing the
+           * link back is a one-line change when it is wanted.
+           */}
         </footer>
       </div>
     </main>

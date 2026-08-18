@@ -19,7 +19,9 @@ import {
 
 export default function StudioHomePage() {
   const router = useRouter();
-  const [mode, setMode] = useState<StudioMode>('education');
+  // Only the education surface is reachable from the UI for now; the general
+  // mode stays wired through the API and the prompts.
+  const mode: StudioMode = 'education';
   const [draft, setDraft] = useState('');
   const targetAge = useSyncExternalStore(subscribeTargetAge, readTargetAge, serverTargetAge);
   const [busy, setBusy] = useState(false);
@@ -61,11 +63,6 @@ export default function StudioHomePage() {
       busy={busy}
       error={error}
       projects={projects}
-      onModeChange={(next) => {
-        setMode(next);
-        setDraft('');
-        setError(null);
-      }}
       onDraftChange={setDraft}
       onTargetAgeChange={writeTargetAge}
       onSubmit={onSubmit}

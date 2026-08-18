@@ -303,7 +303,6 @@ describe('the studio home', () => {
     busy: false,
     error: null,
     projects: [],
-    onModeChange: vi.fn(),
     onDraftChange: vi.fn(),
     onTargetAgeChange: vi.fn(),
     onSubmit: vi.fn(),
@@ -338,10 +337,9 @@ describe('the studio home', () => {
     expect(html).toContain('第一颗星还没有亮');
   });
 
-  it('keeps the general generator to one quiet line in the footer', () => {
+  it('keeps the general generator out of the page for now', () => {
     const html = renderToStaticMarkup(<StudioHomeView {...homeProps} />);
-    expect(html).toContain('也可以生成任意网页应用');
-    // It is no longer a card competing with the main flow.
+    expect(html).not.toContain('也可以生成任意网页应用');
     expect(html).not.toContain('延展能力');
   });
 
