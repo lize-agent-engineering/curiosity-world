@@ -79,6 +79,7 @@ export interface StudioSpikeRun {
   reviewVerdict?: 'pass' | 'revise';
   reviewRetryCount?: number;
   reviewSkipped?: boolean;
+  planFallback?: boolean;
   editBlockFailures?: string[];
   warnings?: string[];
   error?: string;

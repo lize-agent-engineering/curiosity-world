@@ -84,6 +84,7 @@ async function runCase(sample: StudioSpikeCase, coderModel: string): Promise<Stu
       reviewVerdict: created.review.verdict,
       reviewRetryCount: created.reviewRetryCount,
       reviewSkipped: created.reviewSkipped,
+      planFallback: created.planFallback,
       warnings: validation.warnings.map((issue) => issue.code),
     });
     await writeFile(
@@ -131,6 +132,7 @@ async function runCase(sample: StudioSpikeCase, coderModel: string): Promise<Stu
       reviewVerdict: patched.review.verdict,
       reviewRetryCount: patched.reviewRetryCount,
       reviewSkipped: patched.reviewSkipped,
+      planFallback: patched.planFallback,
       editBlockFailures: patched.editBlockFailures,
       warnings: validation.warnings.map((issue) => issue.code),
     });

@@ -103,6 +103,8 @@ export interface StudioPipelineResult {
   review: StudioReview;
   reviewRetryCount: 0 | 1;
   reviewSkipped: boolean;
+  /** True when re-planning failed and the previous plan was carried forward. */
+  planFallback: boolean;
   validation: StudioValidationReport;
   codeAttempts: number;
   editBlockFailures: string[];
@@ -171,6 +173,7 @@ export async function runStudioPipeline(
 
   await emit({ type: 'stage', stage: 'planning', attempt: 1 });
   let plan: StudioPlan;
+  let planFallback = false;
   try {
     plan = await completeStructured(
       models['studio.planner'],
@@ -187,12 +190,19 @@ export async function runStudioPipeline(
       (raw) => parseStudioPlan(parseCuriosityModelJson(raw, z.unknown())),
     );
   } catch (error) {
-    throw new StudioPipelineError(
-      'PLAN_INVALID',
-      'studio.planner',
-      `规划阶段没有产出可用方案（${validationSummary(error)}）。`,
-      error,
-    );
+    // A modify round already has a plan: the previous one, plus the user's own
+    // words as this round's change note. Losing the re-plan is a worse plan, not
+    // a reason to refuse an edit the coder can perfectly well make.
+    if (!input.current) {
+      throw new StudioPipelineError(
+        'PLAN_INVALID',
+        'studio.planner',
+        `规划阶段没有产出可用方案（${validationSummary(error)}）。`,
+        error,
+      );
+    }
+    planFallback = true;
+    plan = { ...input.current.plan, changeNote: input.request.trim().slice(0, 160) };
   }
   await emit({ type: 'plan', plan });
 
@@ -359,6 +369,7 @@ export async function runStudioPipeline(
     review: verdict ?? { verdict: 'pass', findings: [] },
     reviewRetryCount,
     reviewSkipped: verdict === undefined,
+    planFallback,
     validation: round.validation,
     codeAttempts,
     editBlockFailures,

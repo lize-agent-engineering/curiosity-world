@@ -232,6 +232,18 @@ describe('modifying an app', () => {
     });
   });
 
+  it('carries the previous plan forward when re-planning fails, rather than refusing the edit', async () => {
+    const bundle = models({
+      planner: ['规划失败了'],
+      coder: [editBlock('<h1>番茄钟</h1>', '<h1>专注钟</h1>')],
+    });
+    const result = await runStudioPipeline({ request: '标题改成专注钟', current }, bundle);
+    expect(result.planFallback).toBe(true);
+    expect(result.plan.features).toEqual(currentPlan.features);
+    expect(result.summary).toBe('标题改成专注钟');
+    expect(result.html).toContain('专注钟');
+  });
+
   it('carries the current app into the planner so unrelated features survive', async () => {
     const bundle = models({
       planner: [planJson()],
