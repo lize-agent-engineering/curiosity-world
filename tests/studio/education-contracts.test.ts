@@ -7,6 +7,7 @@ import {
   studioEducationPlannerOutputSchema,
   studioProjectSchema,
   studioTargetAgeSchema,
+  studioVersionSchema,
 } from '@/lib/studio/contracts';
 
 const base = {
@@ -78,5 +79,51 @@ describe('project mode', () => {
 
   it('defaults a project stored before the education surface to general', () => {
     expect(studioProjectSchema.parse(project).mode).toBe('general');
+  });
+});
+
+describe('storing an education version', () => {
+  const at = '2026-08-18T10:00:00.000Z';
+  const educationPlan = {
+    ...base,
+    knowledgePoints: ['距离越远，观察方向变化越小'],
+    misconceptions: ['月亮真的在追着我们跑'],
+  };
+
+  it('accepts a version whose plan carries the education-only fields', () => {
+    const version = studioVersionSchema.parse({
+      id: 'ver_one',
+      projectId: 'prj_one',
+      parentVersionId: null,
+      revision: 1,
+      html: '<!doctype html><html><body>x</body></html>',
+      summary: '第一版',
+      appKind: 'creative',
+      editMode: 'create',
+      jobId: 'job_one',
+      runtimeErrors: [],
+      createdAt: at,
+      plan: educationPlan,
+    });
+    expect(version.plan!.knowledgePoints).toEqual(['距离越远，观察方向变化越小']);
+  });
+
+  it('still accepts a general-mode version whose plan has neither field', () => {
+    expect(
+      studioVersionSchema.parse({
+        id: 'ver_one',
+        projectId: 'prj_one',
+        parentVersionId: null,
+        revision: 1,
+        html: '<html><body>x</body></html>',
+        summary: '第一版',
+        appKind: 'tool',
+        editMode: 'create',
+        jobId: 'job_one',
+        runtimeErrors: [],
+        createdAt: at,
+        plan: base,
+      }).plan!.misconceptions,
+    ).toBeUndefined();
   });
 });

@@ -86,13 +86,14 @@ describe('the education planner prompt', () => {
     expect(eleven).toContain('完整句子');
   });
 
-  it('asks for things the child does, with a transfer challenge and an ending', () => {
+  it('keeps the plan small enough to be written in one pass, with fixed parts out of it', () => {
     const prompt = renderStudioEducationPlannerPrompt({
       question: '海水为什么是咸的？',
       targetAge: 8,
     });
-    expect(prompt).toContain('孩子真正能做的事');
-    expect(prompt).toContain('换个情境再想一次');
+    expect(prompt).toContain('只写 **3 条**');
+    expect(prompt).toContain('一屏之内');
+    expect(prompt).toContain('固定组成部分');
   });
 
   it('carries the existing exploration forward on a modification', () => {

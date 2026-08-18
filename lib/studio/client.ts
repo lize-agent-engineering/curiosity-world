@@ -13,10 +13,10 @@ import {
   studioEditBlockRecordSchema,
   studioModeSchema,
   studioMessageSchema,
-  studioPlannerOutputSchema,
   studioProjectSchema,
   studioReviewSchema,
   studioRuntimeErrorSchema,
+  studioStoredPlanSchema,
   studioVersionSchema,
   type StudioMessage,
 } from './contracts';
@@ -45,7 +45,7 @@ export const studioJobViewSchema = z.object({
   codeLength: z.number().int().min(0),
   progress: z.number(),
   done: z.boolean(),
-  plan: studioPlannerOutputSchema.optional(),
+  plan: studioStoredPlanSchema.optional(),
   review: studioReviewSchema.optional(),
   editMode: z.enum(['create', 'patch', 'rewrite']).optional(),
   editBlockFailures: z.array(z.string()).optional(),
@@ -211,7 +211,7 @@ export async function pollStudioJob(
 }
 
 export interface StudioTurnArtifacts {
-  plan?: z.infer<typeof studioPlannerOutputSchema>;
+  plan?: z.infer<typeof studioStoredPlanSchema>;
   review?: z.infer<typeof studioReviewSchema>;
   editMode?: 'create' | 'patch' | 'rewrite';
   editBlockFailures?: string[];

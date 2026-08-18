@@ -87,10 +87,18 @@ export const studioEducationPlannerOutputSchema = studioPlannerOutputSchema.exte
   misconceptions: z.array(shortText).max(3),
 });
 
-export const studioPlanSchema = studioPlannerOutputSchema.extend({
-  appKind: z.unknown().transform(normalizeStudioAppKind),
+/**
+ * A plan as stored: the education fields are optional here so one shape covers
+ * both surfaces. Anything that persists a plan must use this rather than the
+ * planner's own strict output schema, which would reject the education fields.
+ */
+export const studioStoredPlanSchema = studioPlannerOutputSchema.extend({
   knowledgePoints: z.array(shortText).max(4).optional(),
   misconceptions: z.array(shortText).max(3).optional(),
+});
+
+export const studioPlanSchema = studioStoredPlanSchema.extend({
+  appKind: z.unknown().transform(normalizeStudioAppKind),
 });
 
 export type StudioPlan = z.infer<typeof studioPlanSchema>;
@@ -165,7 +173,7 @@ export const studioVersionSchema = z.strictObject({
    * stored rather than left on the job so the conversation card can still show
    * how this version was made after a reload.
    */
-  plan: studioPlannerOutputSchema.optional(),
+  plan: studioStoredPlanSchema.optional(),
   review: studioReviewSchema.optional(),
   editBlockFailures: z.array(z.string().max(64)).max(8).optional(),
   /** The edits this version was made by, when it came from a targeted patch. */
