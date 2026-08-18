@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { Output } from 'ai';
 
-import { callLLM } from '@/lib/ai/llm';
+import { callLLM, type LLMRetryOptions } from '@/lib/ai/llm';
 import { resolveModelFromRequest, type ResolvedModel } from '@/lib/server/resolve-model';
 import { CuriosityModelUnavailableError } from './api-handlers';
 import type { CuriosityAgentRole } from './agent-contracts';
@@ -19,9 +19,36 @@ function createTestInitialRoleModel(role: CuriosityAgentRole): CuriosityTextMode
       teamName: '月光观察队',
       rationale: '围绕远近比较和儿童动手观察，组建精简的科学探索团队。',
       members: [
-        { id: 'member_lead', name: '小满队长', role: 'lead', persona: '温和地串起问题和任务，只给孩子下一步线索。', avatar: '🌙', color: '#4F7DA1', priority: 10, voiceStyle: '温暖清楚，语速舒缓' },
-        { id: 'member_science', name: '远近博士', role: 'science', persona: '专门核对远近物体与观察方向，守住科学解释边界。', avatar: '🔭', color: '#927236', priority: 8, voiceStyle: '沉稳准确，句子简短' },
-        { id: 'member_interaction', name: '动手阿桥', role: 'interaction', persona: '把抽象规律变成孩子可以移动、比较和验证的动作。', avatar: '🧩', color: '#3F8066', priority: 7, voiceStyle: '活泼鼓励，节奏明快' },
+        {
+          id: 'member_lead',
+          name: '小满队长',
+          role: 'lead',
+          persona: '温和地串起问题和任务，只给孩子下一步线索。',
+          avatar: '🌙',
+          color: '#4F7DA1',
+          priority: 10,
+          voiceStyle: '温暖清楚，语速舒缓',
+        },
+        {
+          id: 'member_science',
+          name: '远近博士',
+          role: 'science',
+          persona: '专门核对远近物体与观察方向，守住科学解释边界。',
+          avatar: '🔭',
+          color: '#927236',
+          priority: 8,
+          voiceStyle: '沉稳准确，句子简短',
+        },
+        {
+          id: 'member_interaction',
+          name: '动手阿桥',
+          role: 'interaction',
+          persona: '把抽象规律变成孩子可以移动、比较和验证的动作。',
+          avatar: '🧩',
+          color: '#3F8066',
+          priority: 7,
+          voiceStyle: '活泼鼓励，节奏明快',
+        },
       ],
     });
   }
@@ -229,7 +256,7 @@ interface CuriosityRoleModelDependencies {
       output?: ReturnType<typeof Output.object>;
     },
     source: string,
-    retryOptions: undefined,
+    retryOptions: LLMRetryOptions | undefined,
     thinkingConfig: ResolvedModel['thinkingConfig'],
   ): Promise<{ text: string; output?: unknown }>;
 }
@@ -353,7 +380,15 @@ export async function resolveCuriosityRoleModel(
         abortSignal: AbortSignal.timeout(curiosityModelTimeoutMs()),
         ...(input.schema ? { output: Output.object({ schema: input.schema }) } : {}),
       };
-      const result = await dependencies.callModel(parameters, role, undefined, thinkingConfig);
+      // Structured-output calls occasionally come back with nothing generated
+      // (AI_NoOutputGeneratedError). That is thrown, so a retry recovers it.
+      // `validate` must stay permissive: the payload lands in `result.output`,
+      // and the default validator inspects `result.text`, which is empty for a
+      // schema call and would retry every success. The abort signal lives in
+      // `parameters` and is shared across attempts, so retries cannot extend
+      // the per-call timeout budget.
+      const retryOptions = input.schema ? { retries: 2, validate: () => true } : { retries: 2 };
+      const result = await dependencies.callModel(parameters, role, retryOptions, thinkingConfig);
       return input.schema ? JSON.stringify(result.output) : result.text;
     },
   };

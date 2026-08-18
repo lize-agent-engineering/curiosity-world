@@ -1,3 +1,5 @@
+import { CuriosityNarrationCache } from './narration-cache';
+
 interface SpeechSynthesisLike {
   cancel(): void;
   speak(utterance: SpeechUtteranceLike): void;
@@ -57,6 +59,8 @@ interface ManagedGuidancePlayerDependencies {
 }
 
 export class ManagedGuidancePlayer {
+  private readonly narrationCache: CuriosityNarrationCache;
+
   private active:
     | {
         audio: ControllableManagedAudioLike;
@@ -66,7 +70,21 @@ export class ManagedGuidancePlayer {
     | undefined;
   private request: AbortController | undefined;
 
-  constructor(private readonly dependencies: ManagedGuidancePlayerDependencies = {}) {}
+  constructor(
+    private readonly dependencies: ManagedGuidancePlayerDependencies = {},
+    cache?: CuriosityNarrationCache,
+  ) {
+    this.narrationCache =
+      cache ?? new CuriosityNarrationCache(dependencies.fetch ? { fetch: dependencies.fetch } : {});
+  }
+
+  /**
+   * Start synthesizing narration without waiting for playback. Callers use this
+   * the moment the text is known so the round trip overlaps with other work.
+   */
+  prefetch(text: string): void {
+    this.narrationCache.prefetch(text);
+  }
 
   stop(): void {
     this.request?.abort();
@@ -84,18 +102,11 @@ export class ManagedGuidancePlayer {
     this.stop();
     const request = new AbortController();
     this.request = request;
-    const fetchNarration = this.dependencies.fetch ?? globalThis.fetch;
     try {
-      const response = await fetchNarration('/api/curiosity/narration', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text }),
-        signal: request.signal,
-      });
-      if (!response.ok) throw new Error('TTS_FAILED: 语音旁白生成失败，请重试。');
+      const blob = await this.narrationCache.resolve(text, request.signal);
       if (request.signal.aborted) return;
       const createObjectURL = this.dependencies.createObjectURL ?? URL.createObjectURL.bind(URL);
-      const objectUrl = createObjectURL(await response.blob());
+      const objectUrl = createObjectURL(blob);
       if (request.signal.aborted) {
         (this.dependencies.revokeObjectURL ?? URL.revokeObjectURL.bind(URL))(objectUrl);
         return;

@@ -50,6 +50,7 @@ import {
 import {
   CURIOSITY_GENERATION_POLL_INTERVAL_MS,
   CURIOSITY_GENERATION_TIMEOUT_MS,
+  CURIOSITY_REVISION_BUDGET_MS,
   curiosityGenerationPollLimit,
 } from '@/lib/curiosity/live-timing';
 import {
@@ -83,6 +84,12 @@ export default function CuriosityExperiencePage() {
   const [mode, setMode] = useState<Mode>('child');
   const [instruction, setInstruction] = useState('');
   const [revising, setRevising] = useState(false);
+  const [revisionProgress, setRevisionProgress] = useState<string | null>(null);
+  const [regenerateProgress, setRegenerateProgress] = useState<{
+    progress: number;
+    message: string;
+  } | null>(null);
+  const revisionAbortRef = useRef<AbortController | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revisionImpact, setRevisionImpact] = useState<RevisionImpactArtifactV1 | undefined>();
@@ -273,6 +280,11 @@ export default function CuriosityExperiencePage() {
           },
         );
         const response = body.response as GuidanceTurnResponseV1;
+        // The narration text is final the moment the guide answers, so start
+        // synthesizing it now — the persistence round trips below no longer
+        // delay the child's audio.
+        guidancePlayerRef.current ??= new ManagedGuidancePlayer();
+        guidancePlayerRef.current.prefetch(response.narration);
         const next = applyGuidanceTurn(current, response, story, {
           experienceId,
           versionId: selected.id,
@@ -283,7 +295,6 @@ export default function CuriosityExperiencePage() {
         await syncCuriosityExperience(experienceId);
         setGuideNarration(response.narration);
         setGuideStatus(null);
-        guidancePlayerRef.current ??= new ManagedGuidancePlayer();
         await guidancePlayerRef.current.play(response.narration);
       });
       guidanceRequestQueueRef.current = operation.catch(() => undefined);
@@ -435,11 +446,28 @@ export default function CuriosityExperiencePage() {
     }
     setRevising(true);
     setError(null);
+    // The revision pipeline makes three sequential model calls, so it can run
+    // for minutes. Show elapsed time and stay cancellable rather than leaving
+    // the parent in front of a spinner that never resolves.
+    const controller = new AbortController();
+    revisionAbortRef.current = controller;
+    const startedAt = Date.now();
+    setRevisionProgress('正在分析修改影响…');
+    const ticker = window.setInterval(() => {
+      const seconds = Math.round((Date.now() - startedAt) / 1000);
+      setRevisionProgress(
+        seconds < 60
+          ? `正在校验候选版本…已等待 ${seconds} 秒`
+          : `正在校验候选版本…已等待 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒，比平时久，可以取消后重试`,
+      );
+    }, 1000);
+    const budget = window.setTimeout(() => controller.abort(), CURIOSITY_REVISION_BUDGET_MS);
     try {
       const body = await readApiJson(
         await fetch(`/api/curiosity/experiences/${experienceId}/revisions`, {
           method: 'POST',
           headers: getCuriosityApiHeaders('curiosity.revision-planner'),
+          signal: controller.signal,
           body: JSON.stringify({
             baseSpec: active.spec,
             experienceSpec: active.experienceSpec,
@@ -462,10 +490,25 @@ export default function CuriosityExperiencePage() {
       setMode('child');
       await refresh(spec.versionId);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      const aborted = cause instanceof Error && cause.name === 'AbortError';
+      setError(
+        aborted
+          ? '修改已取消。可以调整措辞后再试一次，或改用「换个角度再讲一遍」。'
+          : cause instanceof Error
+            ? cause.message
+            : String(cause),
+      );
     } finally {
+      window.clearInterval(ticker);
+      window.clearTimeout(budget);
+      revisionAbortRef.current = null;
       setRevising(false);
+      setRevisionProgress(null);
     }
+  };
+
+  const cancelRevision = () => {
+    revisionAbortRef.current?.abort();
   };
 
   const handleRegenerate = async () => {
@@ -507,6 +550,9 @@ export default function CuriosityExperiencePage() {
           window.setTimeout(resolve, CURIOSITY_GENERATION_POLL_INTERVAL_MS),
         );
         const job = await readApiJson(await fetch(pollUrl, { cache: 'no-store' }));
+        if (typeof job.progress === 'number' && typeof job.message === 'string') {
+          setRegenerateProgress({ progress: job.progress, message: job.message });
+        }
         if (job.status === 'failed') {
           throw new Error(`${String(job.errorCode)}: ${String(job.error)}`);
         }
@@ -537,6 +583,7 @@ export default function CuriosityExperiencePage() {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setRegenerating(false);
+      setRegenerateProgress(null);
     }
   };
 
@@ -683,9 +730,12 @@ export default function CuriosityExperiencePage() {
             revisionInstruction={instruction}
             revising={revising}
             regenerating={regenerating}
+            revisionProgress={revisionProgress}
+            regenerateProgress={regenerateProgress}
             error={describeExperienceFailure(error)}
             onRevisionInstructionChange={setInstruction}
             onSubmitRevision={handleRevision}
+            onCancelRevision={cancelRevision}
             onRegenerate={() => void handleRegenerate()}
             onSelectVersion={selectVersion}
           />
