@@ -164,7 +164,11 @@ function parseModelOutput<T>(
   try {
     return schema.parse(JSON.parse(raw));
   } catch (error) {
-    throw new CuriosityRevisionPipelineError(code, '修改模型输出不符合严格 Schema。', error);
+    throw new CuriosityRevisionPipelineError(
+      code,
+      `修改模型输出不符合严格 Schema：${deterministicFailureSummary(error)}`,
+      error,
+    );
   }
 }
 
@@ -189,7 +193,11 @@ async function completeRevisionPhase<T>(
     return parseModelOutput(await model.complete(input), schema, code);
   } catch (error) {
     if (error instanceof CuriosityRevisionPipelineError) throw error;
-    throw new CuriosityRevisionPipelineError(code, '修改模型输出不符合严格 Schema。', error);
+    throw new CuriosityRevisionPipelineError(
+      code,
+      `修改模型调用失败：${deterministicFailureSummary(error)}`,
+      error,
+    );
   }
 }
 
@@ -237,7 +245,8 @@ function validatePatchMatchesImpact(
   if (ageOperation?.op === 'set_age' && base.profile.age <= 7 !== ageOperation.age <= 7) {
     throw new CuriosityRevisionPipelineError(
       'REVISION_SCOPE_VIOLATION',
-      '跨年龄带修改需要重新生成故事与互动，不能作为字段补丁发布。',
+      `目标年龄 ${ageOperation.age} 岁与当前的 ${base.profile.age} 岁不在同一年龄带，` +
+        '故事与互动需要整体重写，受控修改做不到。请改用「换个角度再讲一遍」。',
     );
   }
 }

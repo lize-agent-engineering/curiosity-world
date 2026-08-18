@@ -166,7 +166,7 @@ export function CuriosityParentReview({
         >
           <h2 className="text-xl font-black">做一个受控修改</h2>
           <p className="mt-2 text-sm leading-6 text-[#b8cde2]">
-            支持年龄适配、精简文字、调整白名单任务与加入桌上远近实验。
+            支持年龄适配、精简文字、调整白名单任务与观察建议。
           </p>
           <textarea
             aria-label="修改要求"
@@ -174,7 +174,7 @@ export function CuriosityParentReview({
             onChange={(event) => onRevisionInstructionChange(event.target.value)}
             required
             rows={4}
-            placeholder="例如：改成适合 6 岁，并加入桌上远近实验"
+            placeholder="例如：把探索步骤的文字再精简一点"
             className="mt-4 w-full resize-none rounded-2xl border border-white/15 bg-[#091d3b] p-4 text-white outline-none transition focus:border-[#ffe08a] focus:ring-4 focus:ring-[#ffe08a]/10"
           />
           {error && (
