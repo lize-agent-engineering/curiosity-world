@@ -25,9 +25,12 @@ interface CuriosityParentReviewProps {
   revisionInstruction: string;
   revising: boolean;
   regenerating: boolean;
+  revisionProgress?: string | null;
+  regenerateProgress?: { progress: number; message: string } | null;
   error: string | null;
   onRevisionInstructionChange: (value: string) => void;
   onSubmitRevision: (event: FormEvent<HTMLFormElement>) => void;
+  onCancelRevision?: () => void;
   onRegenerate: () => void;
   onSelectVersion: (versionId: string) => void;
 }
@@ -42,9 +45,12 @@ export function CuriosityParentReview({
   revisionInstruction,
   revising,
   regenerating,
+  revisionProgress,
+  regenerateProgress,
   error,
   onRevisionInstructionChange,
   onSubmitRevision,
+  onCancelRevision,
   onRegenerate,
   onSelectVersion,
 }: CuriosityParentReviewProps) {
@@ -101,13 +107,26 @@ export function CuriosityParentReview({
           </p>
           <Button
             type="button"
-            disabled={regenerating || revising}
+            disabled={regenerating}
             onClick={onRegenerate}
             className="mt-4 h-12 w-full rounded-xl bg-[#fff0ae] font-black text-[#173047] hover:bg-[#fff5c9]"
           >
             <RefreshCw className={`size-4 ${regenerating ? 'animate-spin' : ''}`} />
             {regenerating ? '正在换一种方式' : '换一种方式呈现'}
           </Button>
+          {regenerating && regenerateProgress && (
+            <div className="mt-3" aria-live="polite">
+              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[#ffd76a] transition-[width] duration-500"
+                  style={{ width: `${Math.min(100, Math.max(0, regenerateProgress.progress))}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-[#c8dbef]">
+                {regenerateProgress.message}（{regenerateProgress.progress}%）
+              </p>
+            </div>
+          )}
         </section>
         <form
           onSubmit={onSubmitRevision}
@@ -123,7 +142,8 @@ export function CuriosityParentReview({
             onChange={(event) => onRevisionInstructionChange(event.target.value)}
             required
             rows={4}
-            className="mt-4 w-full resize-none rounded-2xl border border-white/15 bg-[#091d3b] p-4 text-white"
+            placeholder="例如：把探索步骤的文字再精简一点"
+            className="mt-4 w-full resize-none rounded-2xl border border-white/15 bg-[#091d3b] p-4 text-white outline-none transition focus:border-[#ffe08a] focus:ring-4 focus:ring-[#ffe08a]/10"
           />
           {error && (
             <p role="alert" className="mt-3 text-sm font-bold text-[#ff9d89]">
@@ -137,6 +157,20 @@ export function CuriosityParentReview({
             <RefreshCw className={`size-4 ${revising ? 'animate-spin' : ''}`} />
             {revising ? '正在校验候选版本' : '生成候选版本'}
           </Button>
+          {revising && (
+            <div className="mt-3 flex items-center justify-between gap-3" aria-live="polite">
+              <p className="text-xs text-[#c8dbef]">{revisionProgress}</p>
+              {onCancelRevision && (
+                <button
+                  type="button"
+                  onClick={onCancelRevision}
+                  className="shrink-0 rounded-lg border border-white/20 px-3 py-1 text-xs font-bold text-white hover:bg-white/10"
+                >
+                  取消
+                </button>
+              )}
+            </div>
+          )}
         </form>
         <section className="rounded-[1.75rem] border border-white/12 bg-white/[.07] p-6">
           <h2 className="flex items-center gap-2 font-black">

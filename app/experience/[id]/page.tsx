@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowLeft, Moon, Play, ScrollText } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { z } from 'zod';
@@ -48,7 +48,13 @@ export default function CuriosityExperiencePage() {
   const [instruction, setInstruction] = useState('');
   const [reflection, setReflection] = useState('');
   const [revising, setRevising] = useState(false);
+  const [revisionWaitedMs, setRevisionWaitedMs] = useState(0);
   const [regenerating, setRegenerating] = useState(false);
+  const [regenerateProgress, setRegenerateProgress] = useState<{
+    progress: number;
+    message: string;
+  } | null>(null);
+  const revisionAbortRef = useRef<AbortController | null>(null);
   const [narrationStarted, setNarrationStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -161,28 +167,45 @@ export default function CuriosityExperiencePage() {
   const handleRevision = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selected) return;
+    const controller = new AbortController();
+    revisionAbortRef.current = controller;
+    const startedAt = Date.now();
     setRevising(true);
+    setRevisionWaitedMs(0);
     setError(null);
+    const ticker = window.setInterval(() => setRevisionWaitedMs(Date.now() - startedAt), 1_000);
     try {
       const body = await readApiJson(
         await fetch(`/api/curiosity/experiences/${experienceId}/revisions`, {
           method: 'POST',
           headers: getCuriosityApiHeaders('curiosity.revision-planner'),
           body: JSON.stringify({ baseVersionId: selected.id, instruction }),
+          signal: controller.signal,
         }),
       );
       await addCandidateFromResult(body, body.artifacts, body.agentRuns);
       setInstruction('');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (controller.signal.aborted) {
+        setError('修改已取消。');
+      } else {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
     } finally {
+      window.clearInterval(ticker);
+      revisionAbortRef.current = null;
       setRevising(false);
     }
+  };
+
+  const handleCancelRevision = () => {
+    revisionAbortRef.current?.abort();
   };
 
   const handleRegenerate = async () => {
     if (!selected) return;
     setRegenerating(true);
+    setRegenerateProgress(null);
     setError(null);
     try {
       const created = await readApiJson(
@@ -201,6 +224,9 @@ export default function CuriosityExperiencePage() {
           window.setTimeout(resolve, CURIOSITY_GENERATION_POLL_INTERVAL_MS),
         );
         const job = await readApiJson(await fetch(String(created.pollUrl), { cache: 'no-store' }));
+        if (typeof job.progress === 'number' && typeof job.message === 'string') {
+          setRegenerateProgress({ progress: job.progress, message: job.message });
+        }
         if (job.status === 'failed')
           throw new Error(`${String(job.errorCode)}: ${String(job.error)}`);
         if (job.status === 'candidate_ready') {
@@ -219,6 +245,7 @@ export default function CuriosityExperiencePage() {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setRegenerating(false);
+      setRegenerateProgress(null);
     }
   };
 
@@ -375,9 +402,12 @@ export default function CuriosityExperiencePage() {
             revisionInstruction={instruction}
             revising={revising}
             regenerating={regenerating}
+            revisionProgress={`已等待 ${Math.floor(revisionWaitedMs / 1000)} 秒，修改需要三次模型调用`}
+            regenerateProgress={regenerateProgress}
             error={error}
             onRevisionInstructionChange={setInstruction}
             onSubmitRevision={handleRevision}
+            onCancelRevision={handleCancelRevision}
             onRegenerate={() => void handleRegenerate()}
             onSelectVersion={(versionId) => void selectVersion(versionId)}
           />
