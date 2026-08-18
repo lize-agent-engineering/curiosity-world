@@ -71,12 +71,19 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
   useEffect(() => {
     let cancelled = false;
     let seen = 0;
+    let streamingJobId: string | null = null;
     const controller = new AbortController();
     const tick = async () => {
       while (!cancelled) {
         await new Promise((resolve) => window.setTimeout(resolve, POLL_INTERVAL_MS));
         const jobId = activeJobIdRef.current;
         if (!jobId) continue;
+        // A new job restarts the stream; carrying the previous offset over would
+        // skip the opening chunk of its document.
+        if (jobId !== streamingJobId) {
+          streamingJobId = jobId;
+          seen = 0;
+        }
         try {
           const next = await pollStudioJob(jobId, seen, controller.signal);
           if (cancelled) return;
@@ -84,11 +91,8 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
           setCode((current) => foldStudioCode(current, next));
           setJob(next);
           if (next.done) {
+            // A failed job is reported on its own card, not in the page banner.
             setActiveJob(null);
-            seen = 0;
-            if (next.status === 'failed') {
-              setError(null);
-            }
             await refresh();
           }
         } catch (cause) {
