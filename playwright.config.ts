@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 process.env.NO_PROXY = [process.env.NO_PROXY, 'localhost', '127.0.0.1'].filter(Boolean).join(',');
 
+const port = process.env.CURIOSITY_E2E_PORT ?? '3002';
+
 export default defineConfig({
   testDir: './e2e/tests',
   fullyParallel: true,
@@ -10,7 +12,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? 'html' : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:3002',
+    baseURL: `http://127.0.0.1:${port}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -22,7 +24,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'tsx scripts/start-curiosity-e2e.ts',
-    url: 'http://127.0.0.1:3002',
+    url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

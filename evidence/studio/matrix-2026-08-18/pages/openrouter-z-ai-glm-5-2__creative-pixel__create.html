@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>像素画板</title>
+<style>
+:root{
+  --bg:#14161b;
+  --surface:#1d2129;
+  --surface-2:#262b35;
+  --text:#e9ecf3;
+  --muted:#8b94a4;
+  --accent:#5cc8ff;
+  --border:#2e333f;
+  --danger:#ff6b6b;
+  --radius:10px;
+  --radius-lg:16px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  min-height:100vh;
+  padding:16px;
+  -webkit-font-smoothing:antialiased;
+}
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-bottom:20px;
+}
+h1{font-size:20px;margin:0;font-weight:600;letter-spacing:.5px;}
+h1 .dot{color:var(--accent);}
+.subtitle{color:var(--muted);font-size:13px;margin-top:4px;}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;}
+.btn{
+  appearance:none;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text);
+  font:inherit;
+  font-size:13px;
+  padding:9px 14px;
+  border-radius:var(--radius);
+  cursor:pointer;
+  transition:background .15s,border-color .15s,transform .1s;
+  min-height:36px;
+}
+.btn:hover{background:var(--surface-2);border-color:#3a4150;}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.btn:active{transform:translateY(1px);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#0a1620;font-weight:600;}
+.btn-primary:hover{filter:brightness(1.08);background:var(--accent);}
+.btn-danger{color:var(--danger);border-color:#4a2e35;}
+.btn-danger:hover{background:#3a2229;border-color:var(--danger);}
+.layout{
+  display:flex;
+  gap:24px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+}
+.board-wrap{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:16px;
+}
+.canvas{
+  --cell:24px;
+  display:grid;
+  grid-template-columns:repeat(16,var(--cell));
+  grid-template-rows:repeat(16,var(--cell));
+  background:#fff;
+  border:1px solid var(--border);
+  touch-action:none;
+  user-select:none;
+  box-shadow:0 4px 20px rgba(0,0,0,.25);
+}
+.cell{
+  width:var(--cell);
+  height:var(--cell);
+  background:#fff;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.04);
+}
+.board-hint{color:var(--muted);font-size:12px;margin-top:12px;text-align:center;}
+.panel{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:16px;
+  min-width:220px;
+  flex:1;
+  max-width:320px;
+}
+.panel h2{font-size:14px;margin:0 0 12px;font-weight:600;}
+.swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.swatch{
+  appearance:none;
+  border:2px solid transparent;
+  border-radius:8px;
+  width:100%;
+  aspect-ratio:1;
+  cursor:pointer;
+  transition:transform .12s,border-color .15s,box-shadow .15s;
+  min-height:44px;
+}
+.swatch:hover{transform:scale(1.06);}
+.swatch:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.swatch:active{transform:scale(.95);}
+.swatch.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent);}
+.current{
+  margin-top:16px;
+  padding:12px;
+  background:var(--surface-2);
+  border-radius:var(--radius);
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.current-chip{
+  width:36px;height:36px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  flex-shrink:0;
+}
+.current-text{font-size:13px;}
+.current-text small{color:var(--muted);display:block;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+.tips{
+  margin-top:16px;
+  padding:12px;
+  background:var(--surface-2);
+  border-radius:var(--radius);
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.7;
+}
+.tips kbd{
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:1px 5px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px;
+  color:var(--text);
+}
+.overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.6);
+  display:flex;align-items:center;justify-content:center;
+  z-index:50;
+  padding:16px;
+  animation:fade .15s;
+}
+.overlay[hidden]{display:none;}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:24px;
+  max-width:360px;
+  width:100%;
+  box-shadow:0 12px 40px rgba(0,0,0,.5);
+}
+.modal h3{margin:0 0 8px;font-size:16px;}
+.modal p{margin:0 0 20px;color:var(--muted);font-size:13px;line-height:1.6;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+.export-img{
+  width:100%;
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:#fff;
+  display:block;
+  margin-bottom:12px;
+}
+.export-area{
+  width:100%;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px;
+  background:var(--bg);
+  color:var(--text);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:8px;
+  resize:none;
+  height:60px;
+  margin-bottom:12px;
+}
+.toast{
+  position:fixed;
+  bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(20px);
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  color:var(--text);
+  padding:10px 18px;
+  border-radius:var(--radius);
+  font-size:13px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .2s,transform .2s;
+  z-index:60;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+@media (max-width:640px){
+  .layout{flex-direction:column;}
+  .panel{max-width:none;width:100%;}
+}
+@media (max-width:420px){
+  .canvas{--cell:20px;}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>像素画板<span class="dot">.</span></h1>
+    <div class="subtitle">16×16 网格 · 左键绘制 · 右键擦除</div>
+  </div>
+  <div class="toolbar">
+    <button class="btn" id="undoBtn" title="撤销 (Ctrl+Z)">撤销</button>
+    <button class="btn" id="redoBtn" title="重做 (Ctrl+Shift+Z)">重做</button>
+    <button class="btn" id="randomBtn">随机示例</button>
+    <button class="btn" id="exportBtn">导出图片</button>
+    <button class="btn btn-danger" id="clearBtn">清空画布</button>
+    <button class="btn btn-primary" id="saveBtn">保存作品</button>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="board-wrap">
+    <div class="canvas" id="canvas"></div>
+    <div class="board-hint">左键画 · 右键擦 · 可拖拽连续绘制</div>
+  </div>
+  <div class="panel">
+    <h2>选择颜色</h2>
+    <div class="swatches" id="swatches"></div>
+    <div class="current">
+      <div class="current-chip" id="currentChip"></div>
+      <div class="current-text">当前画笔<small id="currentColorText">#000000</small></div>
+    </div>
+    <div class="tips">
+      <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销 · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 重做</div>
+      <div style="margin-top:4px;">右键拖拽即可擦除，无需切换工具</div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">清空画布？</h3>
+    <p>所有 256 个格子将被重置为白色。你仍然可以用撤销恢复。</p>
+    <div class="modal-actions">
+      <button class="btn" id="modalCancel">取消</button>
+      <button class="btn btn-danger" id="modalConfirm">确认清空</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="exportOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+    <h3 id="exportTitle">导出图片</h3>
+    <p>长按或右键图片可保存；也可复制下方链接到浏览器打开。</p>
+    <img class="export-img" id="exportImg" alt="导出预览">
+    <textarea class="export-area" id="exportArea" readonly aria-label="图片数据链接"></textarea>
+    <div class="modal-actions">
+      <button class="btn" id="exportClose">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  'use strict';
+  const PRESETS=['#000000','#ff4d4d','#ff9f40','#ffe44d','#3ddc84','#4d9fff','#9b6bff','#ff7eb6'];
+  const SIZE=16;
+  const TOTAL=SIZE*SIZE;
+  const WHITE='#ffffff';
+  const STORAGE_KEY='pixel-board-v1';
+
+  const canvas=document.getElementById('canvas');
+  const swatchesEl=document.getElementById('swatches');
+  const currentChip=document.getElementById('currentChip');
+  const currentColorText=document.getElementById('currentColorText');
+  const undoBtn=document.getElementById('undoBtn');
+  const redoBtn=document.getElementById('redoBtn');
+  const randomBtn=document.getElementById('randomBtn');
+  const exportBtn=document.getElementById('exportBtn');
+  const clearBtn=document.getElementById('clearBtn');
+  const saveBtn=document.getElementById('saveBtn');
+  const overlay=document.getElementById('overlay');
+  const modalCancel=document.getElementById('modalCancel');
+  const modalConfirm=document.getElementById('modalConfirm');
+  const exportOverlay=document.getElementById('exportOverlay');
+  const exportImg=document.getElementById('exportImg');
+  const exportArea=document.getElementById('exportArea');
+  const exportClose=document.getElementById('exportClose');
+  const toastEl=document.getElementById('toast');
+
+  let state=new Array(TOTAL).fill(WHITE);
+  let currentColor=PRESETS[0];
+  let drawing=false, erasing=false, changed=false, snapshot=null;
+  let undoStack=[], redoStack=[];
+
+  // 构建格子
+  const cells=[];
+  for(let i=0;i<TOTAL;i++){
+    const c=document.createElement('div');
+    c.className='cell';
+    c.dataset.i=i;
+    canvas.appendChild(c);
+    cells.push(c);
+  }
+
+  function renderCell(i){ cells[i].style.background=state[i]; }
+  function renderAll(){ for(let i=0;i<TOTAL;i++) renderCell(i); }
+
+  function setCell(i,color){
+    if(state[i]===color) return;
+    state[i]=color;
+    renderCell(i);
+    changed=true;
+  }
+
+  function updateCurrent(){
+    currentChip.style.background=currentColor;
+    currentColorText.textContent=currentColor.toUpperCase();
+  }
+
+  function selectColor(color){
+    currentColor=color;
+    [...swatchesEl.children].forEach(s=>{
+      s.classList.toggle('active', s.dataset.color===color);
+    });
+    updateCurrent();
+  }
+
+  // 颜色面板
+  PRESETS.forEach((color,idx)=>{
+    const sw=document.createElement('button');
+    sw.className='swatch'+(idx===0?' active':'');
+    sw.style.background=color;
+    sw.dataset.color=color;
+    sw.setAttribute('aria-label','选择颜色 '+color);
+    sw.addEventListener('click',()=>selectColor(color));
+    swatchesEl.appendChild(sw);
+  });
+  updateCurrent();
+
+  // 历史栈
+  function pushHistory(prev){
+    undoStack.push(prev);
+    if(undoStack.length>50) undoStack.shift();
+    redoStack=[];
+    updateHistoryButtons();
+  }
+  function updateHistoryButtons(){
+    undoBtn.disabled=undoStack.length===0;
+    redoBtn.disabled=redoStack.length===0;
+  }
+  function undo(){
+    if(!undoStack.length) return;
+    redoStack.push(state.slice());
+    state=undoStack.pop();
+    renderAll();
+    save();
+    updateHistoryButtons();
+  }
+  function redo(){
+    if(!redoStack.length) return;
+    undoStack.push(state.slice());
+    state=redoStack.pop();
+    renderAll();
+    save();
+    updateHistoryButtons();
+  }
+
+  function save(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+  function load(){
+    try{
+      const raw=localStorage.getItem(STORAGE_KEY);
+      if(!raw) return;
+      const arr=JSON.parse(raw);
+      if(Array.isArray(arr) && arr.length===TOTAL){
+        state=arr.map(c=>(typeof c==='string'&&c)?c:WHITE);
+        renderAll();
+      }
+    }catch(e){}
+  }
+
+  function showToast(msg){
+    toastEl.textContent=msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastEl._t);
+    toastEl._t=setTimeout(()=>toastEl.classList.remove('show'),2000);
+  }
+
+  // 绘制事件
+  canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+  function cellFromPoint(x,y){
+    const el=document.elementFromPoint(x,y);
+    if(el && el.classList && el.classList.contains('cell')) return parseInt(el.dataset.i,10);
+    return -1;
+  }
+
+  canvas.addEventListener('pointerdown',e=>{
+    if(e.button!==0 && e.button!==2) return;
+    e.preventDefault();
+    drawing=true;
+    erasing=e.button===2;
+    changed=false;
+    snapshot=state.slice();
+    const color=erasing?WHITE:currentColor;
+    const i=cellFromPoint(e.clientX,e.clientY);
+    if(i>=0) setCell(i,color);
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+  });
+
+  canvas.addEventListener('pointermove',e=>{
+    if(!drawing) return;
+    const color=erasing?WHITE:currentColor;
+    const i=cellFromPoint(e.clientX,e.clientY);
+    if(i>=0) setCell(i,color);
+  });
+
+  function endStroke(){
+    if(drawing){
+      drawing=false;
+      if(changed){
+        pushHistory(snapshot);
+        save();
+      }
+    }
+  }
+  canvas.addEventListener('pointerup',endStroke);
+  canvas.addEventListener('pointercancel',endStroke);
+
+  // 操作
+  function clearCanvas(){
+    const prev=state.slice();
+    state=new Array(TOTAL).fill(WHITE);
+    renderAll();
+    pushHistory(prev);
+    save();
+    showToast('画布已清空');
+  }
+  function randomExample(){
+    const prev=state.slice();
+    const ns=new Array(TOTAL).fill(WHITE);
+    for(let y=0;y<SIZE;y++){
+      for(let x=0;x<8;x++){
+        if(Math.random()<0.45){
+          const color=PRESETS[Math.floor(Math.random()*PRESETS.length)];
+          ns[y*SIZE+x]=color;
+          ns[y*SIZE+(SIZE-1-x)]=color;
+        }
+      }
+    }
+    state=ns;
+    renderAll();
+    pushHistory(prev);
+    save();
+    showToast('已生成随机图案');
+  }
+  function exportImage(){
+    const small=document.createElement('canvas');
+    small.width=SIZE; small.height=SIZE;
+    const sctx=small.getContext('2d');
+    for(let i=0;i<TOTAL;i++){
+      const x=i%SIZE, y=Math.floor(i/SIZE);
+      sctx.fillStyle=state[i];
+      sctx.fillRect(x,y,1,1);
+    }
+    const big=document.createElement('canvas');
+    big.width=SIZE*16; big.height=SIZE*16;
+    const bctx=big.getContext('2d');
+    bctx.imageSmoothingEnabled=false;
+    bctx.drawImage(small,0,0,big.width,big.height);
+    const url=big.toDataURL('image/png');
+    exportImg.src=url;
+    exportArea.value=url;
+    exportOverlay.hidden=false;
+    setTimeout(()=>exportClose.focus(),0);
+  }
+
+  clearBtn.addEventListener('click',()=>{
+    overlay.hidden=false;
+    setTimeout(()=>modalCancel.focus(),0);
+  });
+  modalCancel.addEventListener('click',()=>{ overlay.hidden=true; });
+  modalConfirm.addEventListener('click',()=>{
+    overlay.hidden=true;
+    clearCanvas();
+  });
+  overlay.addEventListener('click',e=>{
+    if(e.target===overlay){ overlay.hidden=true; }
+  });
+  saveBtn.addEventListener('click',()=>{ save(); showToast('已保存到本地'); });
+  randomBtn.addEventListener('click',randomExample);
+  exportBtn.addEventListener('click',exportImage);
+  exportClose.addEventListener('click',()=>{ exportOverlay.hidden=true; });
+  exportOverlay.addEventListener('click',e=>{
+    if(e.target===exportOverlay) exportOverlay.hidden=true;
+  });
+  undoBtn.addEventListener('click',undo);
+  redoBtn.addEventListener('click',redo);
+
+  // 快捷键
+  document.addEventListener('keydown',e=>{
+    const tag=e.target.tagName;
+    if(tag==='TEXTAREA'||tag==='INPUT') return;
+    const mod=e.ctrlKey||e.metaKey;
+    if(mod && e.key.toLowerCase()==='z'){
+      e.preventDefault();
+      if(e.shiftKey) redo(); else undo();
+    }
+    if(e.key==='Escape'){
+      if(!overlay.hidden) overlay.hidden=true;
+      if(!exportOverlay.hidden) exportOverlay.hidden=true;
+    }
+  });
+
+  // 初始化
+  load();
+  updateHistoryButtons();
+})();
+</script>
+</body>
+</html>

@@ -68,4 +68,6 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 --ingroup
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 USER nextjs
 
-CMD ["pnpm", "worker:curiosity"]
+# One process drives both queues (studio + curiosity) on independent loops, so a
+# single worker container serves both products.
+CMD ["pnpm", "worker"]

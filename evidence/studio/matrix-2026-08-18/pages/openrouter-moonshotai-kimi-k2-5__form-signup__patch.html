@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>活动报名登记表</title>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --text: #e8e8e8;
+      --muted: #8a8a8a;
+      --accent: #5e9cff;
+      --border: #2a2a2a;
+      --error: #ff6b6b;
+      --success: #51cf66;
+      --radius-sm: 10px;
+      --radius-lg: 16px;
+      --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 48px 16px;
+      line-height: 1.5;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+      text-align: center;
+      letter-spacing: -0.02em;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+
+    .required::after {
+      content: " *";
+      color: var(--accent);
+    }
+
+    input[type="text"],
+    input[type="tel"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 1rem;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input[type="text"]:focus,
+    input[type="tel"]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(94, 156, 255, 0.15);
+    }
+
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+    }
+
+    select option {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .tag-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 14px;
+      font-size: 0.875rem;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+      min-height: 36px;
+    }
+
+    .tag:hover {
+      border-color: var(--accent);
+    }
+
+    .tag:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .tag.active {
+      background: rgba(94, 156, 255, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .tag-input-wrapper {
+      margin-top: 12px;
+    }
+
+    .tag-input-wrapper.hidden {
+      display: none;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+      font-size: 0.9375rem;
+    }
+
+    .error-msg {
+      display: none;
+      font-size: 0.8125rem;
+      color: var(--error);
+      margin-top: 6px;
+    }
+
+    .error-msg.visible {
+      display: block;
+    }
+
+    .input-error {
+      border-color: var(--error) !important;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 20px;
+      font-size: 1rem;
+      font-weight: 500;
+      font-family: inherit;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      min-height: 48px;
+      width: 100%;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.1);
+    }
+
+    .btn-primary:active {
+      filter: brightness(0.95);
+      transform: scale(0.98);
+    }
+
+    .btn-primary:disabled {
+      background: var(--muted);
+      cursor: not-allowed;
+      filter: none;
+    }
+
+    .btn-secondary {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+    }
+
+    .btn-secondary:active {
+      transform: scale(0.98);
+    }
+
+    .btn-danger {
+      background: rgba(255, 107, 107, 0.1);
+      color: var(--error);
+      border: 1px solid var(--error);
+    }
+
+    .btn-danger:hover {
+      background: rgba(255, 107, 107, 0.2);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .btn-row .btn {
+      flex: 1;
+    }
+
+    .bottom-link {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .bottom-link a {
+      color: var(--accent);
+      font-size: 0.9375rem;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .bottom-link a:hover {
+      text-decoration: underline;
+    }
+
+    /* 确认态 */
+    .result-card {
+      display: none;
+    }
+
+    .result-card.active {
+      display: block;
+    }
+
+    .form-card.hidden {
+      display: none;
+    }
+
+    .registration-id {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .registration-id .label {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .registration-id .id-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.05em;
+    }
+
+    .info-list {
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .info-item {
+      display: flex;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .info-item:last-child {
+      border-bottom: none;
+    }
+
+    .info-item .info-label {
+      width: 80px;
+      flex-shrink: 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .info-item .info-value {
+      flex: 1;
+      font-size: 0.9375rem;
+      word-break: break-all;
+    }
+
+    /* 模态层 */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 420px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      padding: 32px 0;
+      font-size: 0.9375rem;
+    }
+
+    .record-card {
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .record-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .record-id {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .record-time {
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+
+    .record-row {
+      display: flex;
+      padding: 6px 0;
+      font-size: 0.875rem;
+    }
+
+    .record-row .r-label {
+      width: 70px;
+      flex-shrink: 0;
+      color: var(--muted);
+    }
+
+    .record-row .r-value {
+      flex: 1;
+      word-break: break-all;
+    }
+
+    .modal-close {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+    }
+
+    /* 提示条 */
+    .toast {
+      display: none;
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 12px 24px;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow);
+      z-index: 200;
+      font-size: 0.9375rem;
+    }
+
+    .toast.visible {
+      display: block;
+      animation: slideDown 0.2s ease;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    /* 下载结果区域 */
+    .download-result {
+      display: none;
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+
+    .download-result.visible {
+      display: block;
+    }
+
+    .download-result pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 8px;
+      line-height: 1.6;
+    }
+
+    .download-result .hint {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 12px;
+      }
+
+      .card {
+        padding: 24px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- 表单态 -->
+    <div class="card form-card" id="formCard">
+      <h1 class="page-title">活动报名</h1>
+      <form id="registrationForm" novalidate>
+        <div class="form-group">
+          <label for="name" class="required">姓名</label>
+          <input type="text" id="name" name="name" placeholder="请输入姓名" maxlength="20" autocomplete="name">
+          <div class="error-msg" id="nameError">姓名不能为空，且长度需在1-20个字符之间</div>
+        </div>
+
+        <div class="form-group">
+          <label for="phone" class="required">手机号</label>
+          <input type="tel" id="phone" name="phone" placeholder="请输入11位手机号" maxlength="11" autocomplete="tel">
+          <div class="error-msg" id="phoneError">请输入正确的11位手机号（以1开头）</div>
+        </div>
+
+        <div class="form-group">
+          <label for="session" class="required">场次选择</label>
+          <select id="session" name="session">
+            <option value="">请选择场次</option>
+          </select>
+          <div class="error-msg" id="sessionError">请选择一个场次</div>
+        </div>
+
+        <div class="form-group">
+          <label>饮食忌口</label>
+          <div class="tag-group" id="dietTags" role="group" aria-label="饮食忌口选项">
+            <button type="button" class="tag" data-value="无">无</button>
+            <button type="button" class="tag" data-value="素食">素食</button>
+            <button type="button" class="tag" data-value="不含坚果">不含坚果</button>
+            <button type="button" class="tag" data-value="不含海鲜">不含海鲜</button>
+            <button type="button" class="tag" data-value="其它">其它</button>
+          </div>
+          <div class="tag-input-wrapper hidden" id="otherInputWrapper">
+            <textarea id="otherDiet" placeholder="请填写其它饮食忌口（限30字）" maxlength="30"></textarea>
+          </div>
+          <div class="error-msg" id="dietError">选择了"其它"时，请填写具体内容</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submitBtn">提交报名</button>
+      </form>
+
+      <div class="bottom-link">
+        <a href="#" id="viewMyReg">查看我的报名</a>
+      </div>
+    </div>
+
+    <!-- 确认态 -->
+    <div class="card result-card" id="resultCard">
+      <h1 class="page-title">报名成功</h1>
+      <div class="registration-id">
+        <div class="label">报名号</div>
+        <div class="id-value" id="regIdDisplay">--</div>
+      </div>
+      <div class="info-list">
+        <div class="info-item">
+          <div class="info-label">姓名</div>
+          <div class="info-value" id="resName">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">手机号</div>
+          <div class="info-value" id="resPhone">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">场次</div>
+          <div class="info-value" id="resSession">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">饮食忌口</div>
+          <div class="info-value" id="resDiet">--</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btnBack">返回修改</button>
+        <button class="btn btn-primary" id="btnDownload">下载回执</button>
+      </div>
+      <div class="download-result" id="downloadResult">
+        <div class="hint">由于沙箱限制，请复制下方内容保存为 .txt 文件：</div>
+        <pre id="downloadContent"></pre>
+      </div>
+      <div class="bottom-link">
+        <a href="#" id="viewMyReg2">查看我的报名</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 我的报名 模态层 -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-card">
+      <h2 class="modal-title">我的报名</h2>
+      <div id="modalContent">
+        <div class="empty-state">暂无报名记录</div>
+      </div>
+      <button class="btn btn-secondary modal-close" id="modalClose">关闭</button>
+    </div>
+  </div>
+
+  <!-- 提示条 -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      // ===== DOM 元素 =====
+      const formCard = document.getElementById('formCard');
+      const resultCard = document.getElementById('resultCard');
+      const form = document.getElementById('registrationForm');
+      const nameInput = document.getElementById('name');
+      const phoneInput = document.getElementById('phone');
+      const sessionSelect = document.getElementById('session');
+      const dietTags = document.getElementById('dietTags');
+      const otherInputWrapper = document.getElementById('otherInputWrapper');
+      const otherDietInput = document.getElementById('otherDiet');
+      const submitBtn = document.getElementById('submitBtn');
+      const viewMyReg = document.getElementById('viewMyReg');
+      const viewMyReg2 = document.getElementById('viewMyReg2');
+      const modalOverlay = document.getElementById('modalOverlay');
+      const modalContent = document.getElementById('modalContent');
+      const modalClose = document.getElementById('modalClose');
+      const btnBack = document.getElementById('btnBack');
+      const btnDownload = document.getElementById('btnDownload');
+      const downloadResult = document.getElementById('downloadResult');
+      const downloadContent = document.getElementById('downloadContent');
+      const toast = document.getElementById('toast');
+
+      // 确认态显示元素
+      const regIdDisplay = document.getElementById('regIdDisplay');
+      const resName = document.getElementById('resName');
+      const resPhone = document.getElementById('resPhone');
+      const resSession = document.getElementById('resSession');
+      const resDiet = document.getElementById('resDiet');
+
+      // 错误信息元素
+      const nameError = document.getElementById('nameError');
+      const phoneError = document.getElementById('phoneError');
+      const sessionError = document.getElementById('sessionError');
+      const dietError = document.getElementById('dietError');
+
+      // ===== 常量 =====
+      const STORAGE_KEY = 'activity_registration_v1';
+      const DRAFT_KEY = 'activity_draft_v1';
+      const SESSION_LIMIT = 20;
+      const SESSIONS = [
+        { value: '上午场 09:00', label: '上午场 09:00' },
+        { value: '下午场 14:00', label: '下午场 14:00' },
+        { value: '晚场 19:00', label: '晚场 19:00' }
+      ];
+
+      // ===== 状态 =====
+      let selectedDiet = [];
+      let currentRegistration = null;
+
+      // ===== 工具函数 =====
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add('visible');
+        setTimeout(() => toast.classList.remove('visible'), 2500);
+      }
+
+      function generateId() {
+        const now = Date.now();
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        return 'REG-' + now.toString().slice(-8) + '-' + random;
+      }
+
+      function formatDate(ts) {
+        const d = new Date(ts);
+        const pad = n => n.toString().padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+
+      function getStorage() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function saveStorage(records) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      }
+
+      function getDraft() {
+        try {
+          const raw = localStorage.getItem(DRAFT_KEY);
+          if (!raw) return null;
+          return JSON.parse(raw);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function saveDraft(draft) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      }
+
+      function clearDraft() {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+
+      function getSessionCount(sessionValue) {
+        const records = getStorage();
+        return records.filter(r => r.session === sessionValue).length;
+      }
+
+      function updateSessionOptions() {
+        const currentVal = sessionSelect.value;
+        sessionSelect.innerHTML = '<option value="">请选择场次</option>';
+        
+        SESSIONS.forEach(sess => {
+          const count = getSessionCount(sess.value);
+          const remaining = SESSION_LIMIT - count;
+          const option = document.createElement('option');
+          option.value = sess.value;
+          
+          if (remaining <= 0) {
+            option.textContent = sess.label + '（已满）';
+            option.disabled = true;
+          } else {
+            option.textContent = sess.label + '（余 ' + remaining + ' 席）';
+          }
+          
+          sessionSelect.appendChild(option);
+        });
+        
+        if (currentVal) {
+          const option = sessionSelect.querySelector('option[value="' + currentVal + '"]');
+          if (option && !option.disabled) {
+            sessionSelect.value = currentVal;
+          } else {
+            sessionSelect.value = '';
+          }
+        }
+      }
+
+      // ===== 校验 =====
+      function validateName(val) {
+        return val && val.trim().length > 0 && val.trim().length <= 20;
+      }
+
+      function validatePhone(val) {
+        return /^1\d{10}$/.test(val);
+      }
+
+      function validateSession(val) {
+        return val && val.length > 0;
+      }
+
+      function validateDiet() {
+        if (selectedDiet.includes('其它')) {
+          const otherVal = otherDietInput.value.trim();
+          return otherVal.length > 0 && otherVal.length <= 30;
+        }
+        return true;
+      }
+
+      function clearErrors() {
+        [nameInput, phoneInput, sessionSelect, otherDietInput].forEach(el => {
+          if (el) el.classList.remove('input-error');
+        });
+        [nameError, phoneError, sessionError, dietError].forEach(el => el.classList.remove('visible'));
+      }
+
+      function showFieldError(field, errorEl) {
+        field.classList.add('input-error');
+        errorEl.classList.add('visible');
+      }
+
+      // ===== 标签交互 =====
+      function updateTagUI() {
+        const tags = dietTags.querySelectorAll('.tag');
+        tags.forEach(tag => {
+          const val = tag.dataset.value;
+          if (selectedDiet.includes(val)) {
+            tag.classList.add('active');
+            tag.setAttribute('aria-pressed', 'true');
+          } else {
+            tag.classList.remove('active');
+            tag.setAttribute('aria-pressed', 'false');
+          }
+        });
+
+        if (selectedDiet.includes('其它')) {
+          otherInputWrapper.classList.remove('hidden');
+        } else {
+          otherInputWrapper.classList.add('hidden');
+          otherDietInput.value = '';
+        }
+      }
+
+      dietTags.querySelectorAll('.tag').forEach(tag => {
+        tag.addEventListener('click', () => {
+          const val = tag.dataset.value;
+          if (val === '无') {
+            if (selectedDiet.includes('无')) {
+              selectedDiet = [];
+            } else {
+              selectedDiet = ['无'];
+            }
+          } else {
+            if (selectedDiet.includes('无')) {
+              selectedDiet = selectedDiet.filter(v => v !== '无');
+            }
+            if (selectedDiet.includes(val)) {
+              selectedDiet = selectedDiet.filter(v => v !== val);
+            } else {
+              selectedDiet.push(val);
+            }
+          }
+          updateTagUI();
+          saveFormDraft();
+        });
+      });
+
+      // ===== 草稿 =====
+      function saveFormDraft() {
+        const draft = {
+          name: nameInput.value.trim(),
+          phone: phoneInput.value.trim(),
+          session: sessionSelect.value,
+          diet: [...selectedDiet],
+          otherDiet: otherDietInput.value.trim()
+        };
+        saveDraft(draft);
+      }
+
+      function loadFormDraft() {
+        const draft = getDraft();
+        if (!draft) return;
+        nameInput.value = draft.name || '';
+        phoneInput.value = draft.phone || '';
+        sessionSelect.value = draft.session || '';
+        selectedDiet = Array.isArray(draft.diet) ? [...draft.diet] : [];
+        otherDietInput.value = draft.otherDiet || '';
+        updateTagUI();
+      }
+
+      // 输入时保存草稿
+      [nameInput, phoneInput, sessionSelect, otherDietInput].forEach(el => {
+        el.addEventListener('input', saveFormDraft);
+        el.addEventListener('change', saveFormDraft);
+      });
+
+      // ===== 提交 =====
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        clearErrors();
+
+        const name = nameInput.value.trim();
+        const phone = phoneInput.value.trim();
+        const session = sessionSelect.value;
+
+        let hasError = false;
+        let firstErrorField = null;
+
+        if (!validateName(name)) {
+          showFieldError(nameInput, nameError);
+          hasError = true;
+          if (!firstErrorField) firstErrorField = nameInput;
+        }
+
+        if (!validatePhone(phone)) {
+          showFieldError(phoneInput, phoneError);
+          hasError = true;
+          if (!firstErrorField) firstErrorField = phoneInput;
+        }
+
+        if (!validateSession(session)) {
+          sessionError.textContent = '请选择一个场次';
+          showFieldError(sessionSelect, sessionError);
+          hasError = true;
+          if (!firstErrorField) firstErrorField = sessionSelect;
+        }
+
+        if (!hasError) {
+          const sessionCount = getSessionCount(session);
+          if (sessionCount >= SESSION_LIMIT) {
+            sessionError.textContent = '该场次已报满，请改选其它场次';
+            showFieldError(sessionSelect, sessionError);
+            sessionSelect.value = '';
+            updateSessionOptions();
+            sessionSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            sessionSelect.focus();
+            return;
+          }
+        }
+
+        if (!validateDiet()) {
+          showFieldError(otherDietInput, dietError);
+          hasError = true;
+          if (!firstErrorField) firstErrorField = otherDietInput;
+        }
+
+        if (hasError) {
+          if (firstErrorField) {
+            firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstErrorField.focus();
+          }
+          return;
+        }
+
+        // 构建饮食忌口文本
+        let dietText = '无';
+        if (selectedDiet.length > 0) {
+          if (selectedDiet.includes('其它')) {
+            const otherVal = otherDietInput.value.trim();
+            const others = selectedDiet.filter(v => v !== '其它');
+            if (others.length > 0) {
+              dietText = others.join('、') + '、其它：' + otherVal;
+            } else {
+              dietText = '其它：' + otherVal;
+            }
+          } else {
+            dietText = selectedDiet.join('、');
+          }
+        }
+
+        const regId = generateId();
+        const record = {
+          id: regId,
+          name: name,
+          phone: phone,
+          session: session,
+          diet: dietText,
+          rawDiet: [...selectedDiet],
+          otherDiet: selectedDiet.includes('其它') ? otherDietInput.value.trim() : '',
+          createdAt: Date.now()
+        };
+
+        // 保存到 storage
+        const records = getStorage();
+        records.unshift(record);
+        saveStorage(records);
+
+        // 清除草稿
+        clearDraft();
+
+        // 显示确认态
+        currentRegistration = record;
+        showResult(record);
+      });
+
+      function showResult(record) {
+        formCard.classList.add('hidden');
+        resultCard.classList.add('active');
+        downloadResult.classList.remove('visible');
+
+        regIdDisplay.textContent = record.id;
+        resName.textContent = record.name;
+        resPhone.textContent = record.phone;
+        resSession.textContent = record.session;
+        resDiet.textContent = record.diet;
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      // ===== 返回修改 =====
+      btnBack.addEventListener('click', () => {
+        resultCard.classList.remove('active');
+        formCard.classList.remove('hidden');
+        downloadResult.classList.remove('visible');
+
+        // 恢复表单数据
+        if (currentRegistration) {
+          nameInput.value = currentRegistration.name;
+          phoneInput.value = currentRegistration.phone;
+          sessionSelect.value = currentRegistration.session;
+          selectedDiet = Array.isArray(currentRegistration.rawDiet) ? [...currentRegistration.rawDiet] : [];
+          otherDietInput.value = currentRegistration.otherDiet || '';
+          updateTagUI();
+          saveFormDraft();
+        }
+
+        updateSessionOptions();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      // ===== 下载回执 =====
+      btnDownload.addEventListener('click', () => {
+        if (!currentRegistration) return;
+
+        const content = [
+          '活动报名回执',
+          '================',
+          '报名号：' + currentRegistration.id,
+          '姓名：' + currentRegistration.name,
+          '手机号：' + currentRegistration.phone,
+          '场次：' + currentRegistration.session,
+          '饮食忌口：' + currentRegistration.diet,
+          '报名时间：' + formatDate(currentRegistration.createdAt),
+          '================',
+          '请妥善保管此回执'
+        ].join('\n');
+
+        const filename = 'registration-' + currentRegistration.id + '.txt';
+
+        // 尝试创建下载
+        try {
+          const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('回执已生成');
+        } catch (err) {
+          // 沙箱拦截时显示复制内容
+          downloadContent.textContent = content;
+          downloadResult.classList.add('visible');
+          showToast('请复制下方内容保存为文件');
+        }
+      });
+
+      // ===== 我的报名 模态层 =====
+      function openModal() {
+        renderModalContent();
+        modalOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeModal() {
+        modalOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function renderModalContent() {
+        const records = getStorage();
+        if (records.length === 0) {
+          modalContent.innerHTML = '<div class="empty-state">暂无报名记录</div>';
+          return;
+        }
+
+        // 只显示最近一条
+        const record = records[0];
+        const html = `
+          <div class="record-card">
+            <div class="record-header">
+              <span class="record-id">${record.id}</span>
+              <span class="record-time">${formatDate(record.createdAt)}</span>
+            </div>
+            <div class="record-row">
+              <span class="r-label">姓名</span>
+              <span class="r-value">${escapeHtml(record.name)}</span>
+            </div>
+            <div class="record-row">
+              <span class="r-label">手机</span>
+              <span class="r-value">${escapeHtml(record.phone)}</span>
+            </div>
+            <div class="record-row">
+              <span class="r-label">场次</span>
+              <span class="r-value">${escapeHtml(record.session)}</span>
+            </div>
+            <div class="record-row">
+              <span class="r-label">忌口</span>
+              <span class="r-value">${escapeHtml(record.diet)}</span>
+            </div>
+            <button class="btn btn-danger" id="btnCancelReg" style="margin-top: 12px;">取消此报名</button>
+          </div>
+        `;
+        modalContent.innerHTML = html;
+
+        const btnCancel = document.getElementById('btnCancelReg');
+        if (btnCancel) {
+          btnCancel.addEventListener('click', () => {
+            // 自定义确认卡片替代 confirm
+            showConfirmDialog('确定要取消此报名吗？此操作不可撤销。', () => {
+              const all = getStorage();
+              const filtered = all.filter(r => r.id !== record.id);
+              saveStorage(filtered);
+              clearDraft();
+              renderModalContent();
+              showToast('报名已取消');
+
+              // 如果当前在确认态，回到表单态
+              if (resultCard.classList.contains('active')) {
+                resultCard.classList.remove('active');
+                formCard.classList.remove('hidden');
+                form.reset();
+                selectedDiet = [];
+                updateTagUI();
+                currentRegistration = null;
+              }
+              updateSessionOptions();
+            });
+          });
+        }
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      // 自定义确认对话框（不用 confirm）
+      function showConfirmDialog(message, onConfirm) {
+        const dialogOverlay = document.createElement('div');
+        dialogOverlay.style.cssText = `
+          position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+          z-index: 300; display: flex; align-items: center; justify-content: center;
+          padding: 16px; backdrop-filter: blur(4px);
+        `;
+        const dialogCard = document.createElement('div');
+        dialogCard.style.cssText = `
+          background: var(--surface); border: 1px solid var(--border);
+          border-radius: var(--radius-lg); width: 100%; max-width: 360px;
+          padding: 24px; box-shadow: var(--shadow);
+        `;
+        dialogCard.innerHTML = `
+          <p style="font-size: 1rem; margin-bottom: 20px; line-height: 1.5;">${escapeHtml(message)}</p>
+          <div style="display: flex; gap: 12px;">
+            <button class="btn btn-secondary" id="dlgCancel" style="flex:1;">取消</button>
+            <button class="btn btn-danger" id="dlgConfirm" style="flex:1;">确定取消</button>
+          </div>
+        `;
+        dialogOverlay.appendChild(dialogCard);
+        document.body.appendChild(dialogOverlay);
+
+        dialogOverlay.querySelector('#dlgCancel').addEventListener('click', () => {
+          document.body.removeChild(dialogOverlay);
+        });
+        dialogOverlay.querySelector('#dlgConfirm').addEventListener('click', () => {
+          document.body.removeChild(dialogOverlay);
+          onConfirm();
+        });
+        dialogOverlay.addEventListener('click', (e) => {
+          if (e.target === dialogOverlay) {
+            document.body.removeChild(dialogOverlay);
+          }
+        });
+      }
+
+      viewMyReg.addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal();
+      });
+
+      viewMyReg2.addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal();
+      });
+
+      modalClose.addEventListener('click', closeModal);
+
+      modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) closeModal();
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modalOverlay.classList.contains('active')) {
+          closeModal();
+        }
+      });
+
+      // ===== 初始化 =====
+      function init() {
+        // 检查是否有已保存的报名记录，若有则显示确认态
+        const records = getStorage();
+        if (records.length > 0) {
+          const latest = records[0];
+          currentRegistration = latest;
+          showResult(latest);
+        } else {
+          loadFormDraft();
+        }
+        updateSessionOptions();
+      }
+
+      init();
+    })();
+  </script>
+
+</body>
+</html>

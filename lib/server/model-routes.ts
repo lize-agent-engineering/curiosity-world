@@ -106,6 +106,9 @@ export const LLM_STAGES = [
   'curiosity.presentation-designer',
   'curiosity.quality-reviewer',
   'curiosity.revision-planner',
+  'studio.planner',
+  'studio.coder',
+  'studio.reviewer',
 ] as const;
 
 export type LlmStage = (typeof LLM_STAGES)[number];

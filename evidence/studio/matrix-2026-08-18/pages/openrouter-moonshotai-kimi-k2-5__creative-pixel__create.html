@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width device-width, initial-scale=1.0">
+  <title>16×16 像素画板</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-hover: #21262d;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79b8ff;
+      --border: #30363d;
+      --canvas-bg: #ffffff;
+      --grid-line: #e5e7eb;
+      --toast-bg: #21262d;
+      --danger: #f85149;
+      --danger-hover: #ff7b72;
+      --success: #3fb950;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+      letter-spacing: -0.02em;
+      margin-right: auto;
+    }
+
+    .tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 14px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.85rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 150ms ease;
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: var(--surface-hover);
+      border-color: var(--muted);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0d1117;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .btn-danger {
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: rgba(248, 81, 73, 0.1);
+      border-color: var(--danger-hover);
+    }
+
+    .color-preview {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      background: var(--canvas-bg);
+      flex-shrink: 0;
+      transition: background 150ms;
+    }
+
+    main {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      border-radius: 16px;
+      padding: 12px;
+      background: var(--surface);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    #pixelCanvas {
+      display: block;
+      border-radius: 4px;
+      cursor: crosshair;
+      touch-action: none;
+      background: var(--canvas-bg);
+      width: 384px;
+      height: 384px;
+      max-width: 100%;
+      max-height: 70vw;
+      image-rendering: pixelated;
+    }
+
+    .palette-wrap {
+      width: 100%;
+      max-width: 384px;
+    }
+
+    .palette-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+    }
+
+    .swatch {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 150ms, border-color 150ms;
+      position: relative;
+      min-height: 44px;
+    }
+
+    .swatch:hover {
+      transform: scale(1.1);
+      z-index: 1;
+    }
+
+    .swatch:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .swatch.active {
+      border-color: var(--text);
+      box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    }
+
+    .eraser-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--toast-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease, transform 200ms ease;
+      z-index: 999;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease;
+    }
+
+    .overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 320px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      transform: scale(0.95);
+      transition: transform 200ms ease;
+    }
+
+    .overlay.show .modal {
+      transform: scale(1);
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    .modal-body {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .modal-actions .btn {
+      min-width: 80px;
+      justify-content: center;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 12px;
+      }
+
+      header {
+        gap: 8px;
+      }
+
+      header h1 {
+        width: 100%;
+        text-align: center;
+        margin-right: 0;
+      }
+
+      .tools {
+        width: 100%;
+        justify-content: center;
+      }
+
+      #pixelCanvas {
+        width: 100%;
+        height: auto;
+      }
+
+      .palette {
+        grid-template-columns: repeat(8, 1fr);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>16×16 像素画板</h1>
+    <div class="tools">
+      <div class="color-preview" id="colorPreview" title="当前颜色"></div>
+      <button class="btn" id="btnUndo" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7v6h6"></path>
+          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+        </svg>
+        撤销
+      </button>
+      <button class="btn btn-danger" id="btnClear">清空</button>
+      <button class="btn btn-primary" id="btnSave">保存 PNG</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="canvas-wrap">
+      <canvas id="pixelCanvas" width="384" height="384"></canvas>
+    </div>
+
+    <div class="palette-wrap">
+      <div class="palette-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="13.5" cy="6.5" r="0.5" fill="currentColor"></circle>
+          <circle cx="17.5" cy="10.5" r="0.5" fill="currentColor"></circle>
+          <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor"></circle>
+          <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor"></circle>
+          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.01 17.461 2 12 2z"></path>
+        </svg>
+        调色板（点击选色，右键或按 <kbd>E</kbd> 使用橡皮擦）
+      </div>
+      <div class="palette" id="palette"></div>
+      <div class="eraser-hint">使用橡皮擦时，会将格子恢复为白色</div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="overlay" id="clearOverlay">
+    <div class="modal">
+      <div class="modal-title">确认清空？</div>
+      <div class="modal-body">此操作会清除画板上的所有内容，且无法恢复。</div>
+      <div class="modal-actions">
+        <button class="btn" id="btnCancelClear">取消</button>
+        <button class="btn btn-danger" id="btnConfirmClear">确认清空</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const GRID_SIZE = 16;
+      const CELL_SIZE = 24; // canvas internal logical size per cell
+      const CANVAS_SIZE = GRID_SIZE * CELL_SIZE;
+      const MAX_UNDO = 20;
+      const STORAGE_KEY = 'pixel-art-board';
+      const BG_COLOR = [255, 255, 255, 255];
+
+      const COLORS = [
+        '#000000', '#1f1f1f', '#5c5c5c', '#ffffff',
+        '#cf3c3c', '#e67e22', '#f1c40f', '#2ecc71',
+        '#1abc9c', '#3498db', '#2980b9', '#9b59b6',
+        '#e91e63', '#795548', '#607d8b', '#ff9800'
+      ];
+
+      let currentColor = COLORS[0];
+      let isDrawing = false;
+      let isErasing = false;
+      let undoStack = [];
+      let redoStack = [];
+      let pixels = [];
+      let lastCell = null;
+
+      const canvas = document.getElementById('pixelCanvas');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      const colorPreview = document.getElementById('colorPreview');
+      const btnUndo = document.getElementById('btnUndo');
+      const btnClear = document.getElementById('btnClear');
+      const btnSave = document.getElementById('btnSave');
+      const paletteEl = document.getElementById('palette');
+      const toastEl = document.getElementById('toast');
+      const clearOverlay = document.getElementById('clearOverlay');
+      const btnCancelClear = document.getElementById('btnCancelClear');
+      const btnConfirmClear = document.getElementById('btnConfirmClear');
+
+      function init() {
+        loadFromStorage();
+        buildPalette();
+        resizeCanvas();
+        drawCanvas();
+        bindEvents();
+        updateUI();
+      }
+
+      function resizeCanvas() {
+        const displayWidth = canvas.clientWidth;
+        const displayHeight = canvas.clientHeight;
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = Math.floor(displayWidth * dpr);
+        canvas.height = Math.floor(displayHeight * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        drawCanvas();
+      }
+
+      function pixelIndex(x, y) {
+        return y * GRID_SIZE + x;
+      }
+
+      function getPixelColor(x, y) {
+        const idx = pixelIndex(x, y);
+        if (idx < 0 || idx >= pixels.length) return null;
+        const c = pixels[idx];
+        return [c[0], c[1], c[2], 255];
+      }
+
+      function setPixelColor(x, y, colorArr) {
+        const idx = pixelIndex(x, y);
+        if (idx < 0 || idx >= pixels.length) return false;
+        const old = pixels[idx];
+        const same = old[0] === colorArr[0] && old[1] === colorArr[1] && old[2] === colorArr[2];
+        if (same) return false;
+        pixels[idx] = [colorArr[0], colorArr[1], colorArr[2]];
+        return true;
+      }
+
+      function colorToStr(arr) {
+        return `rgb(${arr[0]}, ${arr[1]}, ${arr[2]})`;
+      }
+
+      function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? [
+          parseInt(result[1], 16),
+          parseInt(result[2], 16),
+          parseInt(result[3], 16)
+        ] : [0, 0, 0];
+      }
+
+      function drawCanvas() {
+        // Draw pixels
+        for (let y = 0; y < GRID_SIZE; y++) {
+          for (let x = 0; x < GRID_SIZE; x++) {
+            const c = pixels[pixelIndex(x, y)];
+            ctx.fillStyle = colorToStr(c);
+            const px = x * CELL_SIZE;
+            const py = y * CELL_SIZE;
+            ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+          }
+        }
+
+        // Draw grid lines
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= GRID_SIZE; i++) {
+          const pos = i * CELL_SIZE;
+          ctx.beginPath();
+          ctx.moveTo(pos, 0);
+          ctx.lineTo(pos, CANVAS_SIZE);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(0, pos);
+          ctx.lineTo(CANVAS_SIZE, pos);
+          ctx.stroke();
+        }
+      }
+
+      function getCellFromEvent(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const cellX = Math.min(GRID_SIZE - 1, Math.max(0, Math.floor((x / rect.width) * GRID_SIZE)));
+        const cellY = Math.min(GRID_SIZE - 1, Math.max(0, Math.floor((y / rect.height) * GRID_SIZE)));
+        return [cellX, cellY];
+      }
+
+      function startAction(e) {
+        if (e.button !== 0 && e.button !== 2) return;
+        e.preventDefault();
+
+        isErasing = e.button === 2;
+        isDrawing = true;
+        const [cx, cy] = getCellFromEvent(e);
+        lastCell = [cx, cy];
+
+        pushUndoSnapshot();
+
+        if (isErasing) {
+          setPixelColor(cx, cy, BG_COLOR);
+        } else {
+          const rgb = hexToRgb(currentColor);
+          setPixelColor(cx, cy, rgb);
+        }
+        drawCanvas();
+        saveToStorage();
+      }
+
+      function moveAction(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const [cx, cy] = getCellFromEvent(e);
+
+        // Bresenham's line algorithm to fill between lastCell and current cell
+        if (lastCell) {
+          drawLine(lastCell[0], lastCell[1], cx, cy);
+        }
+
+        lastCell = [cx, cy];
+        drawCanvas();
+        saveToStorage();
+      }
+
+      function endAction(e) {
+        if (!isDrawing) return;
+        isDrawing = false;
+        isErasing = false;
+        lastCell = null;
+        saveToStorage();
+      }
+
+      function drawLine(x0, y0, x1, y1) {
+        const dx = Math.abs(x1 - x0);
+        const dy = Math.abs(y1 - y0);
+        const sx = x0 < x1 ? 1 : -1;
+        const sy = y0 < y1 ? 1 : -1;
+        let err = dx - dy;
+
+        const color = isErasing ? BG_COLOR : hexToRgb(currentColor);
+
+        while (true) {
+          setPixelColor(x0, y0, color);
+          if (x0 === x1 && y0 === y1) break;
+          const e2 = 2 * err;
+          if (e2 > -dy) {
+            err -= dy;
+            x0 += sx;
+          }
+          if (e2 < dx) {
+            err += dx;
+            y0 += sy;
+          }
+        }
+      }
+
+      function pushUndoSnapshot() {
+        // Deep copy current pixels
+        const snapshot = pixels.map(p => [p[0], p[1], p[2]]);
+        undoStack.push(snapshot);
+        if (undoStack.length > MAX_UNDO) {
+          undoStack.shift();
+        }
+        redoStack = [];
+        updateUI();
+      }
+
+      function undo() {
+        if (undoStack.length === 0) return;
+        // Save current state to redo stack
+        const current = pixels.map(p => [p[0], p[1], p[2]]);
+        redoStack.push(current);
+
+        // Restore previous state
+        const prev = undoStack.pop();
+        pixels = prev;
+
+        drawCanvas();
+        saveToStorage();
+        updateUI();
+        showToast('已撤销');
+      }
+
+      function buildPalette() {
+        paletteEl.innerHTML = '';
+        COLORS.forEach((color, idx) => {
+          const swatch = document.createElement('button');
+          swatch.className = 'swatch';
+          swatch.style.backgroundColor = color;
+          swatch.setAttribute('aria-label', `选择颜色 ${color}`);
+          swatch.dataset.color = color;
+          if (color === currentColor) {
+            swatch.classList.add('active');
+          }
+          swatch.addEventListener('click', () => {
+            currentColor = color;
+            isErasing = false;
+            updateUI();
+          });
+          paletteEl.appendChild(swatch);
+        });
+      }
+
+      function updateUI() {
+        colorPreview.style.backgroundColor = isErasing ? '#fff' : currentColor;
+        if (isErasing) {
+          colorPreview.style.borderColor = '#333';
+        } else {
+          colorPreview.style.borderColor = 'var(--border)';
+        }
+
+        btnUndo.disabled = undoStack.length === 0;
+
+        const swatches = paletteEl.querySelectorAll('.swatch');
+        swatches.forEach(s => {
+          s.classList.toggle('active', s.dataset.color === currentColor && !isErasing);
+        });
+      }
+
+      function clearCanvas() {
+        pixels = Array.from({ length: GRID_SIZE * GRID_SIZE }, () => [255, 255, 255]);
+        undoStack = [];
+        redoStack = [];
+        drawCanvas();
+        saveToStorage();
+        updateUI();
+        showToast('画板已清空');
+      }
+
+      function isCanvasBlank() {
+        return pixels.every(p => p[0] === 255 && p[1] === 255 && p[2] === 255);
+      }
+
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        setTimeout(() => {
+          toastEl.classList.remove('show');
+        }, 2000);
+      }
+
+      // Storage functions
+      function loadFromStorage() {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length === GRID_SIZE * GRID_SIZE) {
+              pixels = parsed;
+              return;
+            }
+          }
+        } catch (e) {
+          // ignore parse errors
+        }
+        // Default blank
+        pixels = Array.from({ length: GRID_SIZE * GRID_SIZE }, () => [255, 255, 255]);
+      }
+
+      function saveToStorage() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(pixels));
+        } catch (e) {
+          // ignore storage errors
+        }
+      }
+
+      // Export PNG
+      function exportPNG() {
+        const exportSize = 512;
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = exportSize;
+        exportCanvas.height = exportSize;
+        const eCtx = exportCanvas.getContext('2d');
+
+        const cellSize = exportSize / GRID_SIZE;
+        for (let y = 0; y < GRID_SIZE; y++) {
+          for (let x = 0; x < GRID_SIZE; x++) {
+            const c = pixels[pixelIndex(x, y)];
+            eCtx.fillStyle = colorToStr(c);
+            eCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
+        }
+
+        exportCanvas.toBlob(function (blob) {
+          if (!blob) {
+            showToast('保存失败');
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+          a.download = `像素画-${timestamp}.png`;
+          a.href = url;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('PNG 已保存');
+        }, 'image/png');
+      }
+
+      function bindEvents() {
+        // Canvas interactions
+        canvas.addEventListener('pointerdown', startAction);
+        window.addEventListener('pointermove', moveAction);
+        window.addEventListener('pointerup', endAction);
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+        canvas.addEventListener('pointerleave', endAction);
+
+        // Buttons
+        btnUndo.addEventListener('click', undo);
+
+        btnClear.addEventListener('click', () => {
+          if (isCanvasBlank()) {
+            showToast('画板已经是空白的');
+            return;
+          }
+          clearOverlay.classList.add('show');
+        });
+
+        btnCancelClear.addEventListener('click', () => {
+          clearOverlay.classList.remove('show');
+        });
+
+        btnConfirmClear.addEventListener('click', () => {
+          clearOverlay.classList.remove('show');
+          clearCanvas();
+        });
+
+        btnSave.addEventListener('click', exportPNG);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault();
+            undo();
+          }
+          if (e.key === 'e' || e.key === 'E') {
+            isErasing = true;
+            updateUI();
+          }
+        });
+
+        document.addEventListener('keyup', (e) => {
+          if (e.key === 'e' || e.key === 'E') {
+            isErasing = false;
+            updateUI();
+          }
+        });
+
+        // Resize
+        window.addEventListener('resize', () => {
+          resizeCanvas();
+        });
+      }
+
+      // Initialize
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>

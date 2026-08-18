@@ -135,6 +135,12 @@
     overflow-y: scroll;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    /*
+     * Every surface in this product is dark, and each paints its own background
+     * on `main`. Overscroll and short pages used to reveal the light default
+     * behind them, so the base colour is set here to the shared night-sky navy.
+     */
+    background-color: #07152f;
   }
 }

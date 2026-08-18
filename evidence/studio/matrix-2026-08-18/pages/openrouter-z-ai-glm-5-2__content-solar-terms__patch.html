@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>二十四节气图鉴</title>
+<style>
+:root{
+  --bg:#f0e9dc;
+  --surface:#faf6ee;
+  --surface-2:#f4ecdd;
+  --text:#3a322a;
+  --muted:#7a6f60;
+  --accent:#8a6a3a;
+  --border:#e0d4bf;
+  --shadow:0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.05);
+}
+body[data-season="春"]{
+  --bg:#e8f5e1; --surface:#f7fbf3; --surface-2:#eaf3e3;
+  --text:#2d3b28; --muted:#5e7355; --accent:#4a8a3a; --border:#d4e3c8;
+}
+body[data-season="夏"]{
+  --bg:#d7eef5; --surface:#ecf7fc; --surface-2:#dfeaf0;
+  --text:#1e3a4a; --muted:#51707d; --accent:#2a6b95; --border:#c3d9e6;
+}
+body[data-season="秋"]{
+  --bg:#f5e6cf; --surface:#fbf2e3; --surface-2:#efe2cb;
+  --text:#4a3018; --muted:#85694a; --accent:#b06820; --border:#e6d2b0;
+}
+body[data-season="冬"]{
+  --bg:#eef2f5; --surface:#f7f9fb; --surface-2:#e4eaef;
+  --text:#2a3540; --muted:#6a7787; --accent:#5a7090; --border:#d4dde5;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.7;
+  min-height:100vh;
+  transition:background-color 400ms ease, color 400ms ease;
+}
+.wrap{max-width:1100px;margin:0 auto;padding:32px 20px 64px}
+header{margin-bottom:24px}
+h1{font-size:clamp(28px,5vw,40px);font-weight:700;letter-spacing:.04em;margin:0 0 8px}
+.subtitle{color:var(--muted);font-size:16px;margin:0}
+.filters{
+  display:flex;flex-wrap:wrap;gap:12px;margin:24px 0 28px;align-items:center;
+}
+.tab{
+  font-family:inherit;font-size:15px;
+  padding:10px 22px;border-radius:16px;
+  border:1.5px solid var(--border);
+  background:transparent;color:var(--text);
+  cursor:pointer;min-height:44px;
+  transition:background-color 180ms ease,color 180ms ease,border-color 180ms ease,transform 120ms ease;
+}
+.tab:hover{border-color:var(--accent);color:var(--accent)}
+.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tab:active{transform:translateY(1px)}
+.tab.active{
+  background:var(--accent);color:#fff;border-color:var(--accent);
+}
+.tab.active:hover{color:#fff}
+.search-wrap{
+  flex:1 1 220px;display:flex;align-items:center;position:relative;
+}
+.search-input{
+  font-family:inherit;font-size:15px;
+  width:100%;min-width:0;min-height:44px;
+  padding:10px 38px 10px 16px;
+  border-radius:16px;
+  border:1.5px solid var(--border);
+  background:rgba(255,255,255,.45);
+  color:var(--text);
+  transition:background-color 180ms ease,border-color 180ms ease,box-shadow 180ms ease;
+}
+.search-input::placeholder{color:var(--muted)}
+.search-input:hover{border-color:var(--accent)}
+.search-input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,.7);box-shadow:0 0 0 3px rgba(0,0,0,.05)}
+.search-icon{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  width:18px;height:18px;pointer-events:none;opacity:.55;
+}
+.search-clear{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  width:28px;height:28px;border:none;background:transparent;
+  color:var(--muted);cursor:pointer;font-size:16px;line-height:1;
+  border-radius:50%;display:none;align-items:center;justify-content:center;
+  transition:background-color 180ms ease,color 180ms ease;
+}
+.search-clear:hover{background:var(--surface-2);color:var(--accent)}
+.search-clear:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.search-clear.show{display:flex}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  gap:16px;
+}
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:18px;
+  cursor:pointer;
+  box-shadow:var(--shadow);
+  transition:transform 180ms ease,box-shadow 180ms ease,border-color 180ms ease;
+  display:flex;flex-direction:column;gap:8px;
+  text-align:left;
+  font-family:inherit;color:inherit;
+}
+.card:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,.08);border-color:var(--accent)}
+.card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.card .swatch{
+  height:8px;border-radius:6px;background:var(--term-color);margin-bottom:6px;
+}
+.card .name{font-size:24px;font-weight:700;letter-spacing:.06em}
+.card .date{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.card .brief{font-size:15px;color:var(--text);opacity:.85}
+@keyframes flashBorder{
+  0%,100%{box-shadow:0 0 0 0 var(--accent), var(--shadow)}
+  50%{box-shadow:0 0 0 4px var(--accent), var(--shadow)}
+}
+.card.flash{animation:flashBorder 0.5s ease 4;border-color:var(--accent)}
+
+.empty{padding:48px 0;text-align:center;color:var(--muted);font-size:15px}
+
+footer{
+  margin-top:48px;padding-top:24px;border-top:1px solid var(--border);
+  display:flex;flex-direction:column;gap:16px;align-items:flex-start;
+}
+footer p{margin:0;color:var(--muted);font-size:14px;max-width:34em}
+.btn-primary{
+  font-family:inherit;font-size:15px;
+  padding:12px 24px;border-radius:16px;
+  background:var(--accent);color:#fff;border:none;cursor:pointer;
+  min-height:44px;
+  transition:transform 120ms ease,opacity 180ms ease,filter 180ms ease;
+}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-primary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.btn-primary:active{transform:translateY(1px)}
+
+/* Modal */
+.overlay{
+  position:fixed;inset:0;background:rgba(20,18,14,.45);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;z-index:50;
+  opacity:0;pointer-events:none;
+  transition:opacity 200ms ease;
+}
+.overlay.open{opacity:1;pointer-events:auto}
+.modal{
+  background:var(--surface);color:var(--text);
+  border:1px solid var(--border);border-radius:16px;
+  max-width:560px;width:100%;max-height:84vh;overflow-y:auto;
+  padding:28px;box-shadow:0 12px 40px rgba(0,0,0,.2);
+  transform:translateY(12px) scale(.98);
+  transition:transform 200ms ease;
+}
+.overlay.open .modal{transform:translateY(0) scale(1)}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:4px}
+.modal-title{font-size:28px;font-weight:700;letter-spacing:.06em;margin:0}
+.modal-meta{font-size:13px;color:var(--muted);margin:4px 0 20px;font-variant-numeric:tabular-nums}
+.close-btn{
+  font-family:inherit;font-size:18px;width:36px;height:36px;
+  border-radius:10px;border:1px solid var(--border);
+  background:transparent;color:var(--text);cursor:pointer;
+  flex-shrink:0;
+  transition:background-color 180ms ease;
+}
+.close-btn:hover{background:var(--surface-2);color:var(--accent)}
+.close-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.section{margin:20px 0}
+.section h3{
+  font-size:15px;font-weight:600;color:var(--accent);
+  margin:0 0 10px;letter-spacing:.08em;
+  display:flex;align-items:center;gap:8px;
+}
+.section h3::before{content:"";width:14px;height:2px;background:var(--accent);border-radius:2px}
+.section ul{margin:0;padding-left:22px}
+.section li{margin:4px 0;font-size:15px}
+.poem{
+  background:var(--surface-2);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 10px 10px 0;
+  font-size:15px;line-height:1.9;
+}
+.poem .poem-title{font-weight:600;margin-bottom:6px;font-size:14px;color:var(--muted)}
+.poem .poem-line{display:block}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important;animation:none !important}
+}
+@media (max-width:600px){
+  .wrap{padding:20px 14px 48px}
+  .grid{grid-template-columns:1fr 1fr;gap:12px}
+  .card{padding:14px}
+  .card .name{font-size:20px}
+  .modal{padding:22px}
+}
+</style>
+</head>
+<body data-season="全部">
+<div class="wrap">
+  <header>
+    <h1>二十四节气图鉴</h1>
+    <p class="subtitle">一年有四时，四时各六气。点开任一节气，看看古人如何记录光阴。</p>
+    <nav class="filters" aria-label="季节筛选与搜索">
+      <button class="tab active" data-filter="全部" type="button">全部</button>
+      <button class="tab" data-filter="春" type="button">春</button>
+      <button class="tab" data-filter="夏" type="button">夏</button>
+      <button class="tab" data-filter="秋" type="button">秋</button>
+      <button class="tab" data-filter="冬" type="button">冬</button>
+      <div class="search-wrap">
+        <input class="search-input" id="searchInput" type="search" placeholder="搜索节气名称…" autocomplete="off" aria-label="搜索节气名称">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <button class="search-clear" id="searchClear" type="button" aria-label="清空搜索">×</button>
+      </div>
+    </nav>
+  </header>
+
+  <main id="grid" class="grid" aria-live="polite"></main>
+
+  <footer>
+    <p>节气数据依现行公历日期与太阳黄经标注。物候取自《月令七十二候集解》，习俗为各地常见做法。</p>
+    <button class="btn-primary" id="locateBtn" type="button">定位当前节气</button>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <div>
+        <h2 class="modal-title" id="modalTitle"></h2>
+        <p class="modal-meta" id="modalMeta"></p>
+      </div>
+      <button class="close-btn" id="closeBtn" type="button" aria-label="关闭详情">×</button>
+    </div>
+    <div class="section">
+      <h3>物候</h3>
+      <ul id="phenology"></ul>
+    </div>
+    <div class="section">
+      <h3>习俗</h3>
+      <ul id="customs"></ul>
+    </div>
+    <div class="section">
+      <h3>相关诗词</h3>
+      <div class="poem" id="poem"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TERMS = [
+  {name:"立春",season:"春",date:"2月3-5日",start:[2,4],longitude:"315°",color:"#7cb342",brief:"东风送暖，万物起始。",
+    phenology:["一候 东风解冻","二候 蛰虫始振","三候 鱼陟负冰"],
+    customs:["咬春饼，食春卷","鞭春牛，劝农耕","佩燕子，迎春神"],
+    poem:{title:"《立春》朱淑真",lines:["律回岁晚冰霜少，春到人间草木知。","便觉眼前生意满，东风吹水绿参差。"]}},
+  {name:"雨水",season:"春",date:"2月18-20日",start:[2,19],longitude:"330°",color:"#66bb6a",brief:"冰雪消融，润物无声。",
+    phenology:["一候 獭祭鱼","二候 候雁北","三候 草木萌动"],
+    customs:["撞拜寄，认干爹","占稻色，卜丰歉","接寿送雨水"],
+    poem:{title:"《春夜喜雨》杜甫",lines:["好雨知时节，当春乃发生。","随风潜入夜，润物细无声。"]}},
+  {name:"惊蛰",season:"春",date:"3月5-7日",start:[3,6],longitude:"345°",color:"#9ccc65",brief:"春雷乍响，蛰虫初醒。",
+    phenology:["一候 桃始华","二候 仓庚鸣","三候 鹰化为鸠"],
+    customs:["祭白虎，解口舌","打小人，驱霉运","吃梨，离害虫"],
+    poem:{title:"《观田家》韦应物",lines:["微雨众卉新，一雷惊蛰始。","田家几日闲，耕种从此起。"]}},
+  {name:"春分",season:"春",date:"3月20-22日",start:[3,21],longitude:"0°",color:"#aed581",brief:"昼夜平分，春意正浓。",
+    phenology:["一候 玄鸟至","二候 雷乃发声","三候 始电"],
+    customs:["竖蛋，验春分","放风筝，牵线游春","采春菜，煮春汤"],
+    poem:{title:"《阮郎归》欧阳修",lines:["南园春半踏青时，风和闻马嘶。","青梅如豆柳如眉，日长蝴蝶飞。"]}},
+  {name:"清明",season:"春",date:"4月4-6日",start:[4,5],longitude:"15°",color:"#c5e1a5",brief:"气清景明，慎终追远。",
+    phenology:["一候 桐始华","二候 田鼠化为鴽","三候 虹始见"],
+    customs:["扫墓祭祖","踏青郊游","插柳戴柳"],
+    poem:{title:"《清明》杜牧",lines:["清明时节雨纷纷，路上行人欲断魂。","借问酒家何处有，牧童遥指杏花村。"]}},
+  {name:"谷雨",season:"春",date:"4月19-21日",start:[4,20],longitude:"30°",color:"#dce775",brief:"雨生百谷，春耕正忙。",
+    phenology:["一候 萍始生","二候 鸣鸠拂其羽","三候 戴胜降于桑"],
+    customs:["祭仓颉，敬字纸","食香椿，品新茶","走谷雨，散百病"],
+    poem:{title:"《浣溪沙》仇远",lines:["红紫妆林绿满池，游丝飞絮两依依。","正当谷雨弄晴时。"]}},
+
+  {name:"立夏",season:"夏",date:"5月5-7日",start:[5,6],longitude:"45°",color:"#4dd0e1",brief:"夏日初临，万物渐长。",
+    phenology:["一候 蛛蝈鸣","二候 蚯蚓出","三候 王瓜生"],
+    customs:["称人，量轻重","尝三新，品夏味","煮立夏蛋，挂蛋兜"],
+    poem:{title:"《立夏》陆游",lines:["赤帜插城扉，东君整驾归。","泥新巢燕闹，花尽蜜蜂稀。"]}},
+  {name:"小满",season:"夏",date:"5月20-22日",start:[5,21],longitude:"60°",color:"#26c6da",brief:"麦粒渐满，未至于满。",
+    phenology:["一候 苦菜秀","二候 靡草死","三候 麦秋至"],
+    customs:["祭车神，保水源","抢水开犁，动三车","食苦菜，清暑热"],
+    poem:{title:"《小满》欧阳修",lines:["夜莺啼绿柳，皓月醒长空。","最爱垄头麦，迎风笑落红。"]}},
+  {name:"芒种",season:"夏",date:"6月5-7日",start:[6,6],longitude:"75°",color:"#00acc1",brief:"有芒之谷，可种可收。",
+    phenology:["一候 螳螂生","二候 鵙始鸣","三候 反舌无声"],
+    customs:["送花神，饯春归","安苗祭祀，祈丰年","煮梅饮酒，尝青梅"],
+    poem:{title:"《观刈麦》白居易",lines:["田家少闲月，五月人倍忙。","夜来南风起，小麦覆陇黄。"]}},
+  {name:"夏至",season:"夏",date:"6月21-22日",start:[6,21],longitude:"90°",color:"#0097a7",brief:"日长至极，阳气盛极。",
+    phenology:["一候 鹿角解","二候 蜩始鸣","三候 半夏生"],
+    customs:["祭神祀祖，庆丰收","冬至饺子夏至面","消夏避伏，互赠扇"],
+    poem:{title:"《夏至避暑北池》韦应物",lines:["昼晷已云极，宵漏自此长。","绿筠尚含粉，圆荷始散芳。"]}},
+  {name:"小暑",season:"夏",date:"7月6-8日",start:[7,7],longitude:"105°",color:"#0288d1",brief:"天气尚热，未至于极。",
+    phenology:["一候 温风至","二候 蟋蟀居宇","三候 鹰始鸷"],
+    customs:["晒伏晒衣，去潮防蛀","食新米，敬祖先","头伏饺子二伏面"],
+    poem:{title:"《小暑六月节》元稹",lines:["倏忽温风至，因循小暑来。","竹喧先觉雨，山暗已闻雷。"]}},
+  {name:"大暑",season:"夏",date:"7月22-24日",start:[7,23],longitude:"120°",color:"#0277bd",brief:"酷热至极，腐草化萤。",
+    phenology:["一候 腐草为萤","二候 土润溽暑","三候 大雨时行"],
+    customs:["饮伏茶，清热解暑","晒伏姜，备冬用","送大暑船，驱暑瘟"],
+    poem:{title:"《大暑》曾几",lines:["赤日几时过，清风无处寻。","经书聊枕籍，瓜李漫浮沉。"]}},
+
+  {name:"立秋",season:"秋",date:"8月7-9日",start:[8,8],longitude:"135°",color:"#ffb74d",brief:"凉风初至，秋意始生。",
+    phenology:["一候 凉风至","二候 白露生","三候 寒蝉鸣"],
+    customs:["贴秋膘，称体重","咬秋，吃西瓜","晒秋，晾农物"],
+    poem:{title:"《立秋》刘翰",lines:["乳鸦啼散玉屏空，一枕新凉一扇风。","睡起秋声无觅处，满阶梧叶月明中。"]}},
+  {name:"处暑",season:"秋",date:"8月22-24日",start:[8,23],longitude:"150°",color:"#ffa726",brief:"暑气止矣，天地始肃。",
+    phenology:["一候 鹰乃祭鸟","二候 天地始肃","三候 禾乃登"],
+    customs:["放河灯，悼亡魂","吃鸭子，润秋燥","开渔节，迎丰收"],
+    poem:{title:"《秋夜独坐》王维",lines:["独坐悲双鬓，空堂欲二更。","雨中山果落，灯下草虫鸣。"]}},
+  {name:"白露",season:"秋",date:"9月7-9日",start:[9,8],longitude:"165°",color:"#ff9800",brief:"露凝而白，凉意渐浓。",
+    phenology:["一候 鸿雁来","二候 玄鸟归","三候 群鸟养羞"],
+    customs:["收清露，疗百病","饮白露茶，润秋燥","酿白露米酒"],
+    poem:{title:"《白露》杜甫",lines:["白露团甘子，清晨散马蹄。","圃开连石树，船渡入江溪。"]}},
+  {name:"秋分",season:"秋",date:"9月22-24日",start:[9,23],longitude:"180°",color:"#fb8c00",brief:"昼夜均分，秋意正半。",
+    phenology:["一候 雷始收声","二候 蛰虫坯户","三候 水始涸"],
+    customs:["祭月，拜月神","竖秋蛋，验秋分","吃秋菜，煮秋汤"],
+    poem:{title:"《秋词》刘禹锡",lines:["自古逢秋悲寂寥，我言秋日胜春朝。","晴空一鹤排云上，便引诗情到碧霄。"]}},
+  {name:"寒露",season:"秋",date:"10月8-9日",start:[10,8],longitude:"195°",color:"#f57c00",brief:"露气寒冷，将凝为霜。",
+    phenology:["一候 鸿雁来宾","二候 雀入大水为蛤","三候 菊有黄华"],
+    customs:["登高望远，赏红叶","赏菊，饮菊花酒","插茱萸，佩香囊"],
+    poem:{title:"《寒露》元稹",lines:["寒露惊秋晚，朝看菊渐黄。","千家风扫叶，万里雁随阳。"]}},
+  {name:"霜降",season:"秋",date:"10月23-24日",start:[10,24],longitude:"210°",color:"#ef6c00",brief:"气肃霜降，草木黄落。",
+    phenology:["一候 豺乃祭兽","二候 草木黄落","三候 蛰虫咸俯"],
+    customs:["吃柿子，防霜寒","赏菊宴，秋末雅集","进补，煲羊头"],
+    poem:{title:"《山行》杜牧",lines:["远上寒山石径斜，白云生处有人家。","停车坐爱枫林晚，霜叶红于二月花。"]}},
+
+  {name:"立冬",season:"冬",date:"11月7-8日",start:[11,7],longitude:"225°",color:"#b0bec5",brief:"冬之始也，万物收藏。",
+    phenology:["一候 水始冰","二候 地始冻","三候 雉入大水为蜃"],
+    customs:["补冬，食膏滋","北方吃饺子","南方炖鸡鸭"],
+    poem:{title:"《立冬》陆游",lines:["室小财容膝，墙低仅及肩。","方过授衣月，又遇始裘天。"]}},
+  {name:"小雪",season:"冬",date:"11月22-23日",start:[11,22],longitude:"240°",color:"#90a4ae",brief:"虹藏不见，闭塞成冬。",
+    phenology:["一候 虹藏不见","二候 天气上升地气下降","三候 闭塞而成冬"],
+    customs:["腌寒菜，备冬储","风腊肉，灌香肠","吃糍粑，暖脾胃"],
+    poem:{title:"《小雪》戴叔伦",lines:["花雪随风不厌看，更多还肯失林峦。","愁人正在书窗下，一片飞来一片寒。"]}},
+  {name:"大雪",season:"冬",date:"12月6-8日",start:[12,7],longitude:"255°",color:"#78909c",brief:"雪盛于此，鹖鴠不鸣。",
+    phenology:["一候 鹖鴠不鸣","二候 虎始交","三候 荔挺出"],
+    customs:["腌肉，备年货","观赏封河，滑冰嬉雪","煮红薯粥，暖身御寒"],
+    poem:{title:"《塞下曲》卢纶",lines:["月黑雁飞高，单于夜遁逃。","欲将轻骑逐，大雪满弓刀。"]}},
+  {name:"冬至",season:"冬",date:"12月21-23日",start:[12,22],longitude:"270°",color:"#607d8b",brief:"阴极阳生，日影最长。",
+    phenology:["一候 蚯蚓结","二候 麋角解","三候 水泉动"],
+    customs:["北方吃饺子，防冻耳","南方吃汤圆，寓团圆","祭祖，贺冬节"],
+    poem:{title:"《冬至》杜甫",lines:["年年至日长为客，忽忽穷愁泥杀人。","江上形容吾独老，天涯风俗自相亲。"]}},
+  {name:"小寒",season:"冬",date:"1月5-7日",start:[1,6],longitude:"285°",color:"#546e7a",brief:"寒气积久，未至于大。",
+    phenology:["一候 雁北乡","二候 鹊始巢","三候 雉始雊"],
+    customs:["吃菜饭，南京风俗","糯米饭，广东御寒","探梅，赏寒梅初绽"],
+    poem:{title:"《小寒》元稹",lines:["小寒连大吕，欢鹊垒新巢。","拾食寻河曲，衔紫绕树梢。"]}},
+  {name:"大寒",season:"冬",date:"1月20-21日",start:[1,20],longitude:"300°",color:"#455a64",brief:"寒至极矣，岁末迎春。",
+    phenology:["一候 鸡乳","二候 征鸟厉疾","三候 水泽腹坚"],
+    customs:["尾牙祭，酬土地","蒸供，备年货","扫尘，辞旧迎新"],
+    poem:{title:"《大寒》陆游",lines:["大寒雪未干，闭户不能出。","可怜切云冠，局此容膝室。"]}}
+];
+
+const grid = document.getElementById('grid');
+const tabs = document.querySelectorAll('.tab');
+const overlay = document.getElementById('overlay');
+const closeBtn = document.getElementById('closeBtn');
+const searchInput = document.getElementById('searchInput');
+const searchClear = document.getElementById('searchClear');
+let currentFilter = '全部';
+let currentSearch = '';
+
+function applyFilters(){
+  let list = currentFilter === '全部' ? TERMS.slice() : TERMS.filter(t=>t.season===currentFilter);
+  const q = currentSearch.trim().toLowerCase();
+  if(q){
+    list = list.filter(t=>t.name.toLowerCase().includes(q));
+  }
+  return list;
+}
+
+function renderGrid(){
+  const list = applyFilters();
+  if(list.length === 0){
+    grid.innerHTML = '<div class="empty">未找到匹配的节气</div>';
+    return;
+  }
+  grid.innerHTML = list.map(t=>`
+    <button class="card" data-name="${t.name}" type="button" style="--term-color:${t.color}">
+      <span class="swatch" aria-hidden="true"></span>
+      <span class="name">${t.name}</span>
+      <span class="date">${t.date} · 黄经 ${t.longitude}</span>
+      <span class="brief">${t.brief}</span>
+    </button>
+  `).join('');
+  grid.querySelectorAll('.card').forEach(card=>{
+    card.addEventListener('click',()=>openModal(card.dataset.name));
+  });
+}
+
+function updateClearVisibility(){
+  searchClear.classList.toggle('show', currentSearch.length > 0);
+}
+
+function setFilter(filter){
+  currentFilter = filter;
+  tabs.forEach(t=>t.classList.toggle('active', t.dataset.filter===filter));
+  document.body.dataset.season = filter;
+  renderGrid();
+}
+
+tabs.forEach(t=>{
+  t.addEventListener('click',()=>setFilter(t.dataset.filter));
+});
+
+searchInput.addEventListener('input',()=>{
+  currentSearch = searchInput.value;
+  updateClearVisibility();
+  renderGrid();
+});
+
+searchClear.addEventListener('click',()=>{
+  searchInput.value = '';
+  currentSearch = '';
+  updateClearVisibility();
+  renderGrid();
+  searchInput.focus();
+});
+
+function openModal(name){
+  const term = TERMS.find(t=>t.name===name);
+  if(!term) return;
+  document.getElementById('modalTitle').textContent = term.name;
+  document.getElementById('modalMeta').textContent = `公历 ${term.date} · 太阳黄经 ${term.longitude} · ${term.season}季`;
+  document.getElementById('phenology').innerHTML = term.phenology.map(p=>`<li>${p}</li>`).join('');
+  document.getElementById('customs').innerHTML = term.customs.map(c=>`<li>${c}</li>`).join('');
+  document.getElementById('poem').innerHTML = `
+    <div class="poem-title">${term.poem.title}</div>
+    ${term.poem.lines.map(l=>`<span class="poem-line">${l}</span>`).join('')}
+  `;
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden','false');
+  closeBtn.focus();
+}
+function closeModal(){
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden','true');
+}
+closeBtn.addEventListener('click',closeModal);
+overlay.addEventListener('click',e=>{ if(e.target===overlay) closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && overlay.classList.contains('open')) closeModal(); });
+
+function findCurrentTerm(){
+  const now = new Date();
+  const m = now.getMonth()+1, d = now.getDate();
+  const tnum = m*100 + d;
+  const sorted = [...TERMS].sort((a,b)=> (a.start[0]*100+a.start[1]) - (b.start[0]*100+b.start[1]));
+  let current = sorted[sorted.length-1];
+  for(const t of sorted){
+    const n = t.start[0]*100 + t.start[1];
+    if(n <= tnum) current = t; else break;
+  }
+  return current;
+}
+
+document.getElementById('locateBtn').addEventListener('click',()=>{
+  const cur = findCurrentTerm();
+  if(!cur) return;
+  setFilter(cur.season);
+  requestAnimationFrame(()=>{
+    const target = grid.querySelector(`.card[data-name="${cur.name}"]`);
+    if(!target) return;
+    target.scrollIntoView({behavior:'smooth', block:'center'});
+    target.classList.add('flash');
+    setTimeout(()=>target.classList.remove('flash'),2100);
+    setTimeout(()=>target.focus(),400);
+  });
+});
+
+renderGrid();
+</script>
+</body>
+</html>
